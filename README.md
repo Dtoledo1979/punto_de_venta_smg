@@ -56,7 +56,11 @@ El PIN es único por caja (no por persona), tal como se usa hoy.
 
 Al terminal EFTPOS solo se le envía el **monto de tarjeta** de la venta (nunca el total ni la parte en efectivo).
 
-También hay un campo opcional para el **nombre del cliente**, que queda impreso en la boleta, visible en la pantalla de Entrega junto al número de ticket, y en el CSV exportado.
+También hay un campo para el **nombre del cliente**: en la caja de
+**productos (bar) es obligatorio** — no deja cobrar sin escribirlo, porque
+sirve para identificar a quién entregarle el pedido — y en la caja de
+**tickets es opcional**. Queda impreso en la boleta, visible en la pantalla
+de Entrega junto al número de ticket, y en el CSV exportado.
 
 ### Entrega por producto (checklist)
 

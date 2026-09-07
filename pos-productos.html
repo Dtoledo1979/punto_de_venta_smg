@@ -126,7 +126,7 @@
     <h2>Pedido actual</h2>
     <div id="cart-list"><p style="color:#9AA7B2; font-size:13px;">Toca un ítem del menú para agregarlo.</p></div>
     <div class="total-row"><span>Total</span><span id="total">$0</span></div>
-    <input type="text" id="customer-name" class="customer-input" placeholder="Nombre del cliente (opcional)">
+    <input type="text" id="customer-name" class="customer-input" placeholder="Nombre del cliente (obligatorio)">
     <textarea id="obs" placeholder="Observación (ej. sin hielo, sin granadina)"></textarea>
 
     <div class="pay-buttons">
@@ -444,6 +444,13 @@
     if (keys.length === 0) return;
     if (!activeEvent) { showToast("Primero inicia un evento."); return; }
 
+    const customerName = document.getElementById("customer-name").value.trim();
+    if (!customerName) {
+      showToast("Escribe el nombre del cliente antes de cobrar.");
+      document.getElementById("customer-name").focus();
+      return;
+    }
+
     const total = cartTotal();
     const eftposResult = await sendToEftpos(card);
     if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
@@ -452,7 +459,6 @@
     if (tErr) { showToast("No se pudo generar el número de ticket."); return; }
 
     const obs = document.getElementById("obs").value.trim();
-    const customerName = document.getElementById("customer-name").value.trim();
     const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: false }));
     const now = new Date();
 
