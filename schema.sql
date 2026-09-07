@@ -113,6 +113,21 @@ create policy "acceso interno" on pos.admin_settings for all using (true) with c
 insert into pos.admin_settings (admin_pin) values ('9999');
 
 -- ---------------------------------------------------------------------
+-- IMPORTANTE: los schemas nuevos (fuera de "public") no le dan permisos
+-- a los roles anon/authenticated automáticamente, aunque las políticas
+-- RLS digan "true". Sin esto, la API responde 401 aunque todo lo demás
+-- esté bien configurado.
+-- ---------------------------------------------------------------------
+grant usage on schema pos to anon, authenticated, service_role;
+grant all on all tables in schema pos to anon, authenticated, service_role;
+grant all on all sequences in schema pos to anon, authenticated, service_role;
+grant execute on all functions in schema pos to anon, authenticated, service_role;
+
+alter default privileges in schema pos grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema pos grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema pos grant execute on functions to anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------
 -- Seguridad (RLS)
 -- IMPORTANTE: esto deja las tablas abiertas a cualquiera que tenga la
 -- anon key del proyecto. Es aceptable para una herramienta interna que
