@@ -205,3 +205,29 @@ lugar donde alguien curioso vaya a mirar.
   cambia cómo se abre la sesión.
 - Ajustar los umbrales de color del cronómetro en `despacho.html`
   (`WARN_AFTER`, `DANGER_AFTER`) a los tiempos reales de tu operación.
+
+## Auditoría de reportes y botones (07-09-2026)
+
+Revisando el CSV exportado se encontraron 3 bugs reales, ya corregidos:
+
+- **El CSV se desordenaba de columna.** La hora se exportaba con
+  `toLocaleString`, que en español incluye una coma ("07-09-2026, 21:30:36").
+  Como el CSV no protegía los campos con comas adentro, Excel/Sheets cortaba
+  esa coma como si fuera un separador de columna y todo lo que venía después
+  en esa fila quedaba corrido una columna a la derecha (por eso la hora
+  aparecía donde debía ir el cliente, el cliente donde iba el producto, etc.).
+  Se separó Fecha y Hora en dos valores sin coma, y además se agregó un
+  escape de CSV real (entre comillas) para cualquier campo — así, aunque un
+  nombre de cliente o una observación tenga una coma en el futuro, no vuelve
+  a desordenar la fila.
+- **El resumen de ventas no se abría al primer clic.** Hacía falta tocar
+  "Ver resumen de ventas" dos veces la primera vez. Corregido.
+- **Los totales y cortesías no se actualizaban solos.** Si dejabas el panel
+  de resumen abierto mientras seguías vendiendo, se quedaba con los números
+  viejos hasta cerrarlo y abrirlo de nuevo. Ahora se refresca solo después
+  de cada cobro si está abierto.
+
+También se agregó protección contra doble clic al cobrar (un clic doble
+accidental ya no puede generar dos pedidos), y el desglose de cortesías del
+resumen ahora muestra **a quién** se le entregó cada una (cliente, ticket,
+hora y productos), no solo el total agregado por producto.

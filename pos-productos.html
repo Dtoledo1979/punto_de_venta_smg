@@ -186,7 +186,7 @@
 <div class="card wide-card" style="margin-bottom:24px;">
   <button class="toggle" onclick="toggleSummary()">📊 Ver resumen de ventas</button>
   <button class="btn btn-secondary btn-small" style="float:right;" onclick="exportarCSV()">⬇️ Exportar CSV</button>
-  <div id="summary">
+  <div id="summary" style="display:none;">
     <h2>Resumen del evento activo</h2>
     <div id="summary-body">Cargando…</div>
   </div>
@@ -547,7 +547,10 @@
     finalizarCobro(0, 0, "cortesia", 0, pin);
   }
 
+  let cobrando = false;
+
   async function finalizarCobro(cash, card, paymentMethod, receivedCash, adminPin){
+    if (cobrando) return;
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
     if (!activeEvent) { showToast("Primero inicia un evento."); return; }
@@ -559,46 +562,53 @@
       return;
     }
 
-    const total = cartTotal();
-    const eftposResult = await sendToEftpos(card);
-    if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
+    cobrando = true;
+    try {
+      const total = cartTotal();
+      const eftposResult = await sendToEftpos(card);
+      if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
-    const obs = document.getElementById("obs").value.trim();
-    const items = keys.map(id => ({ id, name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: false }));
+      const obs = document.getElementById("obs").value.trim();
+      const items = keys.map(id => ({ id, name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: false }));
 
-    const { data: order, error } = await sb.rpc("create_order", {
-      p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
-      p_payment_method: paymentMethod, p_cash: cash, p_card: card,
-      p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
-      p_admin_pin: adminPin || null
-    });
-
-    if (error || !order) { showToast("No se pudo registrar el pedido: " + (error ? error.message : "")); return; }
-
-    const ticketNum = order.ticket_num;
-    lastOrderId = order.id; lastTicketNum = ticketNum;
-    document.getElementById("void-btn").style.display = "block";
-    document.getElementById("void-num").textContent = ticketNum;
-    document.getElementById("next-ticket").textContent = ticketNum + 1;
-
-    printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash);
-    showToast("Pedido #" + ticketNum + " enviado a Entrega.");
-
-    const trackedSold = keys.filter(id => {
-      const m = menu.find(x => x.id === id);
-      return m && m.track_stock && m.stock_qty !== null;
-    });
-    if (trackedSold.length) {
-      await loadMenu(); renderMenu();
-      const low = [];
-      trackedSold.forEach(id => {
-        const m = menu.find(x => x.id === id);
-        if (m && m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) low.push(m.name + " (" + m.stock_qty + ")");
+      const { data: order, error } = await sb.rpc("create_order", {
+        p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
+        p_payment_method: paymentMethod, p_cash: cash, p_card: card,
+        p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
+        p_admin_pin: adminPin || null
       });
-      if (low.length) setTimeout(() => showToast("⚠️ Reponer stock: " + low.join(", ")), 1800);
-    }
 
-    vaciarCarro();
+      if (error || !order) { showToast("No se pudo registrar el pedido: " + (error ? error.message : "")); return; }
+
+      const ticketNum = order.ticket_num;
+      lastOrderId = order.id; lastTicketNum = ticketNum;
+      document.getElementById("void-btn").style.display = "block";
+      document.getElementById("void-num").textContent = ticketNum;
+      document.getElementById("next-ticket").textContent = ticketNum + 1;
+
+      printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash);
+      showToast("Pedido #" + ticketNum + " enviado a Entrega.");
+
+      const trackedSold = keys.filter(id => {
+        const m = menu.find(x => x.id === id);
+        return m && m.track_stock && m.stock_qty !== null;
+      });
+      if (trackedSold.length) {
+        await loadMenu(); renderMenu();
+        const low = [];
+        trackedSold.forEach(id => {
+          const m = menu.find(x => x.id === id);
+          if (m && m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) low.push(m.name + " (" + m.stock_qty + ")");
+        });
+        if (low.length) setTimeout(() => showToast("⚠️ Reponer stock: " + low.join(", ")), 1800);
+      }
+
+      if (document.getElementById("summary").style.display !== "none") renderSummary();
+
+      vaciarCarro();
+    } finally {
+      cobrando = false;
+    }
   }
 
   function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash){
@@ -724,26 +734,36 @@
     });
     html += '</table>';
     if (courtesy.length){
-      html += '<p style="font-weight:600; margin-top:14px;">🎁 Cortesías entregadas</p><table class="tbl"><tr><th>Producto</th><th>Cant.</th></tr>';
-      const byC = {};
-      courtesy.forEach(o => o.items.forEach(it => byC[it.name] = (byC[it.name]||0) + it.qty));
-      Object.keys(byC).forEach(name => html += '<tr><td>'+name+'</td><td>'+byC[name]+'</td></tr>');
+      html += '<p style="font-weight:600; margin-top:14px;">🎁 Cortesías entregadas (' + courtesy.length + ')</p>';
+      html += '<table class="tbl"><tr><th>Cliente</th><th>Ticket</th><th>Hora</th><th>Productos</th></tr>';
+      courtesy.forEach(o => {
+        const itemsTxt = o.items.map(it => it.qty + "x " + it.name).join(", ");
+        const horaTxt = new Date(o.paid_at).toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
+        html += '<tr><td>' + (o.customer_name || "(sin nombre)") + '</td><td>#' + o.ticket_num + '</td><td>' + horaTxt + '</td><td>' + itemsTxt + '</td></tr>';
+      });
       html += '</table>';
     }
     body.innerHTML = html;
   }
 
+  function csvField(val){
+    const s = String(val ?? "");
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+
   async function exportarCSV(){
-    const { data: orders } = await sb.from("orders").select("*, events(name,event_date)").eq("register_id", register.id);
-    let csv = "Evento,Fecha,Ticket,Hora,Cliente,Producto,Cantidad,PrecioUnitario,Subtotal,TotalTicket,MetodoPago,Efectivo,Tarjeta,Estado,Observacion\n";
+    const { data: orders } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id);
+    const rows = [["Evento","Fecha","Ticket","Hora","Cliente","Producto","Cantidad","PrecioUnitario","Subtotal","TotalTicket","MetodoPago","Efectivo","Tarjeta","Estado","Observacion"]];
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";
-      const evDate = o.events ? o.events.event_date : "";
-      const time = new Date(o.paid_at).toLocaleString("es-CL");
+      const paidDate = new Date(o.paid_at);
+      const fecha = paidDate.toLocaleDateString("es-CL");
+      const hora = paidDate.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
       o.items.forEach(it => {
-        csv += [evName, evDate, o.ticket_num, time, o.customer_name||"", it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.cash_amount, o.card_amount, o.status, (o.obs||"").replace(/,/g,";")].join(",") + "\n";
+        rows.push([evName, fecha, o.ticket_num, hora, o.customer_name||"", it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.cash_amount, o.card_amount, o.status, o.obs||""]);
       });
     });
+    const csv = rows.map(r => r.map(csvField).join(",")).join("\n");
     const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "ventas_productos.csv";
