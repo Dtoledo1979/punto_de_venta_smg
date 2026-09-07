@@ -41,13 +41,15 @@
   .btn-secondary{background:var(--surface-alt); color:var(--ink); border:1px solid var(--border);}
   .btn-danger{background:#FBE6E4; color:#A3271D;}
   .btn-small{width:auto; padding:8px 12px; margin:0; font-size:13px;}
-  .pay-row{display:flex; gap:8px; margin-top:10px;}
-  .pay-row button{flex:1; margin:0;}
-  .pay-row button.on{outline:2px solid var(--ink);}
-  .split-pay{display:flex; gap:8px; margin-top:8px;}
-  .split-pay label{flex:1; font-size:12px; color:var(--muted); display:block;}
-  .split-pay input{width:100%; margin-top:4px; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-weight:600; color:var(--ink);}
-  .split-hint{font-size:12px; color:var(--muted); margin-top:6px;}
+  .pay-buttons{display:flex; gap:8px; margin-top:10px;}
+  .pay-buttons button{flex:1;}
+  .customer-input{width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-top:10px; font-family:inherit;}
+  .cash-panel{margin-top:10px; padding:12px; background:var(--surface-alt); border:1px solid var(--border); border-radius:10px;}
+  .cash-panel label{font-size:12.5px; color:var(--muted); display:block; margin-bottom:6px;}
+  .cash-panel input{width:100%; padding:11px; border:1px solid var(--border); border-radius:8px; font-size:17px; font-weight:600;}
+  .cash-feedback{font-size:14px; font-weight:600; margin-top:8px; min-height:18px;}
+  .cash-feedback.ok{color:#1E7A3D;}
+  .cash-feedback.warn{color:#B8720A;}
   #obs{width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-top:10px; resize:vertical; min-height:40px; font-family:inherit;}
   .edit-row{display:flex; gap:6px; margin-bottom:7px; align-items:center;}
   .edit-row input{padding:8px; border:1px solid var(--border); border-radius:7px; font-size:13px;}
@@ -123,16 +125,22 @@
     <h2>Venta actual</h2>
     <div id="cart-list"><p style="color:#9AA7B2; font-size:13px;">Toca un tipo de ticket para agregarlo.</p></div>
     <div class="total-row"><span>Total</span><span id="total">$0</span></div>
+    <input type="text" id="customer-name" class="customer-input" placeholder="Nombre del cliente (opcional)">
     <textarea id="obs" placeholder="Observación (opcional)"></textarea>
-    <div class="pay-row">
-      <button class="btn btn-secondary" id="pay-cortesia" onclick="toggleCortesia()" style="flex:none; width:100%;">🎁 Marcar como cortesía</button>
+
+    <div class="pay-buttons">
+      <button class="btn btn-primary" style="margin:0;" onclick="pagarConTarjeta()">💳 Tarjeta</button>
+      <button class="btn btn-secondary" style="margin:0;" onclick="mostrarEfectivo()">💵 Efectivo</button>
+      <button class="btn btn-secondary" style="margin:0;" onclick="pagarCortesia()">🎁 Cortesía</button>
     </div>
-    <div class="split-pay" id="split-payment">
-      <label>💵 Efectivo<input type="number" id="cash-input" min="0" step="1" placeholder="0" oninput="onCashInput()"></label>
-      <label>💳 Tarjeta<input type="number" id="card-input" min="0" step="1" placeholder="0" oninput="onCardInput()"></label>
+
+    <div id="cash-panel" class="cash-panel" style="display:none;">
+      <label>¿Cuánto te dio el cliente?</label>
+      <input type="number" id="cash-received" min="0" step="1" placeholder="$" oninput="onCashReceivedInput()">
+      <div id="cash-feedback" class="cash-feedback"></div>
+      <button class="btn btn-primary" id="cash-confirm-btn" style="display:none;"></button>
     </div>
-    <div class="split-hint">Escribe cuánto pagó en efectivo y el resto en tarjeta se calcula solo (y viceversa).</div>
-    <button class="btn btn-primary" onclick="cobrar()">Cobrar e imprimir ticket</button>
+
     <button class="btn btn-secondary" onclick="vaciarCarro()">Vaciar venta</button>
     <button class="btn btn-danger" id="void-btn" style="display:none;" onclick="anularUltimo()">↩️ Anular último ticket (#<span id="void-num"></span>)</button>
     <div class="ticket-note">Esta caja se autoejecuta: al cobrar, el ticket queda entregado de inmediato. Próximo N°: <b id="next-ticket">—</b></div>
@@ -171,13 +179,12 @@
 
   const EFTPOS_ENABLED = false;
   async function sendToEftpos(cardAmount) {
-    if (!EFTPOS_ENABLED) return { ok: true, skipped: true };
+    if (!EFTPOS_ENABLED || cardAmount <= 0) return { ok: true, skipped: true };
     // TODO: misma integración EFTPOS que en pos-productos.html.
-    // cardAmount es solo la parte pagada con tarjeta (0 si es puro efectivo).
     return { ok: true };
   }
 
-  let register = null, activeEvent = null, menu = [], cart = {}, isCortesia = false;
+  let register = null, activeEvent = null, menu = [], cart = {};
   let lastOrderId = null, lastTicketNum = null;
 
   function showToast(msg){
@@ -387,24 +394,76 @@
     document.getElementById("cash-input").value = round2(Math.max(0, total - card)) || "";
   }
 
-  async function cobrar(){
+  function vaciarCarro(){
+    cart = {}; document.getElementById("obs").value = ""; document.getElementById("customer-name").value = "";
+    resetCashPanel();
+    renderCart();
+  }
+
+  function resetCashPanel(){
+    document.getElementById("cash-panel").style.display = "none";
+    document.getElementById("cash-received").value = "";
+    document.getElementById("cash-feedback").textContent = "";
+    document.getElementById("cash-feedback").className = "cash-feedback";
+    document.getElementById("cash-confirm-btn").style.display = "none";
+  }
+
+  function round2(n){ return Math.round(n * 100) / 100; }
+
+  function mostrarEfectivo(){
+    const panel = document.getElementById("cash-panel");
+    const showing = panel.style.display !== "none";
+    if (showing) { resetCashPanel(); return; }
+    panel.style.display = "block";
+    document.getElementById("cash-received").focus();
+  }
+
+  function onCashReceivedInput(){
+    const total = cartTotal();
+    const received = round2(Number(document.getElementById("cash-received").value) || 0);
+    const feedback = document.getElementById("cash-feedback");
+    const btn = document.getElementById("cash-confirm-btn");
+    if (received <= 0) { feedback.textContent = ""; feedback.className = "cash-feedback"; btn.style.display = "none"; return; }
+
+    if (received >= total) {
+      const change = round2(received - total);
+      feedback.textContent = change > 0 ? ("Vuelto: $" + Math.round(change).toLocaleString("es-CL")) : "Pago exacto — sin vuelto.";
+      feedback.className = "cash-feedback ok";
+      btn.textContent = "Cobrar";
+      btn.style.display = "block";
+      btn.onclick = () => finalizarCobro(total, 0, "efectivo", received);
+    } else {
+      const remaining = round2(total - received);
+      feedback.textContent = "Faltan $" + Math.round(remaining).toLocaleString("es-CL");
+      feedback.className = "cash-feedback warn";
+      btn.textContent = "Cobrar $" + Math.round(received).toLocaleString("es-CL") + " efectivo + $" + Math.round(remaining).toLocaleString("es-CL") + " tarjeta";
+      btn.style.display = "block";
+      btn.onclick = () => finalizarCobro(received, remaining, "mixto", received);
+    }
+  }
+
+  function pagarConTarjeta(){
+    const total = cartTotal();
+    if (total <= 0) return;
+    finalizarCobro(0, total, "tarjeta", 0);
+  }
+
+  async function pagarCortesia(){
+    const total = cartTotal();
+    if (total <= 0) return;
+    const pin = prompt("PIN de administrador para autorizar la cortesía:");
+    if (pin === null) return;
+    const { data, error } = await sb.from("admin_settings").select("admin_pin").eq("id", true).maybeSingle();
+    if (error || !data || pin !== data.admin_pin) { showToast("PIN de administrador incorrecto."); return; }
+    finalizarCobro(0, 0, "cortesia", 0);
+  }
+
+  async function finalizarCobro(cash, card, paymentMethod, receivedCash){
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
     if (!activeEvent) { showToast("Primero inicia un evento."); return; }
 
     const total = cartTotal();
-    let cash = 0, card = 0, paymentMethod;
-
-    if (isCortesia) {
-      paymentMethod = "cortesia";
-    } else {
-      cash = round2(Number(document.getElementById("cash-input").value) || 0);
-      card = round2(Number(document.getElementById("card-input").value) || 0);
-      if (cash === 0 && card === 0) { showToast("Ingresa el monto pagado en efectivo y/o tarjeta."); return; }
-      if (Math.abs((cash + card) - total) > 1) { showToast("Efectivo + Tarjeta ($" + Math.round(cash+card) + ") no coincide con el total ($" + Math.round(total) + ")."); return; }
-      paymentMethod = cash > 0 && card > 0 ? "mixto" : cash > 0 ? "efectivo" : "tarjeta";
-    }
-
     const eftposResult = await sendToEftpos(card);
     if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
@@ -412,6 +471,7 @@
     if (tErr) { showToast("No se pudo generar el número de ticket."); return; }
 
     const obs = document.getElementById("obs").value.trim();
+    const customerName = document.getElementById("customer-name").value.trim();
     const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: true }));
     const now = new Date();
 
@@ -419,6 +479,7 @@
     const { data: order, error } = await sb.from("orders").insert({
       register_id: register.id, event_id: activeEvent.id, ticket_num: ticketNum,
       items, total, payment_method: paymentMethod, cash_amount: cash, card_amount: card,
+      customer_name: customerName || null,
       status: "entregado", obs, paid_at: now.toISOString(), delivered_at: now.toISOString()
     }).select().single();
 
@@ -429,21 +490,37 @@
     document.getElementById("void-num").textContent = ticketNum;
     document.getElementById("next-ticket").textContent = ticketNum + 1;
 
-    printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod);
+    printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash);
     showToast("Ticket #" + ticketNum + " emitido.");
     vaciarCarro();
   }
 
-  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod){
+  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash){
     const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
+    const isCortesia = paymentMethod === "cortesia";
     let html = '<div class="receipt-copy"><h3>South Media — Ticket</h3>';
-    html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div><hr>';
-    items.forEach(l => html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span>$' + Math.round(l.subtotal) + '</span></div>');
+    html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
+    if (customerName) html += '<div class="line"><span>Cliente</span><span>' + customerName + '</span></div>';
+    html += '<hr>';
+    items.forEach(l => {
+      if (isCortesia) html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
+      else html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span>$' + Math.round(l.subtotal) + '</span></div>';
+    });
     if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
-    html += '<hr><div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div>';
-    if (paymentMethod === "mixto") {
-      html += '<div class="line"><span>Efectivo</span><span>$' + Math.round(cash) + '</span></div>';
-      html += '<div class="line"><span>Tarjeta</span><span>$' + Math.round(card) + '</span></div>';
+    html += '<hr>';
+    if (isCortesia) {
+      html += '<div class="line"><b>🎁 CORTESÍA — 100% DCTO.</b></div>';
+      html += '<div class="line"><span>Valor referencial</span><span>$' + Math.round(total) + '</span></div>';
+      html += '<div class="line"><b>TOTAL A PAGAR</b><b>$0</b></div>';
+    } else {
+      html += '<div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div>';
+      if (paymentMethod === "mixto") {
+        html += '<div class="line"><span>Efectivo</span><span>$' + Math.round(cash) + '</span></div>';
+        html += '<div class="line"><span>Tarjeta</span><span>$' + Math.round(card) + '</span></div>';
+      } else if (paymentMethod === "efectivo" && receivedCash > total) {
+        html += '<div class="line"><span>Recibido</span><span>$' + Math.round(receivedCash) + '</span></div>';
+        html += '<div class="line"><span>Vuelto</span><span>$' + Math.round(receivedCash - total) + '</span></div>';
+      }
     }
     html += '</div>';
     document.getElementById("receipt-area").innerHTML = html;
@@ -504,13 +581,13 @@
 
   async function exportarCSV(){
     const { data: orders } = await sb.from("orders").select("*, events(name,event_date)").eq("register_id", register.id);
-    let csv = "Evento,Fecha,Ticket,Hora,Tipo,Cantidad,PrecioUnitario,Subtotal,TotalTicket,MetodoPago,Efectivo,Tarjeta,Estado,Observacion\n";
+    let csv = "Evento,Fecha,Ticket,Hora,Cliente,Tipo,Cantidad,PrecioUnitario,Subtotal,TotalTicket,MetodoPago,Efectivo,Tarjeta,Estado,Observacion\n";
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";
       const evDate = o.events ? o.events.event_date : "";
       const time = new Date(o.paid_at).toLocaleString("es-CL");
       o.items.forEach(it => {
-        csv += [evName, evDate, o.ticket_num, time, it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.cash_amount, o.card_amount, o.status, (o.obs||"").replace(/,/g,";")].join(",") + "\n";
+        csv += [evName, evDate, o.ticket_num, time, o.customer_name||"", it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.cash_amount, o.card_amount, o.status, (o.obs||"").replace(/,/g,";")].join(",") + "\n";
       });
     });
     const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });

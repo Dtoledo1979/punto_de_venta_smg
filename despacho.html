@@ -179,7 +179,7 @@
             '<span>' + it.qty + 'x ' + it.name + '</span></div>';
         }).join("");
         return '<div class="order">' +
-          '<div class="row1"><span class="tnum">#' + o.ticket_num + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
+          '<div class="row1"><span class="tnum">#' + o.ticket_num + (o.customer_name ? ' · ' + o.customer_name : '') + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
           '<div class="progress">' + doneCount + ' de ' + o.items.length + ' entregados — toca un producto para marcarlo</div>' +
           '<div class="items">' + itemsHtml + '</div>' +
           (o.obs ? '<div class="obs">' + o.obs + '</div>' : '') +

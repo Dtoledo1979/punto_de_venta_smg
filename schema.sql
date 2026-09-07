@@ -61,6 +61,7 @@ create table pos.orders (
   payment_method text not null check (payment_method in ('efectivo','tarjeta','mixto','cortesia')),
   cash_amount numeric(10,2) not null default 0,
   card_amount numeric(10,2) not null default 0,
+  customer_name text,
   status text not null default 'pendiente_entrega'
     check (status in ('pendiente_entrega','entregado','anulado')),
   obs text,
@@ -141,6 +142,8 @@ alter table pos.orders
 alter table pos.orders drop constraint if exists orders_payment_method_check;
 alter table pos.orders add constraint orders_payment_method_check
   check (payment_method in ('efectivo','tarjeta','mixto','cortesia'));
+
+alter table pos.orders add column if not exists customer_name text;
 
 -- ---------------------------------------------------------------------
 -- Seguridad (RLS)

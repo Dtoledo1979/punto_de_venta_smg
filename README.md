@@ -46,15 +46,17 @@ necesita pasar por Entrega), porque quien vende también entrega.
 
 El PIN es único por caja (no por persona), tal como se usa hoy.
 
-### Pago mixto (efectivo + tarjeta)
+### Cómo cobrar
 
-En vez de elegir un solo método de pago, la caja de productos y la de
-tickets tienen dos campos: **Efectivo** y **Tarjeta**. Al escribir un monto
-en uno, el otro se autocompleta con el resto del total — el cajero no
-necesita sacar la cuenta a mano. El sistema no deja cobrar si la suma no
-coincide con el total del pedido. Al terminal EFTPOS solo se le envía el
-monto de **tarjeta** (nunca el total), porque la parte en efectivo no pasa
-por la máquina.
+- **💳 Tarjeta** — un clic, cobra el total completo a tarjeta y envía a Entrega. No requiere escribir nada.
+- **💵 Efectivo** — pide un solo dato: "¿Cuánto te dio el cliente?".
+  - Si da igual o más que el total → muestra el **vuelto** y aparece el botón "Cobrar".
+  - Si da menos que el total → automáticamente se convierte en **pago mixto**: muestra "Faltan $X" y un botón de un clic "Cobrar $Y efectivo + $X tarjeta" que cierra la venta.
+- **🎁 Cortesía** — pide el PIN de administrador ahí mismo (tabla `admin_settings`). Si es correcto, cobra $0 automáticamente. En la boleta sale con el precio original tachado, "$0" al lado, la leyenda "CORTESÍA — 100% DCTO." y el "valor referencial" para control interno.
+
+Al terminal EFTPOS solo se le envía el **monto de tarjeta** de la venta (nunca el total ni la parte en efectivo).
+
+También hay un campo opcional para el **nombre del cliente**, que queda impreso en la boleta, visible en la pantalla de Entrega junto al número de ticket, y en el CSV exportado.
 
 ### Entrega por producto (checklist)
 
