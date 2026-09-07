@@ -105,7 +105,7 @@
     <h2>Menú</h2>
     <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / cambiar precios)</button>
     <div id="edit-panel" style="display:none; margin-bottom:14px;">
-      <button class="toggle" style="font-size:12px;" onclick="cambiarPin()">🔒 Cambiar PIN de esta caja</button>
+      <button class="toggle" style="font-size:12px;" onclick="abrirAdmin()">⚙️ Administración (renombrar / resetear PIN)</button>
       <div id="edit-list"></div>
       <div class="add-form">
         <input type="text" id="new-name" placeholder="Nombre (ej. Terremoto)">
@@ -160,7 +160,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
-  const SUPABASE_ANON_KEY = "REEMPLAZA_CON_TU_ANON_KEY";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
 
   // Cambia esto a true una vez tengas la integración EFTPOS con BNZ/Verifone lista.
@@ -305,14 +305,28 @@
     await loadMenu(); renderMenu();
   }
 
-  function cambiarPin(){
-    const nuevo = prompt("Nuevo PIN para esta caja:");
-    if (!nuevo) return;
-    sb.from("registers").update({ pin: nuevo }).eq("id", register.id).then(() => {
-      register.pin = nuevo;
-      sessionStorage.setItem("pos_pin_" + register.id, nuevo);
+  async function abrirAdmin(){
+    const pin = prompt("PIN de administrador:");
+    if (pin === null) return;
+    const { data, error } = await sb.from("admin_settings").select("admin_pin").eq("id", true).maybeSingle();
+    if (error || !data) { showToast("No se pudo verificar el PIN de administrador."); return; }
+    if (pin !== data.admin_pin) { showToast("PIN de administrador incorrecto."); return; }
+
+    const nuevoNombre = prompt("Nombre de este punto de venta:", register.name);
+    if (nuevoNombre && nuevoNombre.trim() && nuevoNombre.trim() !== register.name) {
+      await sb.from("registers").update({ name: nuevoNombre.trim() }).eq("id", register.id);
+      register.name = nuevoNombre.trim();
+      document.getElementById("register-name").textContent = register.name;
+      showToast("Nombre actualizado.");
+    }
+
+    const nuevoPin = prompt("Nuevo PIN para esta caja (deja vacío para no cambiarlo):");
+    if (nuevoPin) {
+      await sb.from("registers").update({ pin: nuevoPin }).eq("id", register.id);
+      register.pin = nuevoPin;
+      sessionStorage.setItem("pos_pin_" + register.id, nuevoPin);
       showToast("PIN actualizado.");
-    });
+    }
   }
 
   function addToCart(item){

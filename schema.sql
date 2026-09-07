@@ -97,6 +97,22 @@ $$;
 alter publication supabase_realtime add table pos.orders;
 
 -- ---------------------------------------------------------------------
+-- PIN de administrador: un solo PIN maestro (independiente del PIN de
+-- cada caja) que autoriza resetear el PIN de una caja o renombrarla,
+-- desde la opción "Administración" dentro de cada punto de venta.
+-- ---------------------------------------------------------------------
+create table pos.admin_settings (
+  id boolean primary key default true check (id),
+  admin_pin text not null
+);
+
+alter table pos.admin_settings enable row level security;
+create policy "acceso interno" on pos.admin_settings for all using (true) with check (true);
+
+-- CAMBIA este PIN antes de usar el sistema en un evento real.
+insert into pos.admin_settings (admin_pin) values ('9999');
+
+-- ---------------------------------------------------------------------
 -- Seguridad (RLS)
 -- IMPORTANTE: esto deja las tablas abiertas a cualquiera que tenga la
 -- anon key del proyecto. Es aceptable para una herramienta interna que
@@ -116,7 +132,10 @@ create policy "acceso interno" on pos.menu_items for all using (true) with check
 create policy "acceso interno" on pos.orders for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------
--- Datos iniciales de ejemplo — AJUSTA nombres y PIN antes de usar.
+-- Datos iniciales de ejemplo. El PIN y el nombre se pueden dejar así y
+-- cambiar después desde la opción "Administración" dentro de cada caja
+-- (con el admin_pin de arriba) — no hace falta editar esto antes de correr
+-- el script.
 -- ---------------------------------------------------------------------
 insert into pos.registers (name, type, pin) values
   ('Barra Principal', 'producto', '1234'),

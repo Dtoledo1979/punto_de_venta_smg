@@ -46,6 +46,15 @@ necesita pasar por Entrega), porque quien vende también entrega.
 
 El PIN es único por caja (no por persona), tal como se usa hoy.
 
+### PIN de administrador
+
+Además del PIN de cada caja, hay un **PIN de administrador** único para todo
+el sistema (tabla `pos.admin_settings`, viene con `9999` de ejemplo —
+cámbialo apenas puedas desde el **Table Editor** de Supabase). Sirve para
+autorizar dos cosas desde el botón **⚙️ Administración** dentro de cada caja:
+renombrar el punto de venta y resetear su PIN. Sin ese PIN maestro, nadie
+puede cambiar el PIN de una caja desde la propia app.
+
 ## 3. Integración EFTPOS (Verifone / BNZ)
 
 Verifone normalmente no expone una API pública propia — la integración se
