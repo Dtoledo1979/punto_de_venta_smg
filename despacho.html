@@ -53,6 +53,7 @@
   .modal .cancel{background:#232B36; color:#fff;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--accent); color:var(--accent-ink); padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; font-weight:600;}
   .search-card{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:14px 16px; margin:0 20px 16px;}
+  @media (min-width:1240px){ .search-card{max-width:1160px; margin:0 auto 16px;} }
   .search-toggle{color:var(--accent); font-size:13px; cursor:pointer; background:none; border:none; padding:0;}
   .search-box{display:flex; gap:8px; margin-top:10px;}
   .search-box input{flex:1; padding:10px; border:1px solid #2A323D; border-radius:8px; font-size:13px; background:#0E1116; color:#fff;}
@@ -99,12 +100,14 @@
 <div id="pin-overlay">
   <div class="modal">
     <h3>Ingresa el PIN</h3>
-    <p>PIN de la caja de productos para abrir Entrega.</p>
-    <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autofocus>
+    <p>Tu nombre y el PIN de Entrega para abrir esta pantalla.</p>
+    <input type="text" id="operator-name-input" placeholder="Tu nombre" style="margin-bottom:8px;" autofocus>
+    <input type="password" id="pin-input" inputmode="numeric" maxlength="8">
     <div class="row">
       <button class="cancel" onclick="location.href='index.html'">Cancelar</button>
       <button class="ok" onclick="checkPin()">Entrar</button>
     </div>
+    <p style="margin:14px 0 0; cursor:pointer; text-decoration:underline;" onclick="cambiarPinEntrega()">⚙️ Cambiar PIN de Entrega (admin)</p>
   </div>
 </div>
 <div id="toast"></div>
@@ -120,6 +123,7 @@
   const DANGER_AFTER = 300; // rojo
 
   let register = null;
+  let operatorName = "";
   let pendingOrders = [];
   let deliveredRecent = [];
   let tickInterval = null;
@@ -136,26 +140,45 @@
     if (!registers || registers.length === 0){ showToast("No hay caja de tipo Producto configurada."); return; }
     register = registers[0];
 
-    const saved = sessionStorage.getItem("pos_pin_" + register.id);
-    if (saved === register.pin){
+    const { data: ev } = await sb.from("events").select("name").eq("active", true).limit(1).maybeSingle();
+    document.getElementById("event-label").textContent = ev ? ("Evento activo: " + ev.name) : "Sin evento activo.";
+
+    const savedPin = sessionStorage.getItem("pos_despacho_pin_" + register.id);
+    const savedName = sessionStorage.getItem("pos_despacho_operator_" + register.id);
+    if (savedPin === register.despacho_pin && savedName){
+      operatorName = savedName;
       document.getElementById("pin-overlay").style.display = "none";
       await afterUnlock();
     }
-
-    const { data: ev } = await sb.from("events").select("name").eq("active", true).limit(1).maybeSingle();
-    document.getElementById("event-label").textContent = ev ? ("Evento activo: " + ev.name) : "Sin evento activo.";
   }
 
   function checkPin(){
+    const name = document.getElementById("operator-name-input").value.trim();
     const val = document.getElementById("pin-input").value;
-    if (val === register.pin){
-      sessionStorage.setItem("pos_pin_" + register.id, val);
+    if (!name) { showToast("Escribe tu nombre."); return; }
+    if (val === register.despacho_pin){
+      operatorName = name;
+      sessionStorage.setItem("pos_despacho_pin_" + register.id, val);
+      sessionStorage.setItem("pos_despacho_operator_" + register.id, name);
       document.getElementById("pin-overlay").style.display = "none";
       afterUnlock();
     } else showToast("PIN incorrecto.");
   }
 
+  async function cambiarPinEntrega(){
+    const adminPin = prompt("PIN de administrador:");
+    if (adminPin === null) return;
+    const { data, error } = await sb.from("admin_settings").select("admin_pin").eq("id", true).maybeSingle();
+    if (error || !data || adminPin !== data.admin_pin) { showToast("PIN de administrador incorrecto."); return; }
+    const nuevoPin = prompt("Nuevo PIN de Entrega:");
+    if (!nuevoPin) return;
+    await sb.from("registers").update({ despacho_pin: nuevoPin }).eq("id", register.id);
+    register.despacho_pin = nuevoPin;
+    showToast("PIN de Entrega actualizado.");
+  }
+
   async function afterUnlock(){
+    document.getElementById("event-label").textContent += " · Recibe: " + operatorName;
     await loadPending();
     await loadDeliveredRecent();
     render();
@@ -230,7 +253,7 @@
 
   async function confirmarEntrega(id){
     const order = pendingOrders.find(o => o.id === id);
-    const patch = { status:"entregado", delivered_at:new Date().toISOString() };
+    const patch = { status:"entregado", delivered_at:new Date().toISOString(), delivered_by: operatorName || null };
     if (order) patch.items = order.items.map(it => ({ ...it, delivered:true }));
     await sb.from("orders").update(patch).eq("id", id);
     showToast("Pedido entregado.");

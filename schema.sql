@@ -17,6 +17,7 @@ create table pos.registers (
   name text not null,
   type text not null check (type in ('producto','ticket')),
   pin text not null,
+  despacho_pin text not null default '5678',
   next_ticket int not null default 1,
   active boolean not null default true,
   created_at timestamptz not null default now()
@@ -65,6 +66,8 @@ create table pos.orders (
   cash_amount numeric(10,2) not null default 0,
   card_amount numeric(10,2) not null default 0,
   customer_name text,
+  attended_by text,
+  delivered_by text,
   status text not null default 'pendiente_entrega'
     check (status in ('pendiente_entrega','entregado','anulado')),
   obs text,
@@ -152,6 +155,11 @@ alter table pos.menu_items
   add column if not exists track_stock boolean not null default false,
   add column if not exists stock_qty numeric(10,2),
   add column if not exists initial_stock numeric(10,2);
+
+alter table pos.registers add column if not exists despacho_pin text not null default '5678';
+
+alter table pos.orders add column if not exists attended_by text;
+alter table pos.orders add column if not exists delivered_by text;
 
 -- ---------------------------------------------------------------------
 -- Seguridad (RLS)

@@ -94,16 +94,39 @@ cantidad total — eso también reinicia la base del 25% a ese número.
 ### Menú responsive
 
 La grilla de productos se ajusta sola al ancho de pantalla (celular,
-tablet, etc.) en vez de saltar entre un número fijo de columnas.
+tablet, etc.) en vez de saltar entre un número fijo de columnas. También
+corregí un detalle de alineación: en monitores de PC anchos, algunas
+secciones (el título de inicio, el buscador, el resumen de ventas) quedaban
+pegadas al borde izquierdo en vez de centrarse con el resto — ya está
+parejo en cualquier tamaño de pantalla.
 
 ### PIN de administrador
 
 Además del PIN de cada caja, hay un **PIN de administrador** único para todo
 el sistema (tabla `pos.admin_settings`, viene con `9999` de ejemplo —
-cámbialo apenas puedas desde el **Table Editor** de Supabase). Sirve para
-autorizar dos cosas desde el botón **⚙️ Administración** dentro de cada caja:
-renombrar el punto de venta y resetear su PIN. Sin ese PIN maestro, nadie
-puede cambiar el PIN de una caja desde la propia app.
+cámbialo apenas puedas desde el **Table Editor** de Supabase). Desde el
+botón **⚙️ Administración** dentro de cada caja, el administrador ahora
+puede cambiar los **tres** PIN: el de la caja, el de Entrega, y el PIN de
+administrador mismo — antes solo dejaba cambiar el de la caja, ya está
+corregido. El PIN de Entrega también se puede cambiar directamente desde
+la pantalla de Entrega (link "⚙️ Cambiar PIN de Entrega" en la pantalla de
+acceso), sin tener que ir a la caja.
+
+### PIN de Entrega, separado del de caja
+
+Antes, Entrega usaba el mismo PIN que la caja de productos. Ahora tiene su
+propio PIN (`despacho_pin`, ejemplo genérico `5678`), guardado en el mismo
+registro de la caja pero como un campo aparte del PIN de caja (ejemplo
+genérico `1234`).
+
+### Nombre de quien atiende / recibe
+
+Al entrar a Productos, Tickets o Entrega, además del PIN se pide el
+**nombre de la persona** que va a operar esa pantalla en este momento. Ese
+nombre se guarda en cada pedido (`attended_by` para quien vendió,
+`delivered_by` para quien confirmó la entrega en Entrega) — es un dato
+informativo para saber quién atendió cada caso, no reemplaza el PIN
+compartido de la caja.
 
 ## 3. Integración EFTPOS (Verifone / BNZ)
 

@@ -79,6 +79,8 @@
   table.tbl th, table.tbl td{text-align:left; padding:6px 4px; border-bottom:1px solid var(--border);}
   table.tbl th{color:var(--muted); font-weight:500;}
   .ticket-note{font-size:12.5px; color:var(--muted); margin-top:6px;}
+  .wide-card{max-width:1064px; margin-left:18px; margin-right:18px;}
+  @media (min-width:1140px){ .wide-card{margin-left:auto; margin-right:auto;} }
   #summary{display:none;}
   #pin-overlay,#modal-overlay{position:fixed; inset:0; background:rgba(10,13,18,.6); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
   .modal{background:#fff; border-radius:14px; padding:24px; max-width:340px; width:100%; text-align:center;}
@@ -116,7 +118,7 @@
   <span id="event-label">Cargando evento…</span>
   <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
 </div>
-<div id="event-form" class="card" style="display:none; margin:12px 18px 0; max-width:1064px;">
+<div id="event-form" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <input type="text" id="event-name" placeholder="Nombre del evento" style="flex:2; min-width:160px; padding:9px; border:1px solid var(--border); border-radius:8px;">
     <input type="date" id="event-date" style="padding:9px; border:1px solid var(--border); border-radius:8px;">
@@ -130,7 +132,7 @@
     <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / precios / stock)</button>
     <button class="toggle" style="margin-left:14px;" onclick="toggleStock()">📦 Ver stock</button>
     <div id="edit-panel" style="display:none; margin-bottom:14px;">
-      <button class="toggle" style="font-size:12px;" onclick="abrirAdmin()">⚙️ Administración (renombrar / resetear PIN)</button>
+      <button class="toggle" style="font-size:12px;" onclick="abrirAdmin()">⚙️ Administración (renombrar / PIN de caja, Entrega y admin)</button>
       <div id="edit-list"></div>
       <div class="add-form">
         <input type="text" id="new-name" placeholder="Nombre (ej. Terremoto)">
@@ -170,7 +172,7 @@
   </div>
 </main>
 
-<div class="card" style="max-width:1064px; margin:0 18px 16px;">
+<div class="card wide-card" style="margin-bottom:16px;">
   <button class="toggle" onclick="toggleSearch()">🔎 Buscar ticket (por cliente o número)</button>
   <div id="search-panel" style="display:none; margin-top:10px;">
     <div class="search-box">
@@ -181,7 +183,7 @@
   </div>
 </div>
 
-<div class="card" style="max-width:1064px; margin:0 18px 24px;">
+<div class="card wide-card" style="margin-bottom:24px;">
   <button class="toggle" onclick="toggleSummary()">📊 Ver resumen de ventas</button>
   <button class="btn btn-secondary btn-small" style="float:right;" onclick="exportarCSV()">⬇️ Exportar CSV</button>
   <div id="summary">
@@ -193,8 +195,9 @@
 <div id="pin-overlay">
   <div class="modal">
     <h3 id="pin-title">Ingresa el PIN</h3>
-    <p id="pin-sub">PIN de esta caja para comenzar a vender.</p>
-    <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autofocus>
+    <p id="pin-sub">Tu nombre y el PIN de esta caja para comenzar a vender.</p>
+    <input type="text" id="operator-name-input" placeholder="Tu nombre" style="margin-bottom:8px;" autofocus>
+    <input type="password" id="pin-input" inputmode="numeric" maxlength="8">
     <div class="row">
       <button class="btn btn-secondary" onclick="location.href='index.html'">Cancelar</button>
       <button class="btn btn-primary" onclick="checkPin()">Entrar</button>
@@ -225,6 +228,7 @@
   let activeEvent = null;   // fila de pos.events activa
   let menu = [];             // pos.menu_items
   let cart = {};             // { itemId: {name, price, qty} }
+  let operatorName = "";
   let lastOrderId = null, lastTicketNum = null;
 
   function showToast(msg){
@@ -245,16 +249,22 @@
     document.getElementById("next-ticket").textContent = register.next_ticket;
 
     const savedPin = sessionStorage.getItem("pos_pin_" + register.id);
-    if (savedPin === register.pin) {
+    const savedName = sessionStorage.getItem("pos_operator_" + register.id);
+    if (savedPin === register.pin && savedName) {
+      operatorName = savedName;
       document.getElementById("pin-overlay").style.display = "none";
       await afterUnlock();
     }
   }
 
   function checkPin() {
+    const name = document.getElementById("operator-name-input").value.trim();
     const val = document.getElementById("pin-input").value;
+    if (!name) { showToast("Escribe tu nombre."); return; }
     if (val === register.pin) {
+      operatorName = name;
       sessionStorage.setItem("pos_pin_" + register.id, val);
+      sessionStorage.setItem("pos_operator_" + register.id, name);
       document.getElementById("pin-overlay").style.display = "none";
       afterUnlock();
     } else {
@@ -263,6 +273,7 @@
   }
 
   async function afterUnlock() {
+    document.getElementById("register-name").textContent = register.name + " · " + operatorName;
     await loadActiveEvent();
     await loadMenu();
     renderMenu();
@@ -413,16 +424,29 @@
     if (nuevoNombre && nuevoNombre.trim() && nuevoNombre.trim() !== register.name) {
       await sb.from("registers").update({ name: nuevoNombre.trim() }).eq("id", register.id);
       register.name = nuevoNombre.trim();
-      document.getElementById("register-name").textContent = register.name;
+      document.getElementById("register-name").textContent = register.name + " · " + operatorName;
       showToast("Nombre actualizado.");
     }
 
-    const nuevoPin = prompt("Nuevo PIN para esta caja (deja vacío para no cambiarlo):");
+    const nuevoPin = prompt("Nuevo PIN de esta caja (deja vacío para no cambiarlo):");
     if (nuevoPin) {
       await sb.from("registers").update({ pin: nuevoPin }).eq("id", register.id);
       register.pin = nuevoPin;
       sessionStorage.setItem("pos_pin_" + register.id, nuevoPin);
-      showToast("PIN actualizado.");
+      showToast("PIN de la caja actualizado.");
+    }
+
+    const nuevoDespachoPin = prompt("Nuevo PIN de Entrega (deja vacío para no cambiarlo):");
+    if (nuevoDespachoPin) {
+      await sb.from("registers").update({ despacho_pin: nuevoDespachoPin }).eq("id", register.id);
+      register.despacho_pin = nuevoDespachoPin;
+      showToast("PIN de Entrega actualizado.");
+    }
+
+    const nuevoAdminPin = prompt("Nuevo PIN de administrador (deja vacío para no cambiarlo):");
+    if (nuevoAdminPin) {
+      await sb.from("admin_settings").update({ admin_pin: nuevoAdminPin }).eq("id", true);
+      showToast("PIN de administrador actualizado.");
     }
   }
 
@@ -551,7 +575,7 @@
     const { data: order, error } = await sb.from("orders").insert({
       register_id: register.id, event_id: activeEvent.id, ticket_num: ticketNum,
       items, total, payment_method: paymentMethod, cash_amount: cash, card_amount: card,
-      customer_name: customerName || null,
+      customer_name: customerName || null, attended_by: operatorName || null,
       status: "pendiente_entrega", obs, paid_at: now.toISOString()
     }).select().single();
 
