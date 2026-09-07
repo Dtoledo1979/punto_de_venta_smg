@@ -44,6 +44,10 @@
   .pay-row{display:flex; gap:8px; margin-top:10px;}
   .pay-row button{flex:1; margin:0;}
   .pay-row button.on{outline:2px solid var(--ink);}
+  .split-pay{display:flex; gap:8px; margin-top:8px;}
+  .split-pay label{flex:1; font-size:12px; color:var(--muted); display:block;}
+  .split-pay input{width:100%; margin-top:4px; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; font-weight:600; color:var(--ink);}
+  .split-hint{font-size:12px; color:var(--muted); margin-top:6px;}
   #obs{width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-top:10px; resize:vertical; min-height:40px; font-family:inherit;}
   .edit-row{display:flex; gap:6px; margin-bottom:7px; align-items:center;}
   .edit-row input{padding:8px; border:1px solid var(--border); border-radius:7px; font-size:13px;}
@@ -121,10 +125,13 @@
     <div class="total-row"><span>Total</span><span id="total">$0</span></div>
     <textarea id="obs" placeholder="Observación (opcional)"></textarea>
     <div class="pay-row">
-      <button class="btn btn-secondary" id="pay-efectivo" onclick="setPago('efectivo')">💵 Efectivo</button>
-      <button class="btn btn-secondary" id="pay-tarjeta" onclick="setPago('tarjeta')">💳 Tarjeta</button>
-      <button class="btn btn-secondary" id="pay-cortesia" onclick="setPago('cortesia')">🎁 Cortesía</button>
+      <button class="btn btn-secondary" id="pay-cortesia" onclick="toggleCortesia()" style="flex:none; width:100%;">🎁 Marcar como cortesía</button>
     </div>
+    <div class="split-pay" id="split-payment">
+      <label>💵 Efectivo<input type="number" id="cash-input" min="0" step="1" placeholder="0" oninput="onCashInput()"></label>
+      <label>💳 Tarjeta<input type="number" id="card-input" min="0" step="1" placeholder="0" oninput="onCardInput()"></label>
+    </div>
+    <div class="split-hint">Escribe cuánto pagó en efectivo y el resto en tarjeta se calcula solo (y viceversa).</div>
     <button class="btn btn-primary" onclick="cobrar()">Cobrar e imprimir ticket</button>
     <button class="btn btn-secondary" onclick="vaciarCarro()">Vaciar venta</button>
     <button class="btn btn-danger" id="void-btn" style="display:none;" onclick="anularUltimo()">↩️ Anular último ticket (#<span id="void-num"></span>)</button>
@@ -163,13 +170,14 @@
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
 
   const EFTPOS_ENABLED = false;
-  async function sendToEftpos(totalAmount) {
+  async function sendToEftpos(cardAmount) {
     if (!EFTPOS_ENABLED) return { ok: true, skipped: true };
     // TODO: misma integración EFTPOS que en pos-productos.html.
+    // cardAmount es solo la parte pagada con tarjeta (0 si es puro efectivo).
     return { ok: true };
   }
 
-  let register = null, activeEvent = null, menu = [], cart = {}, selectedPago = null;
+  let register = null, activeEvent = null, menu = [], cart = {}, isCortesia = false;
   let lastOrderId = null, lastTicketNum = null;
 
   function showToast(msg){
@@ -322,6 +330,10 @@
     renderCart();
   }
 
+  function cartTotal(){
+    return Object.keys(cart).reduce((s,id) => s + cart[id].price * cart[id].qty, 0);
+  }
+
   function renderCart(){
     const list = document.getElementById("cart-list");
     const keys = Object.keys(cart);
@@ -335,8 +347,7 @@
           '<span>$' + Math.round(l.price * l.qty).toLocaleString("es-CL") + '</span></div>';
       }).join("");
     }
-    const total = keys.reduce((s,id) => s + cart[id].price * cart[id].qty, 0);
-    document.getElementById("total").textContent = "$" + Math.round(total).toLocaleString("es-CL");
+    document.getElementById("total").textContent = "$" + Math.round(cartTotal()).toLocaleString("es-CL");
   }
 
   function changeQty(id, delta){
@@ -346,38 +357,69 @@
   }
 
   function vaciarCarro(){
-    cart = {}; selectedPago = null; document.getElementById("obs").value = "";
-    ["efectivo","tarjeta","cortesia"].forEach(p => document.getElementById("pay-"+p).classList.remove("on"));
+    cart = {}; isCortesia = false; document.getElementById("obs").value = "";
+    document.getElementById("pay-cortesia").classList.remove("on");
+    document.getElementById("split-payment").style.display = "flex";
+    document.getElementById("cash-input").value = "";
+    document.getElementById("card-input").value = "";
     renderCart();
   }
 
-  function setPago(p){
-    selectedPago = p;
-    ["efectivo","tarjeta","cortesia"].forEach(x => document.getElementById("pay-"+x).classList.toggle("on", x===p));
+  function toggleCortesia(){
+    isCortesia = !isCortesia;
+    document.getElementById("pay-cortesia").classList.toggle("on", isCortesia);
+    document.getElementById("split-payment").style.display = isCortesia ? "none" : "flex";
+  }
+
+  function round2(n){ return Math.round(n * 100) / 100; }
+
+  function onCashInput(){
+    const total = cartTotal();
+    let cash = Number(document.getElementById("cash-input").value) || 0;
+    if (cash > total) cash = total;
+    document.getElementById("card-input").value = round2(Math.max(0, total - cash)) || "";
+  }
+
+  function onCardInput(){
+    const total = cartTotal();
+    let card = Number(document.getElementById("card-input").value) || 0;
+    if (card > total) card = total;
+    document.getElementById("cash-input").value = round2(Math.max(0, total - card)) || "";
   }
 
   async function cobrar(){
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
-    if (!selectedPago) { showToast("Selecciona método de pago: Efectivo, Tarjeta o Cortesía."); return; }
     if (!activeEvent) { showToast("Primero inicia un evento."); return; }
 
-    const total = keys.reduce((s,id) => s + cart[id].price * cart[id].qty, 0);
-    const eftposResult = await sendToEftpos(total);
+    const total = cartTotal();
+    let cash = 0, card = 0, paymentMethod;
+
+    if (isCortesia) {
+      paymentMethod = "cortesia";
+    } else {
+      cash = round2(Number(document.getElementById("cash-input").value) || 0);
+      card = round2(Number(document.getElementById("card-input").value) || 0);
+      if (cash === 0 && card === 0) { showToast("Ingresa el monto pagado en efectivo y/o tarjeta."); return; }
+      if (Math.abs((cash + card) - total) > 1) { showToast("Efectivo + Tarjeta ($" + Math.round(cash+card) + ") no coincide con el total ($" + Math.round(total) + ")."); return; }
+      paymentMethod = cash > 0 && card > 0 ? "mixto" : cash > 0 ? "efectivo" : "tarjeta";
+    }
+
+    const eftposResult = await sendToEftpos(card);
     if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
     const { data: ticketNum, error: tErr } = await sb.rpc("next_ticket", { p_register_id: register.id });
     if (tErr) { showToast("No se pudo generar el número de ticket."); return; }
 
     const obs = document.getElementById("obs").value.trim();
-    const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty }));
+    const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: true }));
     const now = new Date();
 
     // Autoejecutado: queda "entregado" de inmediato, no pasa por Entrega.
     const { data: order, error } = await sb.from("orders").insert({
       register_id: register.id, event_id: activeEvent.id, ticket_num: ticketNum,
-      items, total, payment_method: selectedPago, status: "entregado",
-      obs, paid_at: now.toISOString(), delivered_at: now.toISOString()
+      items, total, payment_method: paymentMethod, cash_amount: cash, card_amount: card,
+      status: "entregado", obs, paid_at: now.toISOString(), delivered_at: now.toISOString()
     }).select().single();
 
     if (error) { showToast("No se pudo registrar la venta."); return; }
@@ -387,18 +429,23 @@
     document.getElementById("void-num").textContent = ticketNum;
     document.getElementById("next-ticket").textContent = ticketNum + 1;
 
-    printReceipt(ticketNum, items, total, obs, now);
+    printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod);
     showToast("Ticket #" + ticketNum + " emitido.");
     vaciarCarro();
   }
 
-  function printReceipt(ticketNum, items, total, obs, now){
+  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod){
     const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
     let html = '<div class="receipt-copy"><h3>South Media — Ticket</h3>';
     html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div><hr>';
     items.forEach(l => html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span>$' + Math.round(l.subtotal) + '</span></div>');
     if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
-    html += '<hr><div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div></div>';
+    html += '<hr><div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div>';
+    if (paymentMethod === "mixto") {
+      html += '<div class="line"><span>Efectivo</span><span>$' + Math.round(cash) + '</span></div>';
+      html += '<div class="line"><span>Tarjeta</span><span>$' + Math.round(card) + '</span></div>';
+    }
+    html += '</div>';
     document.getElementById("receipt-area").innerHTML = html;
     window.print();
   }
@@ -430,8 +477,8 @@
     const byProduct = {};
     paid.forEach(o => {
       total += Number(o.total);
-      if (o.payment_method === "efectivo") cash += Number(o.total);
-      if (o.payment_method === "tarjeta") card += Number(o.total);
+      cash += Number(o.cash_amount || 0);
+      card += Number(o.card_amount || 0);
       o.items.forEach(it => {
         if (!byProduct[it.name]) byProduct[it.name] = { qty:0, total:0 };
         byProduct[it.name].qty += it.qty; byProduct[it.name].total += it.subtotal;
@@ -457,13 +504,13 @@
 
   async function exportarCSV(){
     const { data: orders } = await sb.from("orders").select("*, events(name,event_date)").eq("register_id", register.id);
-    let csv = "Evento,Fecha,Ticket,Hora,Tipo,Cantidad,PrecioUnitario,Subtotal,TotalTicket,MetodoPago,Estado,Observacion\n";
+    let csv = "Evento,Fecha,Ticket,Hora,Tipo,Cantidad,PrecioUnitario,Subtotal,TotalTicket,MetodoPago,Efectivo,Tarjeta,Estado,Observacion\n";
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";
       const evDate = o.events ? o.events.event_date : "";
       const time = new Date(o.paid_at).toLocaleString("es-CL");
       o.items.forEach(it => {
-        csv += [evName, evDate, o.ticket_num, time, it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.status, (o.obs||"").replace(/,/g,";")].join(",") + "\n";
+        csv += [evName, evDate, o.ticket_num, time, it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.cash_amount, o.card_amount, o.status, (o.obs||"").replace(/,/g,";")].join(",") + "\n";
       });
     });
     const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });

@@ -58,7 +58,9 @@ create table pos.orders (
   ticket_num int not null,
   items jsonb not null,
   total numeric(10,2) not null,
-  payment_method text not null check (payment_method in ('efectivo','tarjeta','cortesia')),
+  payment_method text not null check (payment_method in ('efectivo','tarjeta','mixto','cortesia')),
+  cash_amount numeric(10,2) not null default 0,
+  card_amount numeric(10,2) not null default 0,
   status text not null default 'pendiente_entrega'
     check (status in ('pendiente_entrega','entregado','anulado')),
   obs text,
@@ -126,6 +128,19 @@ grant execute on all functions in schema pos to anon, authenticated, service_rol
 alter default privileges in schema pos grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema pos grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema pos grant execute on functions to anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------
+-- MIGRACIÓN — solo necesaria si tu tabla pos.orders ya existía antes de
+-- agregar el pago mixto (efectivo + tarjeta en el mismo ticket). Si estás
+-- corriendo este schema.sql por primera vez, no hace falta este bloque.
+-- ---------------------------------------------------------------------
+alter table pos.orders
+  add column if not exists cash_amount numeric(10,2) not null default 0,
+  add column if not exists card_amount numeric(10,2) not null default 0;
+
+alter table pos.orders drop constraint if exists orders_payment_method_check;
+alter table pos.orders add constraint orders_payment_method_check
+  check (payment_method in ('efectivo','tarjeta','mixto','cortesia'));
 
 -- ---------------------------------------------------------------------
 -- Seguridad (RLS)

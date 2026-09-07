@@ -46,6 +46,27 @@ necesita pasar por Entrega), porque quien vende también entrega.
 
 El PIN es único por caja (no por persona), tal como se usa hoy.
 
+### Pago mixto (efectivo + tarjeta)
+
+En vez de elegir un solo método de pago, la caja de productos y la de
+tickets tienen dos campos: **Efectivo** y **Tarjeta**. Al escribir un monto
+en uno, el otro se autocompleta con el resto del total — el cajero no
+necesita sacar la cuenta a mano. El sistema no deja cobrar si la suma no
+coincide con el total del pedido. Al terminal EFTPOS solo se le envía el
+monto de **tarjeta** (nunca el total), porque la parte en efectivo no pasa
+por la máquina.
+
+### Entrega por producto (checklist)
+
+En `despacho.html`, cada producto del pedido se lista por separado y se
+puede tocar para marcarlo como entregado individualmente (por ejemplo,
+tickear "Piscola", "Mango Sour" y "Copa de vino" pero dejar "Terremoto"
+pendiente). El pedido se mantiene abierto — y el cronómetro sigue
+corriendo — hasta que se marca el último producto, momento en el que el
+pedido se cierra solo. El botón "Marcar todo como entregado" sigue
+disponible como atajo para cerrar todo el pedido de una vez, sin tickear
+producto por producto.
+
 ### PIN de administrador
 
 Además del PIN de cada caja, hay un **PIN de administrador** único para todo

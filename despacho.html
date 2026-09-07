@@ -29,10 +29,16 @@
   .timer{font-family:'Sora',sans-serif; font-size:22px; font-weight:800; padding:3px 10px; border-radius:8px; background:#1E2A1F; color:var(--ok);}
   .timer.warn{background:#2A2312; color:var(--warn);}
   .timer.danger{background:#2E1B19; color:var(--danger);}
-  .items{font-size:13.5px; color:#C9D3DC; line-height:1.5;}
+  .items{display:flex; flex-direction:column; gap:2px;}
+  .item-line{display:flex; align-items:center; gap:9px; padding:6px 2px; cursor:pointer; font-size:13.5px; color:#C9D3DC; border-radius:6px;}
+  .item-line:active{background:#1B222B;}
+  .item-line .check{width:19px; height:19px; border:1.5px solid #3A4552; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--accent-ink); flex:none;}
+  .item-line.done{color:#5C6A77; text-decoration:line-through;}
+  .item-line.done .check{background:var(--accent); border-color:var(--accent);}
+  .progress{font-size:11.5px; color:#5C6A77; font-weight:600;}
   .obs{font-size:12.5px; color:var(--accent); background:#1A2314; padding:6px 9px; border-radius:8px;}
   .meta{font-size:12px; color:#5C6A77; display:flex; justify-content:space-between;}
-  .btn-deliver{border:none; background:var(--accent); color:var(--accent-ink); font-weight:700; padding:11px; border-radius:9px; cursor:pointer; font-size:14.5px;}
+  .btn-deliver{border:none; background:#232B36; color:#C9D3DC; font-weight:600; padding:10px; border-radius:9px; cursor:pointer; font-size:13px;}
   .delivered-title{margin-top:32px; font-family:'Sora',sans-serif; font-size:15px; color:#9AA7B2;}
   .delivered-list{margin-top:10px; font-size:13px; color:#7C8996; display:flex; flex-direction:column; gap:6px;}
   #pin-overlay{position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
@@ -165,13 +171,20 @@
       board.innerHTML = pendingOrders.map(o => {
         const elapsed = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/1000));
         const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
-        const items = o.items.map(it => it.qty + "x " + it.name).join(", ");
+        const doneCount = o.items.filter(it => it.delivered).length;
+        const itemsHtml = o.items.map((it, idx) => {
+          const done = !!it.delivered;
+          return '<div class="item-line ' + (done ? "done" : "") + '" onclick="toggleItem(\'' + o.id + '\',' + idx + ')">' +
+            '<span class="check">' + (done ? "✔" : "") + '</span>' +
+            '<span>' + it.qty + 'x ' + it.name + '</span></div>';
+        }).join("");
         return '<div class="order">' +
           '<div class="row1"><span class="tnum">#' + o.ticket_num + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
-          '<div class="items">' + items + '</div>' +
+          '<div class="progress">' + doneCount + ' de ' + o.items.length + ' entregados — toca un producto para marcarlo</div>' +
+          '<div class="items">' + itemsHtml + '</div>' +
           (o.obs ? '<div class="obs">' + o.obs + '</div>' : '') +
           '<div class="meta"><span>' + new Date(o.paid_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) + '</span><span>' + o.payment_method + '</span></div>' +
-          '<button class="btn-deliver" onclick="confirmarEntrega(\'' + o.id + '\')">Confirmar entrega</button>' +
+          '<button class="btn-deliver" onclick="confirmarEntrega(\'' + o.id + '\')">Marcar todo como entregado</button>' +
           '</div>';
       }).join("");
     }
@@ -182,9 +195,25 @@
     }).join("") || '<div style="color:#4A5563;">Aún no hay entregas registradas.</div>';
   }
 
+  async function toggleItem(orderId, idx){
+    const order = pendingOrders.find(o => o.id === orderId);
+    if (!order) return;
+    const items = order.items.map((it,i) => i === idx ? { ...it, delivered: !it.delivered } : it);
+    const allDone = items.every(it => it.delivered);
+    const patch = { items };
+    if (allDone) { patch.status = "entregado"; patch.delivered_at = new Date().toISOString(); }
+    await sb.from("orders").update(patch).eq("id", orderId);
+    if (allDone) showToast("Pedido #" + order.ticket_num + " completo — entregado.");
+    await loadPending(); await loadDeliveredRecent(); render();
+  }
+
   async function confirmarEntrega(id){
-    await sb.from("orders").update({ status:"entregado", delivered_at:new Date().toISOString() }).eq("id", id);
+    const order = pendingOrders.find(o => o.id === id);
+    const patch = { status:"entregado", delivered_at:new Date().toISOString() };
+    if (order) patch.items = order.items.map(it => ({ ...it, delivered:true }));
+    await sb.from("orders").update(patch).eq("id", id);
     showToast("Pedido entregado.");
+    await loadPending(); await loadDeliveredRecent(); render();
   }
 
   init();
