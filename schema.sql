@@ -116,6 +116,7 @@ create table pos.admin_settings (
 );
 
 alter table pos.admin_settings enable row level security;
+drop policy if exists "acceso interno" on pos.admin_settings;
 create policy "acceso interno" on pos.admin_settings for all using (true) with check (true);
 
 -- CAMBIA este PIN antes de usar el sistema en un evento real.
@@ -125,7 +126,10 @@ insert into pos.admin_settings (admin_pin) values ('9999');
 -- IMPORTANTE: los schemas nuevos (fuera de "public") no le dan permisos
 -- a los roles anon/authenticated automáticamente, aunque las políticas
 -- RLS digan "true". Sin esto, la API responde 401 aunque todo lo demás
--- esté bien configurado.
+-- esté bien configurado. (Más abajo, en "ENDURECIMIENTO DE SEGURIDAD",
+-- se le quita a anon/authenticated el insert/update/delete y la lectura
+-- de columnas sensibles que este bloque otorga aquí — dejar ambos
+-- bloques, en este orden, es intencional.)
 -- ---------------------------------------------------------------------
 grant usage on schema pos to anon, authenticated, service_role;
 grant all on all tables in schema pos to anon, authenticated, service_role;
@@ -161,20 +165,277 @@ alter table pos.registers add column if not exists despacho_pin text not null de
 alter table pos.orders add column if not exists attended_by text;
 alter table pos.orders add column if not exists delivered_by text;
 
+-- =====================================================================
+-- ENDURECIMIENTO DE SEGURIDAD
+-- Los pasos anteriores dejaban el sistema abierto: cualquiera con la
+-- anon key (pública, viene en el código de la página) podía leer los
+-- PIN directamente y crear/editar/borrar pedidos sin pasar por la app.
+-- Esto lo cierra: se revoca el acceso amplio y todas las escrituras
+-- pasan a hacerse a través de funciones que verifican el PIN adentro
+-- de la base de datos (nunca lo devuelven al navegador).
+-- =====================================================================
+
+-- 1) Quitar los permisos amplios dados anteriormente
+revoke insert, update, delete on pos.registers from anon, authenticated;
+revoke all on pos.admin_settings from anon, authenticated;
+revoke insert, update, delete on pos.menu_items from anon, authenticated;
+revoke insert, update, delete on pos.orders from anon, authenticated;
+revoke insert, update, delete on pos.events from anon, authenticated;
+
+-- 2) Ocultar los PIN de cualquier lectura directa (select * ya no los trae)
+revoke select on pos.registers from anon, authenticated;
+grant select (id, name, type, next_ticket, active, created_at) on pos.registers to anon, authenticated;
+
+-- 3) Ya no se llama directo desde el navegador — ahora vive dentro de create_order()
+revoke execute on function pos.next_ticket(uuid) from anon, authenticated;
+
 -- ---------------------------------------------------------------------
--- Seguridad (RLS)
--- IMPORTANTE: esto deja las tablas abiertas a cualquiera que tenga la
--- anon key del proyecto. Es aceptable para una herramienta interna que
--- no se enlaza desde el sitio público, pero si más adelante se expone
--- de forma pública hay que reemplazar estas políticas por unas que
--- validen el PIN en el servidor (por ejemplo, vía una función RPC con
--- "security definer" en vez de acceso directo a las tablas).
+-- Verificación de PIN (devuelven true/false, nunca el valor real)
+-- ---------------------------------------------------------------------
+create or replace function pos.verify_register_pin(p_register_id uuid, p_pin text)
+returns boolean language sql security definer set search_path = pos as $$
+  select exists(select 1 from pos.registers where id = p_register_id and pin = p_pin);
+$$;
+grant execute on function pos.verify_register_pin(uuid, text) to anon, authenticated;
+
+create or replace function pos.verify_despacho_pin(p_register_id uuid, p_pin text)
+returns boolean language sql security definer set search_path = pos as $$
+  select exists(select 1 from pos.registers where id = p_register_id and despacho_pin = p_pin);
+$$;
+grant execute on function pos.verify_despacho_pin(uuid, text) to anon, authenticated;
+
+create or replace function pos.verify_admin_pin(p_pin text)
+returns boolean language sql security definer set search_path = pos as $$
+  select exists(select 1 from pos.admin_settings where id = true and admin_pin = p_pin);
+$$;
+grant execute on function pos.verify_admin_pin(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Acciones de administrador (re-validan el PIN admin adentro)
+-- ---------------------------------------------------------------------
+create or replace function pos.admin_update_register(
+  p_admin_pin text, p_register_id uuid,
+  p_name text default null, p_pin text default null, p_despacho_pin text default null
+) returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_admin_pin(p_admin_pin) then return false; end if;
+  update pos.registers set
+    name = coalesce(p_name, name),
+    pin = coalesce(p_pin, pin),
+    despacho_pin = coalesce(p_despacho_pin, despacho_pin)
+  where id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.admin_update_register(text, uuid, text, text, text) to anon, authenticated;
+
+create or replace function pos.admin_update_admin_pin(p_admin_pin text, p_new_pin text)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_admin_pin(p_admin_pin) then return false; end if;
+  update pos.admin_settings set admin_pin = p_new_pin where id = true;
+  return true;
+end;
+$$;
+grant execute on function pos.admin_update_admin_pin(text, text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Eventos
+-- ---------------------------------------------------------------------
+create or replace function pos.create_event(p_register_id uuid, p_pin text, p_name text, p_event_date date)
+returns pos.events language plpgsql security definer set search_path = pos as $$
+declare v_event pos.events;
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  update pos.events set active = false where active = true;
+  insert into pos.events (name, event_date, active) values (p_name, p_event_date, true)
+    returning * into v_event;
+  return v_event;
+end;
+$$;
+grant execute on function pos.create_event(uuid, text, text, date) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Menú y stock
+-- ---------------------------------------------------------------------
+create or replace function pos.add_menu_item(p_register_id uuid, p_pin text, p_name text, p_price numeric, p_sort_order int)
+returns pos.menu_items language plpgsql security definer set search_path = pos as $$
+declare v_item pos.menu_items;
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  insert into pos.menu_items (register_id, name, price, sort_order) values (p_register_id, p_name, p_price, p_sort_order)
+    returning * into v_item;
+  return v_item;
+end;
+$$;
+grant execute on function pos.add_menu_item(uuid, text, text, numeric, int) to anon, authenticated;
+
+create or replace function pos.update_menu_item(p_register_id uuid, p_pin text, p_item_id uuid, p_name text, p_price numeric)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  update pos.menu_items set name = coalesce(p_name, name), price = coalesce(p_price, price)
+    where id = p_item_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.update_menu_item(uuid, text, uuid, text, numeric) to anon, authenticated;
+
+create or replace function pos.remove_menu_item(p_register_id uuid, p_pin text, p_item_id uuid)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  update pos.menu_items set active = false where id = p_item_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.remove_menu_item(uuid, text, uuid) to anon, authenticated;
+
+create or replace function pos.set_item_stock(p_register_id uuid, p_pin text, p_item_id uuid, p_track_stock boolean, p_qty numeric)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  if p_track_stock then
+    update pos.menu_items set track_stock = true, stock_qty = p_qty, initial_stock = p_qty
+      where id = p_item_id and register_id = p_register_id;
+  else
+    update pos.menu_items set track_stock = false where id = p_item_id and register_id = p_register_id;
+  end if;
+  return true;
+end;
+$$;
+grant execute on function pos.set_item_stock(uuid, text, uuid, boolean, numeric) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Pedidos: crear, anular, reabrir
+-- ---------------------------------------------------------------------
+create or replace function pos.create_order(
+  p_register_id uuid, p_pin text, p_event_id uuid, p_items jsonb,
+  p_payment_method text, p_cash numeric, p_card numeric,
+  p_customer_name text, p_obs text, p_attended_by text,
+  p_admin_pin text default null
+) returns pos.orders language plpgsql security definer set search_path = pos as $$
+declare
+  v_register pos.registers;
+  v_total numeric := 0;
+  v_ticket_num int;
+  v_status text;
+  v_delivered_at timestamptz := null;
+  v_order pos.orders;
+  v_item jsonb;
+begin
+  select * into v_register from pos.registers where id = p_register_id;
+  if v_register is null or v_register.pin <> p_pin then
+    raise exception 'PIN incorrecto';
+  end if;
+
+  if p_payment_method = 'cortesia' then
+    if p_admin_pin is null or not pos.verify_admin_pin(p_admin_pin) then
+      raise exception 'Cortesía requiere PIN de administrador válido';
+    end if;
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_total := v_total + coalesce((v_item->>'subtotal')::numeric, 0);
+  end loop;
+
+  if p_payment_method <> 'cortesia' and abs((coalesce(p_cash,0) + coalesce(p_card,0)) - v_total) > 1 then
+    raise exception 'El efectivo + tarjeta no coincide con el total';
+  end if;
+
+  update pos.registers set next_ticket = next_ticket + 1 where id = p_register_id returning next_ticket - 1 into v_ticket_num;
+
+  if v_register.type = 'ticket' then
+    v_status := 'entregado';
+    v_delivered_at := now();
+  else
+    v_status := 'pendiente_entrega';
+  end if;
+
+  insert into pos.orders (
+    register_id, event_id, ticket_num, items, total, payment_method,
+    cash_amount, card_amount, customer_name, attended_by, status, obs, delivered_at
+  ) values (
+    p_register_id, p_event_id, v_ticket_num, p_items, v_total, p_payment_method,
+    coalesce(p_cash,0), coalesce(p_card,0), p_customer_name, p_attended_by, v_status, p_obs, v_delivered_at
+  ) returning * into v_order;
+
+  return v_order;
+end;
+$$;
+grant execute on function pos.create_order(uuid, text, uuid, jsonb, text, numeric, numeric, text, text, text, text) to anon, authenticated;
+
+create or replace function pos.void_order(p_register_id uuid, p_pin text, p_order_id uuid)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not (pos.verify_register_pin(p_register_id, p_pin) or pos.verify_despacho_pin(p_register_id, p_pin)) then
+    raise exception 'PIN incorrecto';
+  end if;
+  update pos.orders set status = 'anulado' where id = p_order_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.void_order(uuid, text, uuid) to anon, authenticated;
+
+create or replace function pos.reopen_order(p_register_id uuid, p_pin text, p_order_id uuid)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not (pos.verify_register_pin(p_register_id, p_pin) or pos.verify_despacho_pin(p_register_id, p_pin)) then
+    raise exception 'PIN incorrecto';
+  end if;
+  update pos.orders set status = 'pendiente_entrega', delivered_at = null where id = p_order_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.reopen_order(uuid, text, uuid) to anon, authenticated;
+
+create or replace function pos.despacho_toggle_item(p_register_id uuid, p_despacho_pin text, p_order_id uuid, p_item_index int)
+returns boolean language plpgsql security definer set search_path = pos as $$
+declare v_items jsonb;
+begin
+  if not pos.verify_despacho_pin(p_register_id, p_despacho_pin) then raise exception 'PIN incorrecto'; end if;
+  select items into v_items from pos.orders where id = p_order_id and register_id = p_register_id;
+  v_items := jsonb_set(v_items, array[p_item_index::text, 'delivered'],
+    to_jsonb(not coalesce((v_items->p_item_index->>'delivered')::boolean, false)));
+  update pos.orders set items = v_items where id = p_order_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.despacho_toggle_item(uuid, text, uuid, int) to anon, authenticated;
+
+create or replace function pos.despacho_confirm_all(p_register_id uuid, p_despacho_pin text, p_order_id uuid, p_delivered_by text)
+returns boolean language plpgsql security definer set search_path = pos as $$
+declare v_items jsonb;
+begin
+  if not pos.verify_despacho_pin(p_register_id, p_despacho_pin) then raise exception 'PIN incorrecto'; end if;
+  select items into v_items from pos.orders where id = p_order_id and register_id = p_register_id;
+  select jsonb_agg(elem || '{"delivered":true}'::jsonb) into v_items from jsonb_array_elements(v_items) elem;
+  update pos.orders set items = v_items, status = 'entregado', delivered_at = now(), delivered_by = p_delivered_by
+    where id = p_order_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.despacho_confirm_all(uuid, text, uuid, text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Políticas RLS — permisivas a propósito.
+-- La protección real está en los "revoke" de la sección de arriba:
+-- anon ya NO tiene permiso de insert/update/delete en estas tablas
+-- (solo las funciones "security definer" pueden escribir, y ellas sí
+-- validan el PIN). Estas políticas solo habilitan la LECTURA directa que
+-- la app sigue necesitando (tablero de Entrega, menú, eventos). No las
+-- endurezcas pensando que ahí falta algo — lo que falta ya está resuelto
+-- arriba.
 -- ---------------------------------------------------------------------
 alter table pos.registers enable row level security;
 alter table pos.events enable row level security;
 alter table pos.menu_items enable row level security;
 alter table pos.orders enable row level security;
 
+drop policy if exists "acceso interno" on pos.registers;
+drop policy if exists "acceso interno" on pos.events;
+drop policy if exists "acceso interno" on pos.menu_items;
+drop policy if exists "acceso interno" on pos.orders;
 create policy "acceso interno" on pos.registers for all using (true) with check (true);
 create policy "acceso interno" on pos.events for all using (true) with check (true);
 create policy "acceso interno" on pos.menu_items for all using (true) with check (true);

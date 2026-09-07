@@ -128,7 +128,36 @@ nombre se guarda en cada pedido (`attended_by` para quien vendió,
 informativo para saber quién atendió cada caso, no reemplaza el PIN
 compartido de la caja.
 
-## 3. Integración EFTPOS (Verifone / BNZ)
+## 3. Seguridad — cómo quedó protegido
+
+**Antes:** los PIN se leían directo desde la base de datos hacia el
+navegador (bastaba abrir las herramientas de desarrollador para verlos), y
+cualquiera con la anon key (pública, está en el código de la página) podía
+insertar/editar/borrar pedidos, PIN, menú y stock **sin pasar por ningún
+PIN**, hablándole directo a la API de Supabase.
+
+**Ahora:** ningún PIN sale nunca de la base de datos. Todo lo sensible —
+crear un pedido, anular, reabrir, cambiar el menú o el stock, cambiar
+cualquier PIN, autorizar una cortesía — pasa por funciones dentro de
+Supabase (`pos.create_order`, `pos.void_order`, `pos.admin_update_register`,
+etc.) que reciben el PIN como parámetro, lo verifican **adentro** de la
+base de datos, y solo ahí ejecutan el cambio. El navegador nunca ve el PIN
+real de nadie, ni siquiera el suyo propio — solo un "sí/no". Las tablas ya
+no aceptan escrituras directas desde afuera de esas funciones.
+
+**Lo que sigue siendo una limitación conocida (aceptable para esta
+operación, pero conviene que la tengas clara):** cualquiera con la anon key
+todavía puede **leer** el historial de pedidos (nombres de clientes,
+montos, etc.) directamente vía API, porque no hay un sistema de sesiones
+reales por persona — solo el PIN compartido por caja. Cerrar eso del todo
+requeriría pasar a un login individual real (Supabase Auth), que es un
+cambio más grande. Si en algún momento te preocupa la privacidad de los
+datos de clientes más que la posibilidad de pedidos falsos, dímelo y lo
+evaluamos.
+
+
+
+## 4. Integración EFTPOS (Verifone / BNZ)
 
 Verifone normalmente no expone una API pública propia — la integración se
 hace a través del procesador de fondo que usa tu banco (con BNZ, habría que
@@ -147,7 +176,7 @@ Cuando tengas las credenciales/documentación, se completa esa función para
 que envíe el total al terminal y espere la confirmación de pago antes de
 generar el ticket — no hay que tocar nada más del resto del sistema.
 
-## 4. Desplegar en venta.southmedia.co.nz
+## 5. Desplegar en venta.southmedia.co.nz
 
 Mismo patrón que usamos para southmedia.co.nz:
 
@@ -159,14 +188,13 @@ Mismo patrón que usamos para southmedia.co.nz:
    para `venta` apuntando al sitio de Netlify (Netlify te da el valor exacto
    al agregar el dominio).
 
-## 5. Seguridad — léelo antes de usar en producción
+## 6. Nota sobre la anon key
 
-Las tablas quedan abiertas a cualquiera que tenga la anon key (ver
-`schema.sql`). Es razonable para una herramienta interna con un subdominio
-que nadie más conoce, pero **no la enlaces desde el sitio público** de
-South Media. Si más adelante se necesita más seguridad, el siguiente paso es
-mover las escrituras a funciones RPC que validen el PIN en el servidor en
-vez de dejar acceso directo a las tablas.
+Aunque las escrituras ya están protegidas por PIN a nivel de base de datos
+(sección 3), la anon key sigue siendo pública por diseño de Supabase —
+sigue siendo buena práctica **no enlazar este sitio desde el sitio
+público** de South Media, para que no quede indexado ni sea el primer
+lugar donde alguien curioso vaya a mirar.
 
 ## Pendientes / próximos pasos sugeridos
 

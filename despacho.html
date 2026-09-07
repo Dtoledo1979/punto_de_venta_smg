@@ -136,7 +136,7 @@
   }
 
   async function init(){
-    const { data: registers } = await sb.from("registers").select("*").eq("type","producto").eq("active", true).order("created_at").limit(1);
+    const { data: registers } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type","producto").eq("active", true).order("created_at").limit(1);
     if (!registers || registers.length === 0){ showToast("No hay caja de tipo Producto configurada."); return; }
     register = registers[0];
 
@@ -145,18 +145,24 @@
 
     const savedPin = sessionStorage.getItem("pos_despacho_pin_" + register.id);
     const savedName = sessionStorage.getItem("pos_despacho_operator_" + register.id);
-    if (savedPin === register.despacho_pin && savedName){
-      operatorName = savedName;
-      document.getElementById("pin-overlay").style.display = "none";
-      await afterUnlock();
+    if (savedPin && savedName){
+      const { data: ok } = await sb.rpc("verify_despacho_pin", { p_register_id: register.id, p_pin: savedPin });
+      if (ok) {
+        operatorName = savedName;
+        document.getElementById("pin-overlay").style.display = "none";
+        await afterUnlock();
+      }
     }
   }
 
-  function checkPin(){
+  function myDespachoPin(){ return sessionStorage.getItem("pos_despacho_pin_" + register.id) || ""; }
+
+  async function checkPin(){
     const name = document.getElementById("operator-name-input").value.trim();
     const val = document.getElementById("pin-input").value;
     if (!name) { showToast("Escribe tu nombre."); return; }
-    if (val === register.despacho_pin){
+    const { data: ok } = await sb.rpc("verify_despacho_pin", { p_register_id: register.id, p_pin: val });
+    if (ok){
       operatorName = name;
       sessionStorage.setItem("pos_despacho_pin_" + register.id, val);
       sessionStorage.setItem("pos_despacho_operator_" + register.id, name);
@@ -168,12 +174,11 @@
   async function cambiarPinEntrega(){
     const adminPin = prompt("PIN de administrador:");
     if (adminPin === null) return;
-    const { data, error } = await sb.from("admin_settings").select("admin_pin").eq("id", true).maybeSingle();
-    if (error || !data || adminPin !== data.admin_pin) { showToast("PIN de administrador incorrecto."); return; }
+    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: adminPin });
+    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
     const nuevoPin = prompt("Nuevo PIN de Entrega:");
     if (!nuevoPin) return;
-    await sb.from("registers").update({ despacho_pin: nuevoPin }).eq("id", register.id);
-    register.despacho_pin = nuevoPin;
+    await sb.rpc("admin_update_register", { p_admin_pin: adminPin, p_register_id: register.id, p_name: null, p_pin: null, p_despacho_pin: nuevoPin });
     showToast("PIN de Entrega actualizado.");
   }
 
@@ -244,18 +249,12 @@
   }
 
   async function toggleItem(orderId, idx){
-    const order = pendingOrders.find(o => o.id === orderId);
-    if (!order) return;
-    const items = order.items.map((it,i) => i === idx ? { ...it, delivered: !it.delivered } : it);
-    await sb.from("orders").update({ items }).eq("id", orderId);
+    await sb.rpc("despacho_toggle_item", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_item_index: idx });
     await loadPending(); await loadDeliveredRecent(); render();
   }
 
   async function confirmarEntrega(id){
-    const order = pendingOrders.find(o => o.id === id);
-    const patch = { status:"entregado", delivered_at:new Date().toISOString(), delivered_by: operatorName || null };
-    if (order) patch.items = order.items.map(it => ({ ...it, delivered:true }));
-    await sb.from("orders").update(patch).eq("id", id);
+    await sb.rpc("despacho_confirm_all", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: id, p_delivered_by: operatorName || null });
     showToast("Pedido entregado.");
     await loadPending(); await loadDeliveredRecent(); render();
   }
@@ -290,13 +289,13 @@
   }
 
   async function reabrirPedido(id){
-    await sb.from("orders").update({ status:"pendiente_entrega", delivered_at:null }).eq("id", id);
+    await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
     showToast("Pedido reabierto.");
     buscarTicket();
   }
 
   async function anularPedidoBuscado(id){
-    await sb.from("orders").update({ status:"anulado" }).eq("id", id);
+    await sb.rpc("void_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
     showToast("Pedido anulado.");
     buscarTicket();
   }

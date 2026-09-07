@@ -202,7 +202,7 @@
   }
 
   async function init() {
-    const { data: registers } = await sb.from("registers").select("*").eq("type","ticket").eq("active", true).order("created_at").limit(1);
+    const { data: registers } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type","ticket").eq("active", true).order("created_at").limit(1);
     if (!registers || registers.length === 0) { showToast("No hay una caja de tipo Ticket configurada en Supabase."); return; }
     register = registers[0];
     document.getElementById("register-name").textContent = register.name;
@@ -210,18 +210,24 @@
 
     const savedPin = sessionStorage.getItem("pos_pin_" + register.id);
     const savedName = sessionStorage.getItem("pos_operator_" + register.id);
-    if (savedPin === register.pin && savedName) {
-      operatorName = savedName;
-      document.getElementById("pin-overlay").style.display = "none";
-      await afterUnlock();
+    if (savedPin && savedName) {
+      const { data: ok } = await sb.rpc("verify_register_pin", { p_register_id: register.id, p_pin: savedPin });
+      if (ok) {
+        operatorName = savedName;
+        document.getElementById("pin-overlay").style.display = "none";
+        await afterUnlock();
+      }
     }
   }
 
-  function checkPin() {
+  function myPin(){ return sessionStorage.getItem("pos_pin_" + register.id) || ""; }
+
+  async function checkPin() {
     const name = document.getElementById("operator-name-input").value.trim();
     const val = document.getElementById("pin-input").value;
     if (!name) { showToast("Escribe tu nombre."); return; }
-    if (val === register.pin) {
+    const { data: ok } = await sb.rpc("verify_register_pin", { p_register_id: register.id, p_pin: val });
+    if (ok) {
       operatorName = name;
       sessionStorage.setItem("pos_pin_" + register.id, val);
       sessionStorage.setItem("pos_operator_" + register.id, name);
@@ -253,8 +259,7 @@
     const name = document.getElementById("event-name").value.trim();
     const date = document.getElementById("event-date").value || null;
     if (!name) { showToast("Escribe el nombre del evento."); return; }
-    await sb.from("events").update({ active:false }).eq("active", true);
-    const { data, error } = await sb.from("events").insert({ name, event_date: date, active:true }).select().single();
+    const { data, error } = await sb.rpc("create_event", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_event_date: date });
     if (error) { showToast("No se pudo crear el evento."); return; }
     activeEvent = data;
     document.getElementById("event-label").textContent = "Evento activo: " + data.name;
@@ -306,47 +311,40 @@
     const name = document.getElementById("new-name").value.trim();
     const price = Number(document.getElementById("new-price").value);
     if (!name || !price) { showToast("Completa nombre y precio."); return; }
-    await sb.from("menu_items").insert({ register_id: register.id, name, price, sort_order: menu.length });
+    await sb.rpc("add_menu_item", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_price: price, p_sort_order: menu.length });
     document.getElementById("new-name").value = ""; document.getElementById("new-price").value = "";
     await loadMenu(); renderMenu();
   }
 
   async function updateItem(id, patch){
-    await sb.from("menu_items").update(patch).eq("id", id);
+    await sb.rpc("update_menu_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: id, p_name: patch.name ?? null, p_price: patch.price ?? null });
     await loadMenu(); renderMenu();
   }
 
   async function removeItem(id){
-    await sb.from("menu_items").update({ active:false }).eq("id", id);
+    await sb.rpc("remove_menu_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: id });
     await loadMenu(); renderMenu();
   }
 
   async function abrirAdmin(){
     const pin = prompt("PIN de administrador:");
     if (pin === null) return;
-    const { data, error } = await sb.from("admin_settings").select("admin_pin").eq("id", true).maybeSingle();
-    if (error || !data) { showToast("No se pudo verificar el PIN de administrador."); return; }
-    if (pin !== data.admin_pin) { showToast("PIN de administrador incorrecto."); return; }
+    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
+    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
 
     const nuevoNombre = prompt("Nombre de este punto de venta:", register.name);
-    if (nuevoNombre && nuevoNombre.trim() && nuevoNombre.trim() !== register.name) {
-      await sb.from("registers").update({ name: nuevoNombre.trim() }).eq("id", register.id);
-      register.name = nuevoNombre.trim();
-      document.getElementById("register-name").textContent = register.name + " · " + operatorName;
-      showToast("Nombre actualizado.");
-    }
-
     const nuevoPin = prompt("Nuevo PIN para esta caja (deja vacío para no cambiarlo):");
-    if (nuevoPin) {
-      await sb.from("registers").update({ pin: nuevoPin }).eq("id", register.id);
-      register.pin = nuevoPin;
-      sessionStorage.setItem("pos_pin_" + register.id, nuevoPin);
-      showToast("PIN actualizado.");
+    const nombreCambio = nuevoNombre && nuevoNombre.trim() && nuevoNombre.trim() !== register.name ? nuevoNombre.trim() : null;
+    if (nombreCambio || nuevoPin) {
+      await sb.rpc("admin_update_register", { p_admin_pin: pin, p_register_id: register.id, p_name: nombreCambio, p_pin: nuevoPin || null, p_despacho_pin: null });
+      if (nombreCambio) { register.name = nombreCambio; document.getElementById("register-name").textContent = register.name + " · " + operatorName; }
+      if (nuevoPin) { sessionStorage.setItem("pos_pin_" + register.id, nuevoPin); }
+      showToast("Datos de la caja actualizados.");
     }
 
     const nuevoAdminPin = prompt("Nuevo PIN de administrador (deja vacío para no cambiarlo):");
     if (nuevoAdminPin) {
-      await sb.from("admin_settings").update({ admin_pin: nuevoAdminPin }).eq("id", true);
+      await sb.rpc("admin_update_admin_pin", { p_admin_pin: pin, p_new_pin: nuevoAdminPin });
       showToast("PIN de administrador actualizado.");
     }
   }
@@ -473,12 +471,12 @@
     if (total <= 0) return;
     const pin = prompt("PIN de administrador para autorizar la cortesía:");
     if (pin === null) return;
-    const { data, error } = await sb.from("admin_settings").select("admin_pin").eq("id", true).maybeSingle();
-    if (error || !data || pin !== data.admin_pin) { showToast("PIN de administrador incorrecto."); return; }
-    finalizarCobro(0, 0, "cortesia", 0);
+    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
+    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
+    finalizarCobro(0, 0, "cortesia", 0, pin);
   }
 
-  async function finalizarCobro(cash, card, paymentMethod, receivedCash){
+  async function finalizarCobro(cash, card, paymentMethod, receivedCash, adminPin){
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
     if (!activeEvent) { showToast("Primero inicia un evento."); return; }
@@ -487,30 +485,26 @@
     const eftposResult = await sendToEftpos(card);
     if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
-    const { data: ticketNum, error: tErr } = await sb.rpc("next_ticket", { p_register_id: register.id });
-    if (tErr) { showToast("No se pudo generar el número de ticket."); return; }
-
     const obs = document.getElementById("obs").value.trim();
     const customerName = document.getElementById("customer-name").value.trim();
     const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: true }));
-    const now = new Date();
 
-    // Autoejecutado: queda "entregado" de inmediato, no pasa por Entrega.
-    const { data: order, error } = await sb.from("orders").insert({
-      register_id: register.id, event_id: activeEvent.id, ticket_num: ticketNum,
-      items, total, payment_method: paymentMethod, cash_amount: cash, card_amount: card,
-      customer_name: customerName || null, attended_by: operatorName || null,
-      status: "entregado", obs, paid_at: now.toISOString(), delivered_at: now.toISOString()
-    }).select().single();
+    const { data: order, error } = await sb.rpc("create_order", {
+      p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
+      p_payment_method: paymentMethod, p_cash: cash, p_card: card,
+      p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
+      p_admin_pin: adminPin || null
+    });
 
-    if (error) { showToast("No se pudo registrar la venta."); return; }
+    if (error || !order) { showToast("No se pudo registrar la venta: " + (error ? error.message : "")); return; }
 
+    const ticketNum = order.ticket_num;
     lastOrderId = order.id; lastTicketNum = ticketNum;
     document.getElementById("void-btn").style.display = "block";
     document.getElementById("void-num").textContent = ticketNum;
     document.getElementById("next-ticket").textContent = ticketNum + 1;
 
-    printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash);
+    printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash);
     showToast("Ticket #" + ticketNum + " emitido.");
     vaciarCarro();
   }
@@ -549,7 +543,7 @@
 
   async function anularUltimo(){
     if (!lastOrderId) return;
-    await sb.from("orders").update({ status:"anulado" }).eq("id", lastOrderId);
+    await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: lastOrderId });
     document.getElementById("void-btn").style.display = "none";
     showToast("Ticket #" + lastTicketNum + " anulado.");
     lastOrderId = null;
