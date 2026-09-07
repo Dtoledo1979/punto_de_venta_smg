@@ -43,6 +43,9 @@ create table pos.menu_items (
   price numeric(10,2) not null,
   active boolean not null default true,
   sort_order int not null default 0,
+  track_stock boolean not null default false,
+  stock_qty numeric(10,2),
+  initial_stock numeric(10,2),
   created_at timestamptz not null default now()
 );
 
@@ -144,6 +147,11 @@ alter table pos.orders add constraint orders_payment_method_check
   check (payment_method in ('efectivo','tarjeta','mixto','cortesia'));
 
 alter table pos.orders add column if not exists customer_name text;
+
+alter table pos.menu_items
+  add column if not exists track_stock boolean not null default false,
+  add column if not exists stock_qty numeric(10,2),
+  add column if not exists initial_stock numeric(10,2);
 
 -- ---------------------------------------------------------------------
 -- Seguridad (RLS)

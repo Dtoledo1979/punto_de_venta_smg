@@ -39,6 +39,7 @@
   .obs{font-size:12.5px; color:var(--accent); background:#1A2314; padding:6px 9px; border-radius:8px;}
   .meta{font-size:12px; color:#5C6A77; display:flex; justify-content:space-between;}
   .btn-deliver{border:none; background:#232B36; color:#C9D3DC; font-weight:600; padding:10px; border-radius:9px; cursor:pointer; font-size:13px;}
+  .btn-deliver.ready{background:var(--accent); color:var(--accent-ink); font-weight:700;}
   .delivered-title{margin-top:32px; font-family:'Sora',sans-serif; font-size:15px; color:#9AA7B2;}
   .delivered-list{margin-top:10px; font-size:13px; color:#7C8996; display:flex; flex-direction:column; gap:6px;}
   #pin-overlay{position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
@@ -51,6 +52,18 @@
   .modal .ok{background:var(--accent); color:var(--accent-ink);}
   .modal .cancel{background:#232B36; color:#fff;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--accent); color:var(--accent-ink); padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; font-weight:600;}
+  .search-card{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:14px 16px; margin:0 20px 16px;}
+  .search-toggle{color:var(--accent); font-size:13px; cursor:pointer; background:none; border:none; padding:0;}
+  .search-box{display:flex; gap:8px; margin-top:10px;}
+  .search-box input{flex:1; padding:10px; border:1px solid #2A323D; border-radius:8px; font-size:13px; background:#0E1116; color:#fff;}
+  .search-box button{border:none; background:var(--accent); color:var(--accent-ink); font-weight:700; padding:10px 14px; border-radius:8px; cursor:pointer; font-size:13px;}
+  .search-results{margin-top:10px;}
+  .search-row{display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid #232B36; font-size:13.5px; gap:8px;}
+  .search-row .meta{font-size:12px; color:#7C8996; margin-top:2px;}
+  .search-actions{display:flex; gap:6px; flex:none;}
+  .search-actions button{padding:7px 10px; font-size:12px; border:none; border-radius:7px; cursor:pointer; font-weight:600;}
+  .search-actions .reopen{background:#232B36; color:#C9D3DC;}
+  .search-actions .void{background:#2E1B19; color:#E4483A;}
 </style>
 </head>
 <body>
@@ -63,6 +76,17 @@
   <a class="back" href="index.html">← Inicio</a>
 </header>
 <div class="sub" id="event-label">Cargando…</div>
+
+<div class="search-card">
+  <button class="search-toggle" onclick="toggleSearch()">🔎 Buscar ticket (por cliente o número) — ver, reabrir o anular</button>
+  <div id="search-panel" style="display:none;">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Nombre del cliente o N° de ticket" onkeydown="if(event.key==='Enter') buscarTicket()">
+      <button onclick="buscarTicket()">Buscar</button>
+    </div>
+    <div id="search-results" class="search-results"></div>
+  </div>
+</div>
 
 <main>
   <div id="board" class="grid"></div>
@@ -172,6 +196,7 @@
         const elapsed = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/1000));
         const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
         const doneCount = o.items.filter(it => it.delivered).length;
+        const allDone = doneCount === o.items.length;
         const itemsHtml = o.items.map((it, idx) => {
           const done = !!it.delivered;
           return '<div class="item-line ' + (done ? "done" : "") + '" onclick="toggleItem(\'' + o.id + '\',' + idx + ')">' +
@@ -184,7 +209,7 @@
           '<div class="items">' + itemsHtml + '</div>' +
           (o.obs ? '<div class="obs">' + o.obs + '</div>' : '') +
           '<div class="meta"><span>' + new Date(o.paid_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) + '</span><span>' + o.payment_method + '</span></div>' +
-          '<button class="btn-deliver" onclick="confirmarEntrega(\'' + o.id + '\')">Marcar todo como entregado</button>' +
+          '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + (allDone ? "✔ Cerrar pedido" : "Marcar todo como entregado") + '</button>' +
           '</div>';
       }).join("");
     }
@@ -199,11 +224,7 @@
     const order = pendingOrders.find(o => o.id === orderId);
     if (!order) return;
     const items = order.items.map((it,i) => i === idx ? { ...it, delivered: !it.delivered } : it);
-    const allDone = items.every(it => it.delivered);
-    const patch = { items };
-    if (allDone) { patch.status = "entregado"; patch.delivered_at = new Date().toISOString(); }
-    await sb.from("orders").update(patch).eq("id", orderId);
-    if (allDone) showToast("Pedido #" + order.ticket_num + " completo — entregado.");
+    await sb.from("orders").update({ items }).eq("id", orderId);
     await loadPending(); await loadDeliveredRecent(); render();
   }
 
@@ -214,6 +235,47 @@
     await sb.from("orders").update(patch).eq("id", id);
     showToast("Pedido entregado.");
     await loadPending(); await loadDeliveredRecent(); render();
+  }
+
+  function toggleSearch(){
+    const p = document.getElementById("search-panel");
+    p.style.display = p.style.display === "none" ? "block" : "none";
+    if (p.style.display === "block") document.getElementById("search-input").focus();
+  }
+
+  async function buscarTicket(){
+    const q = document.getElementById("search-input").value.trim();
+    const results = document.getElementById("search-results");
+    if (!q) { results.innerHTML = ""; return; }
+    let query = sb.from("orders").select("*").eq("register_id", register.id).order("paid_at", { ascending:false }).limit(20);
+    query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) { results.innerHTML = "<p style='color:#7C8996; font-size:13px;'>Sin resultados.</p>"; return; }
+    results.innerHTML = data.map(renderSearchRow).join("");
+  }
+
+  function renderSearchRow(o){
+    const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
+    const itemsTxt = o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", ");
+    return '<div class="search-row">' +
+      '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
+        '<div class="meta">' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+      '<div class="search-actions">' +
+        (o.status !== "pendiente_entrega" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
+        (o.status !== "anulado" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
+      '</div></div>';
+  }
+
+  async function reabrirPedido(id){
+    await sb.from("orders").update({ status:"pendiente_entrega", delivered_at:null }).eq("id", id);
+    showToast("Pedido reabierto.");
+    buscarTicket();
+  }
+
+  async function anularPedidoBuscado(id){
+    await sb.from("orders").update({ status:"anulado" }).eq("id", id);
+    showToast("Pedido anulado.");
+    buscarTicket();
   }
 
   init();

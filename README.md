@@ -68,10 +68,33 @@ En `despacho.html`, cada producto del pedido se lista por separado y se
 puede tocar para marcarlo como entregado individualmente (por ejemplo,
 tickear "Piscola", "Mango Sour" y "Copa de vino" pero dejar "Terremoto"
 pendiente). El pedido se mantiene abierto — y el cronómetro sigue
-corriendo — hasta que se marca el último producto, momento en el que el
-pedido se cierra solo. El botón "Marcar todo como entregado" sigue
-disponible como atajo para cerrar todo el pedido de una vez, sin tickear
-producto por producto.
+corriendo — aunque se tickeen todos los productos: **no se cierra solo**.
+Se cierra únicamente con el botón, que se pone verde y dice "✔ Cerrar
+pedido" cuando ya no queda nada pendiente.
+
+### Buscar y reabrir tickets
+
+Tanto en la caja de productos como en Entrega hay un buscador ("🔎 Buscar
+ticket") que encuentra pedidos por **nombre de cliente** (parcial) o por
+**número de ticket** (exacto), en cualquier estado. Desde ahí se puede
+**reabrir** un pedido ya entregado o anulado (vuelve a `pendiente_entrega`
+y reaparece en Entrega) o **anular** cualquier ticket encontrado, no solo
+el último vendido.
+
+### Control de stock (solo caja de productos)
+
+Desde "Editar menú", cada producto tiene un interruptor "Controlar stock" +
+una cantidad. Al guardar, ese número queda como stock inicial y cada venta
+lo va descontando. "📦 Ver stock" muestra una tabla con el stock actual, el
+% restante y una alerta "¡Reponer!" al llegar a ≤25%; además aparece un
+aviso emergente justo después de una venta si el producto vendido quedó en
+ese rango. Para recargar stock, vuelve a "Editar menú" y guarda la nueva
+cantidad total — eso también reinicia la base del 25% a ese número.
+
+### Menú responsive
+
+La grilla de productos se ajusta sola al ancho de pantalla (celular,
+tablet, etc.) en vez de saltar entre un número fijo de columnas.
 
 ### PIN de administrador
 

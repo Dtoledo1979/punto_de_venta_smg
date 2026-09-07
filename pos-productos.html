@@ -23,14 +23,18 @@
   .event-strip a{color:var(--accent); font-size:12.5px; cursor:pointer; text-decoration:underline;}
   main{max-width:1100px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
   @media (max-width:860px){ main{grid-template-columns:1fr;} }
-  .card{background:var(--surface); border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border);}
+  .card{background:var(--surface); border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
   .card h2{font-family:'Sora',sans-serif; font-size:16px; margin:0 0 12px;}
   .toggle{color:#3E6BD6; font-size:13px; cursor:pointer; background:none; border:none; padding:0; margin-bottom:10px; display:inline-block;}
-  .menu-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:9px;}
-  @media (min-width:520px) and (max-width:859px){ .menu-grid{grid-template-columns:repeat(3,1fr);} }
-  .item-btn{padding:16px 12px; border:1px solid var(--border); border-radius:11px; background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14.5px; font-weight:500; color:var(--ink); min-height:64px;}
-  .item-btn:active{background:#E4EEFB; border-color:#B9D2F5;}
-  .item-btn .price{display:block; font-size:12.5px; color:var(--muted); margin-top:3px; font-weight:400;}
+  .menu-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:8px;}
+  .item-btn{padding:14px 10px; border:1px solid var(--border); border-radius:11px; background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14px; font-weight:500; color:var(--ink); min-height:58px; transition:background .1s, transform .05s;}
+  .item-btn:active{background:#E4EEFB; border-color:#B9D2F5; transform:scale(0.98);}
+  .item-btn .price{display:block; font-size:12px; color:var(--muted); margin-top:3px; font-weight:400;}
+  .item-btn .stock-badge{display:block; font-size:10.5px; color:var(--warn); margin-top:2px; font-weight:600;}
+  @media (max-width:420px){
+    .menu-grid{grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:6px;}
+    .item-btn{padding:10px 8px; font-size:13px; min-height:50px;}
+  }
   .cart-row{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px; gap:8px;}
   .cart-row .name{flex:1;}
   .qty{display:flex; align-items:center; gap:7px;}
@@ -51,10 +55,24 @@
   .cash-feedback.ok{color:#1E7A3D;}
   .cash-feedback.warn{color:#B8720A;}
   #obs{width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-top:10px; resize:vertical; min-height:40px; font-family:inherit;}
-  .edit-row{display:flex; gap:6px; margin-bottom:7px; align-items:center;}
+  .edit-item{border:1px solid var(--border); border-radius:10px; padding:9px; margin-bottom:8px;}
+  .edit-row{display:flex; gap:6px; align-items:center;}
   .edit-row input{padding:8px; border:1px solid var(--border); border-radius:7px; font-size:13px;}
   .edit-row input.name{flex:2;} .edit-row input.price{flex:1; width:70px;}
-  .edit-row button{border:none; background:#FBE6E4; color:#A3271D; border-radius:7px; padding:7px 10px; cursor:pointer;}
+  .edit-row button{border:none; background:#FBE6E4; color:#A3271D; border-radius:7px; padding:7px 10px; cursor:pointer; flex:none;}
+  .stock-row{display:flex; gap:6px; align-items:center; margin-top:7px; padding-top:7px; border-top:1px dashed var(--border); flex-wrap:wrap;}
+  .stock-row label{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; flex:none;}
+  .stock-row input[type=number]{width:80px; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12.5px;}
+  .stock-row button{border:none; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;}
+  #stock-panel{display:none;}
+  .stock-alert{color:#B8720A; font-weight:700;}
+  .search-box{display:flex; gap:8px;}
+  .search-box input{flex:1; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px;}
+  .search-row{display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border); font-size:13.5px; gap:8px;}
+  .search-row .meta{font-size:12px; color:var(--muted); margin-top:2px;}
+  .search-actions{display:flex; gap:6px; flex:none;}
+  .search-actions button{padding:7px 10px; font-size:12px; margin:0;}
+  #search-panel{display:none; margin-top:10px;}
   .add-form{display:flex; gap:6px; margin-top:8px;}
   .add-form input{flex:1; padding:8px; border:1px solid var(--border); border-radius:7px; font-size:13px;}
   table.tbl{width:100%; border-collapse:collapse; font-size:13px; margin-top:8px;}
@@ -109,7 +127,8 @@
 <main>
   <div class="card">
     <h2>Menú</h2>
-    <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / cambiar precios)</button>
+    <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / precios / stock)</button>
+    <button class="toggle" style="margin-left:14px;" onclick="toggleStock()">📦 Ver stock</button>
     <div id="edit-panel" style="display:none; margin-bottom:14px;">
       <button class="toggle" style="font-size:12px;" onclick="abrirAdmin()">⚙️ Administración (renombrar / resetear PIN)</button>
       <div id="edit-list"></div>
@@ -118,6 +137,9 @@
         <input type="number" id="new-price" placeholder="$" style="width:70px;">
         <button class="btn btn-secondary btn-small" onclick="addItem()">Agregar</button>
       </div>
+    </div>
+    <div id="stock-panel" style="display:none;">
+      <div id="stock-body"></div>
     </div>
     <div class="menu-grid" id="menu-grid"></div>
   </div>
@@ -147,6 +169,17 @@
     <div class="ticket-note">Próximo N° de ticket: <b id="next-ticket">—</b></div>
   </div>
 </main>
+
+<div class="card" style="max-width:1064px; margin:0 18px 16px;">
+  <button class="toggle" onclick="toggleSearch()">🔎 Buscar ticket (por cliente o número)</button>
+  <div id="search-panel" style="display:none; margin-top:10px;">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Nombre del cliente o N° de ticket" onkeydown="if(event.key==='Enter') buscarTicket()">
+      <button class="btn btn-primary btn-small" onclick="buscarTicket()">Buscar</button>
+    </div>
+    <div id="search-results"></div>
+  </div>
+</div>
 
 <div class="card" style="max-width:1064px; margin:0 18px 24px;">
   <button class="toggle" onclick="toggleSummary()">📊 Ver resumen de ventas</button>
@@ -271,11 +304,38 @@
     menu.forEach(item => {
       const b = document.createElement("button");
       b.className = "item-btn";
-      b.innerHTML = item.name + '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
+      let html = item.name + '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
+      if (item.track_stock && item.stock_qty !== null) {
+        const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : 1;
+        html += '<span class="stock-badge">' + item.stock_qty + ' en stock' + (pct <= 0.25 ? " ⚠️" : "") + '</span>';
+      }
+      b.innerHTML = html;
       b.onclick = () => addToCart(item);
       grid.appendChild(b);
     });
     renderEditList();
+    renderStockPanel();
+  }
+
+  function toggleStock(){
+    const p = document.getElementById("stock-panel");
+    p.style.display = p.style.display === "none" ? "block" : "none";
+  }
+
+  function renderStockPanel(){
+    const box = document.getElementById("stock-body");
+    const tracked = menu.filter(m => m.track_stock);
+    if (!tracked.length) {
+      box.innerHTML = "<p style='color:#9AA7B2; font-size:13px; margin-top:8px;'>Ningún producto tiene el stock activado todavía. Actívalo desde \"Editar menú\".</p>";
+      return;
+    }
+    let html = '<table class="tbl"><tr><th>Producto</th><th>Stock actual</th><th>% restante</th><th></th></tr>';
+    tracked.forEach(m => {
+      const pct = m.initial_stock > 0 ? Math.round((m.stock_qty / m.initial_stock) * 100) : 0;
+      html += '<tr><td>' + m.name + '</td><td>' + m.stock_qty + ' / ' + m.initial_stock + '</td><td>' + pct + '%</td><td>' + (pct <= 25 ? '<span class="stock-alert">¡Reponer!</span>' : '') + '</td></tr>';
+    });
+    html += '</table>';
+    box.innerHTML = html;
   }
 
   function toggleEdit(){
@@ -287,16 +347,39 @@
     const list = document.getElementById("edit-list");
     list.innerHTML = "";
     menu.forEach(item => {
-      const row = document.createElement("div");
-      row.className = "edit-row";
-      row.innerHTML = '<input class="name" value="' + item.name.replace(/"/g,"&quot;") + '">' +
-        '<input class="price" type="number" value="' + item.price + '">' +
-        "<button>✕</button>";
-      const [nameInput, priceInput] = row.querySelectorAll("input");
+      const wrap = document.createElement("div");
+      wrap.className = "edit-item";
+      wrap.innerHTML =
+        '<div class="edit-row">' +
+          '<input class="name" value="' + item.name.replace(/"/g,"&quot;") + '">' +
+          '<input class="price" type="number" value="' + item.price + '">' +
+          '<button class="del-btn">✕</button>' +
+        '</div>' +
+        '<div class="stock-row">' +
+          '<label><input type="checkbox" class="stock-check" ' + (item.track_stock ? "checked" : "") + '> Controlar stock</label>' +
+          '<input type="number" class="stock-qty-input" placeholder="cantidad" value="' + (item.track_stock && item.stock_qty != null ? item.stock_qty : "") + '" ' + (item.track_stock ? "" : "disabled") + '>' +
+          '<button class="stock-save-btn">Guardar stock</button>' +
+        '</div>';
+      const [nameInput, priceInput] = wrap.querySelectorAll(".edit-row input");
       nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
       priceInput.onchange = () => updateItem(item.id, { price: Number(priceInput.value) });
-      row.querySelector("button").onclick = () => removeItem(item.id);
-      list.appendChild(row);
+      wrap.querySelector(".del-btn").onclick = () => removeItem(item.id);
+
+      const stockCheck = wrap.querySelector(".stock-check");
+      const stockInput = wrap.querySelector(".stock-qty-input");
+      stockCheck.onchange = () => { stockInput.disabled = !stockCheck.checked; };
+      wrap.querySelector(".stock-save-btn").onclick = async () => {
+        if (!stockCheck.checked) {
+          await updateItem(item.id, { track_stock: false });
+          showToast("Stock desactivado para " + item.name + ".");
+          return;
+        }
+        if (stockInput.value === "" || isNaN(Number(stockInput.value))) { showToast("Ingresa una cantidad de stock válida."); return; }
+        const qty = Number(stockInput.value);
+        await updateItem(item.id, { track_stock: true, stock_qty: qty, initial_stock: qty });
+        showToast("Stock de " + item.name + " cargado: " + qty + " unidades.");
+      };
+      list.appendChild(wrap);
     });
   }
 
@@ -346,6 +429,9 @@
   function addToCart(item){
     if (!cart[item.id]) cart[item.id] = { name: item.name, price: Number(item.price), qty: 0 };
     cart[item.id].qty += 1;
+    if (item.track_stock && item.stock_qty !== null && cart[item.id].qty > item.stock_qty) {
+      showToast("⚠️ Solo quedan " + item.stock_qty + " unidades de " + item.name + " en stock.");
+    }
     renderCart();
   }
 
@@ -478,6 +564,27 @@
 
     printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash);
     showToast("Pedido #" + ticketNum + " enviado a Entrega.");
+
+    const soldQty = {}; keys.forEach(id => soldQty[id] = cart[id].qty);
+    const stockUpdates = keys.filter(id => {
+      const m = menu.find(x => x.id === id);
+      return m && m.track_stock && m.stock_qty !== null;
+    });
+    if (stockUpdates.length) {
+      await Promise.all(stockUpdates.map(id => {
+        const m = menu.find(x => x.id === id);
+        const newStock = Math.max(0, Number(m.stock_qty) - soldQty[id]);
+        return sb.from("menu_items").update({ stock_qty: newStock }).eq("id", id);
+      }));
+      await loadMenu(); renderMenu();
+      const low = [];
+      stockUpdates.forEach(id => {
+        const m = menu.find(x => x.id === id);
+        if (m && m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) low.push(m.name + " (" + m.stock_qty + ")");
+      });
+      if (low.length) setTimeout(() => showToast("⚠️ Reponer stock: " + low.join(", ")), 1800);
+    }
+
     vaciarCarro();
   }
 
@@ -525,6 +632,47 @@
     document.getElementById("void-btn").style.display = "none";
     showToast("Ticket #" + lastTicketNum + " anulado.");
     lastOrderId = null;
+  }
+
+  function toggleSearch(){
+    const p = document.getElementById("search-panel");
+    p.style.display = p.style.display === "none" ? "block" : "none";
+    if (p.style.display === "block") document.getElementById("search-input").focus();
+  }
+
+  async function buscarTicket(){
+    const q = document.getElementById("search-input").value.trim();
+    const results = document.getElementById("search-results");
+    if (!q) { results.innerHTML = ""; return; }
+    let query = sb.from("orders").select("*").eq("register_id", register.id).order("paid_at", { ascending:false }).limit(20);
+    query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) { results.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>Sin resultados.</p>"; return; }
+    results.innerHTML = data.map(renderSearchRow).join("");
+  }
+
+  function renderSearchRow(o){
+    const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
+    const itemsTxt = o.items.map(it => it.qty + "x " + it.name).join(", ");
+    return '<div class="search-row">' +
+      '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
+        '<div class="meta">' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+      '<div class="search-actions">' +
+        (o.status !== "pendiente_entrega" ? '<button class="btn btn-secondary" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
+        (o.status !== "anulado" ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
+      '</div></div>';
+  }
+
+  async function reabrirPedido(id){
+    await sb.from("orders").update({ status:"pendiente_entrega", delivered_at:null }).eq("id", id);
+    showToast("Pedido reabierto — vuelve a aparecer en Entrega.");
+    buscarTicket();
+  }
+
+  async function anularPedidoBuscado(id){
+    await sb.from("orders").update({ status:"anulado" }).eq("id", id);
+    showToast("Pedido anulado.");
+    buscarTicket();
   }
 
   function toggleSummary(){
