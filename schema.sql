@@ -360,6 +360,21 @@ begin
     coalesce(p_cash,0), coalesce(p_card,0), p_customer_name, p_attended_by, v_status, p_obs, v_delivered_at
   ) returning * into v_order;
 
+  -- Descontar stock de los productos vendidos que lo tengan activado.
+  -- IMPORTANTE: solo toca stock_qty, nunca initial_stock (esa es la base
+  -- del % restante — reiniciarla en cada venta es el bug que hacía que
+  -- siempre marcara 100%).
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    if v_item ? 'id' then
+      update pos.menu_items
+        set stock_qty = greatest(0, stock_qty - coalesce((v_item->>'qty')::numeric, 0))
+        where id = (v_item->>'id')::uuid
+          and register_id = p_register_id
+          and track_stock = true
+          and stock_qty is not null;
+    end if;
+  end loop;
+
   return v_order;
 end;
 $$;

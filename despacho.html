@@ -279,9 +279,10 @@
   function renderSearchRow(o){
     const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
     const itemsTxt = o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", ");
+    const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
     return '<div class="search-row">' +
       '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+        '<div class="meta">' + timeTxt + ' · ' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
         (o.status !== "pendiente_entrega" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
         (o.status !== "anulado" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +

@@ -564,7 +564,7 @@
     if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
     const obs = document.getElementById("obs").value.trim();
-    const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: false }));
+    const items = keys.map(id => ({ id, name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: false }));
 
     const { data: order, error } = await sb.rpc("create_order", {
       p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
@@ -584,20 +584,14 @@
     printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash);
     showToast("Pedido #" + ticketNum + " enviado a Entrega.");
 
-    const soldQty = {}; keys.forEach(id => soldQty[id] = cart[id].qty);
-    const stockUpdates = keys.filter(id => {
+    const trackedSold = keys.filter(id => {
       const m = menu.find(x => x.id === id);
       return m && m.track_stock && m.stock_qty !== null;
     });
-    if (stockUpdates.length) {
-      await Promise.all(stockUpdates.map(id => {
-        const m = menu.find(x => x.id === id);
-        const newStock = Math.max(0, Number(m.stock_qty) - soldQty[id]);
-        return sb.rpc("set_item_stock", { p_register_id: register.id, p_pin: myPin(), p_item_id: id, p_track_stock: true, p_qty: newStock });
-      }));
+    if (trackedSold.length) {
       await loadMenu(); renderMenu();
       const low = [];
-      stockUpdates.forEach(id => {
+      trackedSold.forEach(id => {
         const m = menu.find(x => x.id === id);
         if (m && m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) low.push(m.name + " (" + m.stock_qty + ")");
       });
@@ -673,9 +667,10 @@
   function renderSearchRow(o){
     const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
     const itemsTxt = o.items.map(it => it.qty + "x " + it.name).join(", ");
+    const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
     return '<div class="search-row">' +
       '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+        '<div class="meta">' + timeTxt + ' · ' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
         (o.status !== "pendiente_entrega" ? '<button class="btn btn-secondary" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
         (o.status !== "anulado" ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
