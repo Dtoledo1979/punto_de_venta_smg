@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrega — South Media Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
+    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
+    --danger:#E4483A; --warn:#D98B00; --ok:#2FA35A; --border:#E2E6EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:#fff; font-family:'Inter',Arial,sans-serif; min-height:100vh;}
+  header{padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid #1E2530;}
+  header .id{display:flex; align-items:center; gap:9px;}
+  header .mark path{fill:var(--accent);}
+  header h1{font-family:'Sora',sans-serif; font-size:16px; font-weight:700; margin:0;}
+  header .back{color:#9AA7B2; text-decoration:none; font-size:13px;}
+  .sub{color:#9AA7B2; font-size:13px; padding:12px 20px 0;}
+  main{max-width:1200px; margin:0 auto; padding:16px 20px 40px;}
+  .empty{color:#5C6A77; text-align:center; padding:80px 20px; font-size:15px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;}
+  .order{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px;}
+  .order .row1{display:flex; justify-content:space-between; align-items:baseline;}
+  .order .tnum{font-family:'Sora',sans-serif; font-size:20px; font-weight:800;}
+  .timer{font-family:'Sora',sans-serif; font-size:22px; font-weight:800; padding:3px 10px; border-radius:8px; background:#1E2A1F; color:var(--ok);}
+  .timer.warn{background:#2A2312; color:var(--warn);}
+  .timer.danger{background:#2E1B19; color:var(--danger);}
+  .items{font-size:13.5px; color:#C9D3DC; line-height:1.5;}
+  .obs{font-size:12.5px; color:var(--accent); background:#1A2314; padding:6px 9px; border-radius:8px;}
+  .meta{font-size:12px; color:#5C6A77; display:flex; justify-content:space-between;}
+  .btn-deliver{border:none; background:var(--accent); color:var(--accent-ink); font-weight:700; padding:11px; border-radius:9px; cursor:pointer; font-size:14.5px;}
+  .delivered-title{margin-top:32px; font-family:'Sora',sans-serif; font-size:15px; color:#9AA7B2;}
+  .delivered-list{margin-top:10px; font-size:13px; color:#7C8996; display:flex; flex-direction:column; gap:6px;}
+  #pin-overlay{position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
+  .modal{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:24px; max-width:320px; width:100%; text-align:center;}
+  .modal h3{font-family:'Sora',sans-serif; margin:0 0 6px; font-size:17px;}
+  .modal p{font-size:13.5px; color:#9AA7B2; margin:0 0 16px;}
+  .modal input{width:100%; padding:12px; border:1px solid #2A323D; border-radius:9px; font-size:20px; text-align:center; letter-spacing:4px; background:#0E1116; color:#fff;}
+  .modal .row{display:flex; gap:8px; margin-top:14px;}
+  .modal button{flex:1; padding:11px; border-radius:9px; border:none; font-weight:600; cursor:pointer;}
+  .modal .ok{background:var(--accent); color:var(--accent-ink);}
+  .modal .cancel{background:#232B36; color:#fff;}
+  #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--accent); color:var(--accent-ink); padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; font-weight:600;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="id">
+    <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
+    <h1>Entrega</h1>
+  </div>
+  <a class="back" href="index.html">← Inicio</a>
+</header>
+<div class="sub" id="event-label">Cargando…</div>
+
+<main>
+  <div id="board" class="grid"></div>
+  <div id="empty-msg" class="empty" style="display:none;">No hay pedidos pendientes de entrega.</div>
+
+  <div class="delivered-title">Entregados recientemente</div>
+  <div id="delivered-list" class="delivered-list"></div>
+</main>
+
+<div id="pin-overlay">
+  <div class="modal">
+    <h3>Ingresa el PIN</h3>
+    <p>PIN de la caja de productos para abrir Entrega.</p>
+    <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autofocus>
+    <div class="row">
+      <button class="cancel" onclick="location.href='index.html'">Cancelar</button>
+      <button class="ok" onclick="checkPin()">Entrar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
+  const SUPABASE_ANON_KEY = "REEMPLAZA_CON_TU_ANON_KEY";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+
+  // Umbrales del timer (segundos) — ajusta si tu operación es más rápida/lenta.
+  const WARN_AFTER = 120;   // amarillo
+  const DANGER_AFTER = 300; // rojo
+
+  let register = null;
+  let pendingOrders = [];
+  let deliveredRecent = [];
+  let tickInterval = null;
+
+  function showToast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.style.display = "block";
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.style.display = "none", 2200);
+  }
+
+  async function init(){
+    const { data: registers } = await sb.from("registers").select("*").eq("type","producto").eq("active", true).order("created_at").limit(1);
+    if (!registers || registers.length === 0){ showToast("No hay caja de tipo Producto configurada."); return; }
+    register = registers[0];
+
+    const saved = sessionStorage.getItem("pos_pin_" + register.id);
+    if (saved === register.pin){
+      document.getElementById("pin-overlay").style.display = "none";
+      await afterUnlock();
+    }
+
+    const { data: ev } = await sb.from("events").select("name").eq("active", true).limit(1).maybeSingle();
+    document.getElementById("event-label").textContent = ev ? ("Evento activo: " + ev.name) : "Sin evento activo.";
+  }
+
+  function checkPin(){
+    const val = document.getElementById("pin-input").value;
+    if (val === register.pin){
+      sessionStorage.setItem("pos_pin_" + register.id, val);
+      document.getElementById("pin-overlay").style.display = "none";
+      afterUnlock();
+    } else showToast("PIN incorrecto.");
+  }
+
+  async function afterUnlock(){
+    await loadPending();
+    await loadDeliveredRecent();
+    render();
+    subscribeRealtime();
+    tickInterval = setInterval(render, 1000);
+  }
+
+  async function loadPending(){
+    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","pendiente_entrega").order("paid_at");
+    pendingOrders = data || [];
+  }
+
+  async function loadDeliveredRecent(){
+    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","entregado").order("delivered_at",{ ascending:false }).limit(6);
+    deliveredRecent = data || [];
+  }
+
+  function subscribeRealtime(){
+    sb.channel("orders-despacho")
+      .on("postgres_changes", { event:"*", schema:"pos", table:"orders", filter:"register_id=eq." + register.id },
+        async () => { await loadPending(); await loadDeliveredRecent(); render(); })
+      .subscribe();
+  }
+
+  function fmt(seconds){
+    const m = Math.floor(seconds/60), s = seconds%60;
+    return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  }
+
+  function render(){
+    const board = document.getElementById("board");
+    const empty = document.getElementById("empty-msg");
+    if (pendingOrders.length === 0){
+      board.innerHTML = ""; empty.style.display = "block";
+    } else {
+      empty.style.display = "none";
+      board.innerHTML = pendingOrders.map(o => {
+        const elapsed = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/1000));
+        const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
+        const items = o.items.map(it => it.qty + "x " + it.name).join(", ");
+        return '<div class="order">' +
+          '<div class="row1"><span class="tnum">#' + o.ticket_num + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
+          '<div class="items">' + items + '</div>' +
+          (o.obs ? '<div class="obs">' + o.obs + '</div>' : '') +
+          '<div class="meta"><span>' + new Date(o.paid_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) + '</span><span>' + o.payment_method + '</span></div>' +
+          '<button class="btn-deliver" onclick="confirmarEntrega(\'' + o.id + '\')">Confirmar entrega</button>' +
+          '</div>';
+      }).join("");
+    }
+
+    document.getElementById("delivered-list").innerHTML = deliveredRecent.map(o => {
+      const secs = Math.round((new Date(o.delivered_at) - new Date(o.paid_at))/1000);
+      return '<div>#' + o.ticket_num + ' — entregado en ' + fmt(secs) + '</div>';
+    }).join("") || '<div style="color:#4A5563;">Aún no hay entregas registradas.</div>';
+  }
+
+  async function confirmarEntrega(id){
+    await sb.from("orders").update({ status:"entregado", delivered_at:new Date().toISOString() }).eq("id", id);
+    showToast("Pedido entregado.");
+  }
+
+  init();
+</script>
+</body>
+</html>

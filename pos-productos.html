@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS Productos — South Media Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
+    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
+    --danger:#E4483A; --warn:#D98B00; --border:#E2E6EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--surface-alt); color:var(--ink); font-family:'Inter',Arial,sans-serif;}
+  header{background:var(--bg); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+  header .id{display:flex; align-items:center; gap:9px;}
+  header .mark path{fill:var(--accent);}
+  header h1{font-family:'Sora',sans-serif; font-size:15px; font-weight:700; margin:0;}
+  header .back{color:#C9D3DC; text-decoration:none; font-size:13px;}
+  .event-strip{background:#171C24; color:#C9D3DC; font-size:13px; padding:9px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+  .event-strip a{color:var(--accent); font-size:12.5px; cursor:pointer; text-decoration:underline;}
+  main{max-width:1100px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
+  @media (max-width:860px){ main{grid-template-columns:1fr;} }
+  .card{background:var(--surface); border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border);}
+  .card h2{font-family:'Sora',sans-serif; font-size:16px; margin:0 0 12px;}
+  .toggle{color:#3E6BD6; font-size:13px; cursor:pointer; background:none; border:none; padding:0; margin-bottom:10px; display:inline-block;}
+  .menu-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:9px;}
+  @media (min-width:520px) and (max-width:859px){ .menu-grid{grid-template-columns:repeat(3,1fr);} }
+  .item-btn{padding:16px 12px; border:1px solid var(--border); border-radius:11px; background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14.5px; font-weight:500; color:var(--ink); min-height:64px;}
+  .item-btn:active{background:#E4EEFB; border-color:#B9D2F5;}
+  .item-btn .price{display:block; font-size:12.5px; color:var(--muted); margin-top:3px; font-weight:400;}
+  .cart-row{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px; gap:8px;}
+  .cart-row .name{flex:1;}
+  .qty{display:flex; align-items:center; gap:7px;}
+  .qty button{width:28px; height:28px; border-radius:7px; border:1px solid var(--border); background:#fff; font-size:15px; cursor:pointer;}
+  .total-row{display:flex; justify-content:space-between; font-size:19px; font-weight:700; margin-top:12px; padding-top:12px; border-top:2px solid var(--ink); font-family:'Sora',sans-serif;}
+  .btn{display:block; width:100%; padding:14px; border:none; border-radius:10px; font-size:15.5px; font-weight:600; cursor:pointer; margin-top:9px; font-family:'Inter',sans-serif;}
+  .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .btn-secondary{background:var(--surface-alt); color:var(--ink); border:1px solid var(--border);}
+  .btn-danger{background:#FBE6E4; color:#A3271D;}
+  .btn-small{width:auto; padding:8px 12px; margin:0; font-size:13px;}
+  .pay-row{display:flex; gap:8px; margin-top:10px;}
+  .pay-row button{flex:1; margin:0;}
+  .pay-row button.on{outline:2px solid var(--ink);}
+  #obs{width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-top:10px; resize:vertical; min-height:40px; font-family:inherit;}
+  .edit-row{display:flex; gap:6px; margin-bottom:7px; align-items:center;}
+  .edit-row input{padding:8px; border:1px solid var(--border); border-radius:7px; font-size:13px;}
+  .edit-row input.name{flex:2;} .edit-row input.price{flex:1; width:70px;}
+  .edit-row button{border:none; background:#FBE6E4; color:#A3271D; border-radius:7px; padding:7px 10px; cursor:pointer;}
+  .add-form{display:flex; gap:6px; margin-top:8px;}
+  .add-form input{flex:1; padding:8px; border:1px solid var(--border); border-radius:7px; font-size:13px;}
+  table.tbl{width:100%; border-collapse:collapse; font-size:13px; margin-top:8px;}
+  table.tbl th, table.tbl td{text-align:left; padding:6px 4px; border-bottom:1px solid var(--border);}
+  table.tbl th{color:var(--muted); font-weight:500;}
+  .ticket-note{font-size:12.5px; color:var(--muted); margin-top:6px;}
+  #summary{display:none;}
+  #pin-overlay,#modal-overlay{position:fixed; inset:0; background:rgba(10,13,18,.6); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
+  .modal{background:#fff; border-radius:14px; padding:24px; max-width:340px; width:100%; text-align:center;}
+  .modal h3{font-family:'Sora',sans-serif; margin:0 0 6px; font-size:17px;}
+  .modal p{font-size:13.5px; color:var(--muted); margin:0 0 16px;}
+  .modal input{width:100%; padding:12px; border:1px solid var(--border); border-radius:9px; font-size:20px; text-align:center; letter-spacing:4px;}
+  .modal .row{display:flex; gap:8px; margin-top:14px;}
+  #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
+  #receipt-area{display:none;}
+  @page{ size:80mm auto; margin:2mm; }
+  @media print{
+    body *{visibility:hidden;}
+    #receipt-area, #receipt-area *{visibility:visible;}
+    #receipt-area{display:block !important; position:absolute; top:0; left:0; width:80mm;}
+    .receipt-copy{padding:4px 6px; font-family:monospace; width:100%;}
+    .receipt-copy h3{text-align:center; margin:0 0 4px; font-size:13px;}
+    .receipt-copy .line{display:flex; justify-content:space-between; font-size:12px;}
+    .receipt-copy .obs{font-size:11px; margin:4px 0; word-wrap:break-word;}
+    .receipt-copy hr{border:none; border-top:1px dashed #000;}
+    .cut{text-align:center; font-size:11px; margin:10px 0; letter-spacing:2px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="id">
+    <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
+    <h1 id="register-name">POS Productos</h1>
+  </div>
+  <a class="back" href="index.html">← Inicio</a>
+</header>
+
+<div class="event-strip">
+  <span id="event-label">Cargando evento…</span>
+  <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
+</div>
+<div id="event-form" class="card" style="display:none; margin:12px 18px 0; max-width:1064px;">
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <input type="text" id="event-name" placeholder="Nombre del evento" style="flex:2; min-width:160px; padding:9px; border:1px solid var(--border); border-radius:8px;">
+    <input type="date" id="event-date" style="padding:9px; border:1px solid var(--border); border-radius:8px;">
+    <button class="btn btn-primary btn-small" onclick="crearEvento()">Iniciar evento</button>
+  </div>
+</div>
+
+<main>
+  <div class="card">
+    <h2>Menú</h2>
+    <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / cambiar precios)</button>
+    <div id="edit-panel" style="display:none; margin-bottom:14px;">
+      <button class="toggle" style="font-size:12px;" onclick="cambiarPin()">🔒 Cambiar PIN de esta caja</button>
+      <div id="edit-list"></div>
+      <div class="add-form">
+        <input type="text" id="new-name" placeholder="Nombre (ej. Terremoto)">
+        <input type="number" id="new-price" placeholder="$" style="width:70px;">
+        <button class="btn btn-secondary btn-small" onclick="addItem()">Agregar</button>
+      </div>
+    </div>
+    <div class="menu-grid" id="menu-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Pedido actual</h2>
+    <div id="cart-list"><p style="color:#9AA7B2; font-size:13px;">Toca un ítem del menú para agregarlo.</p></div>
+    <div class="total-row"><span>Total</span><span id="total">$0</span></div>
+    <textarea id="obs" placeholder="Observación (ej. sin hielo, sin granadina)"></textarea>
+    <div class="pay-row">
+      <button class="btn btn-secondary" id="pay-efectivo" onclick="setPago('efectivo')">💵 Efectivo</button>
+      <button class="btn btn-secondary" id="pay-tarjeta" onclick="setPago('tarjeta')">💳 Tarjeta</button>
+      <button class="btn btn-secondary" id="pay-cortesia" onclick="setPago('cortesia')">🎁 Cortesía</button>
+    </div>
+    <button class="btn btn-primary" onclick="cobrar()">Cobrar y enviar a Entrega</button>
+    <button class="btn btn-secondary" onclick="vaciarCarro()">Vaciar pedido</button>
+    <button class="btn btn-danger" id="void-btn" style="display:none;" onclick="anularUltimo()">↩️ Anular último ticket (#<span id="void-num"></span>)</button>
+    <div class="ticket-note">Próximo N° de ticket: <b id="next-ticket">—</b></div>
+  </div>
+</main>
+
+<div class="card" style="max-width:1064px; margin:0 18px 24px;">
+  <button class="toggle" onclick="toggleSummary()">📊 Ver resumen de ventas</button>
+  <button class="btn btn-secondary btn-small" style="float:right;" onclick="exportarCSV()">⬇️ Exportar CSV</button>
+  <div id="summary">
+    <h2>Resumen del evento activo</h2>
+    <div id="summary-body">Cargando…</div>
+  </div>
+</div>
+
+<div id="pin-overlay">
+  <div class="modal">
+    <h3 id="pin-title">Ingresa el PIN</h3>
+    <p id="pin-sub">PIN de esta caja para comenzar a vender.</p>
+    <input type="password" id="pin-input" inputmode="numeric" maxlength="8" autofocus>
+    <div class="row">
+      <button class="btn btn-secondary" onclick="location.href='index.html'">Cancelar</button>
+      <button class="btn btn-primary" onclick="checkPin()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="receipt-area"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
+  const SUPABASE_ANON_KEY = "REEMPLAZA_CON_TU_ANON_KEY";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+
+  // Cambia esto a true una vez tengas la integración EFTPOS con BNZ/Verifone lista.
+  const EFTPOS_ENABLED = false;
+  async function sendToEftpos(totalAmount) {
+    if (!EFTPOS_ENABLED) return { ok: true, skipped: true };
+    // TODO: reemplazar por la llamada real a la API que entregue BNZ/Verifone.
+    // Debe enviar totalAmount al terminal y esperar confirmación de pago antes
+    // de continuar con cobrar().
+    return { ok: true };
+  }
+
+  let register = null;      // fila de pos.registers
+  let activeEvent = null;   // fila de pos.events activa
+  let menu = [];             // pos.menu_items
+  let cart = {};             // { itemId: {name, price, qty} }
+  let selectedPago = null;
+  let lastOrderId = null, lastTicketNum = null;
+
+  function showToast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.style.display = "block";
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.style.display = "none", 2600);
+  }
+
+  async function init() {
+    const { data: registers, error } = await sb.from("registers").select("*").eq("type","producto").eq("active", true).order("created_at").limit(1);
+    if (error || !registers || registers.length === 0) {
+      showToast("No hay una caja de tipo Producto configurada en Supabase.");
+      return;
+    }
+    register = registers[0];
+    document.getElementById("register-name").textContent = register.name;
+    document.getElementById("next-ticket").textContent = register.next_ticket;
+
+    const savedPin = sessionStorage.getItem("pos_pin_" + register.id);
+    if (savedPin === register.pin) {
+      document.getElementById("pin-overlay").style.display = "none";
+      await afterUnlock();
+    }
+  }
+
+  function checkPin() {
+    const val = document.getElementById("pin-input").value;
+    if (val === register.pin) {
+      sessionStorage.setItem("pos_pin_" + register.id, val);
+      document.getElementById("pin-overlay").style.display = "none";
+      afterUnlock();
+    } else {
+      showToast("PIN incorrecto.");
+    }
+  }
+
+  async function afterUnlock() {
+    await loadActiveEvent();
+    await loadMenu();
+    renderMenu();
+    renderCart();
+  }
+
+  async function loadActiveEvent() {
+    const { data } = await sb.from("events").select("*").eq("active", true).limit(1).maybeSingle();
+    activeEvent = data || null;
+    document.getElementById("event-label").textContent = activeEvent ? ("Evento activo: " + activeEvent.name) : "Sin evento activo — crea uno para empezar a vender.";
+  }
+
+  function toggleEventForm(){
+    const f = document.getElementById("event-form");
+    f.style.display = f.style.display === "none" ? "block" : "none";
+  }
+
+  async function crearEvento(){
+    const name = document.getElementById("event-name").value.trim();
+    const date = document.getElementById("event-date").value || null;
+    if (!name) { showToast("Escribe el nombre del evento."); return; }
+    await sb.from("events").update({ active:false }).eq("active", true);
+    const { data, error } = await sb.from("events").insert({ name, event_date: date, active:true }).select().single();
+    if (error) { showToast("No se pudo crear el evento."); return; }
+    activeEvent = data;
+    document.getElementById("event-label").textContent = "Evento activo: " + data.name;
+    toggleEventForm();
+    showToast("Evento iniciado.");
+  }
+
+  async function loadMenu(){
+    const { data } = await sb.from("menu_items").select("*").eq("register_id", register.id).eq("active", true).order("sort_order");
+    menu = data || [];
+  }
+
+  function renderMenu(){
+    const grid = document.getElementById("menu-grid");
+    grid.innerHTML = "";
+    menu.forEach(item => {
+      const b = document.createElement("button");
+      b.className = "item-btn";
+      b.innerHTML = item.name + '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
+      b.onclick = () => addToCart(item);
+      grid.appendChild(b);
+    });
+    renderEditList();
+  }
+
+  function toggleEdit(){
+    const p = document.getElementById("edit-panel");
+    p.style.display = p.style.display === "none" ? "block" : "none";
+  }
+
+  function renderEditList(){
+    const list = document.getElementById("edit-list");
+    list.innerHTML = "";
+    menu.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "edit-row";
+      row.innerHTML = '<input class="name" value="' + item.name.replace(/"/g,"&quot;") + '">' +
+        '<input class="price" type="number" value="' + item.price + '">' +
+        "<button>✕</button>";
+      const [nameInput, priceInput] = row.querySelectorAll("input");
+      nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
+      priceInput.onchange = () => updateItem(item.id, { price: Number(priceInput.value) });
+      row.querySelector("button").onclick = () => removeItem(item.id);
+      list.appendChild(row);
+    });
+  }
+
+  async function addItem(){
+    const name = document.getElementById("new-name").value.trim();
+    const price = Number(document.getElementById("new-price").value);
+    if (!name || !price) { showToast("Completa nombre y precio."); return; }
+    await sb.from("menu_items").insert({ register_id: register.id, name, price, sort_order: menu.length });
+    document.getElementById("new-name").value = ""; document.getElementById("new-price").value = "";
+    await loadMenu(); renderMenu();
+  }
+
+  async function updateItem(id, patch){
+    await sb.from("menu_items").update(patch).eq("id", id);
+    await loadMenu(); renderMenu();
+  }
+
+  async function removeItem(id){
+    await sb.from("menu_items").update({ active:false }).eq("id", id);
+    await loadMenu(); renderMenu();
+  }
+
+  function cambiarPin(){
+    const nuevo = prompt("Nuevo PIN para esta caja:");
+    if (!nuevo) return;
+    sb.from("registers").update({ pin: nuevo }).eq("id", register.id).then(() => {
+      register.pin = nuevo;
+      sessionStorage.setItem("pos_pin_" + register.id, nuevo);
+      showToast("PIN actualizado.");
+    });
+  }
+
+  function addToCart(item){
+    if (!cart[item.id]) cart[item.id] = { name: item.name, price: Number(item.price), qty: 0 };
+    cart[item.id].qty += 1;
+    renderCart();
+  }
+
+  function renderCart(){
+    const list = document.getElementById("cart-list");
+    const keys = Object.keys(cart);
+    if (keys.length === 0) {
+      list.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">Toca un ítem del menú para agregarlo.</p>';
+    } else {
+      list.innerHTML = keys.map(id => {
+        const l = cart[id];
+        return '<div class="cart-row"><span class="name">' + l.name + '</span>' +
+          '<div class="qty"><button onclick="changeQty(\'' + id + '\',-1)">−</button><span>' + l.qty + '</span><button onclick="changeQty(\'' + id + '\',1)">+</button></div>' +
+          '<span>$' + Math.round(l.price * l.qty).toLocaleString("es-CL") + '</span></div>';
+      }).join("");
+    }
+    const total = keys.reduce((s,id) => s + cart[id].price * cart[id].qty, 0);
+    document.getElementById("total").textContent = "$" + Math.round(total).toLocaleString("es-CL");
+  }
+
+  function changeQty(id, delta){
+    cart[id].qty += delta;
+    if (cart[id].qty <= 0) delete cart[id];
+    renderCart();
+  }
+
+  function vaciarCarro(){
+    cart = {}; selectedPago = null; document.getElementById("obs").value = "";
+    ["efectivo","tarjeta","cortesia"].forEach(p => document.getElementById("pay-"+p).classList.remove("on"));
+    renderCart();
+  }
+
+  function setPago(p){
+    selectedPago = p;
+    ["efectivo","tarjeta","cortesia"].forEach(x => document.getElementById("pay-"+x).classList.toggle("on", x===p));
+  }
+
+  async function cobrar(){
+    const keys = Object.keys(cart);
+    if (keys.length === 0) return;
+    if (!selectedPago) { showToast("Selecciona método de pago: Efectivo, Tarjeta o Cortesía."); return; }
+    if (!activeEvent) { showToast("Primero inicia un evento."); return; }
+
+    const total = keys.reduce((s,id) => s + cart[id].price * cart[id].qty, 0);
+    const eftposResult = await sendToEftpos(total);
+    if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
+
+    const { data: ticketNum, error: tErr } = await sb.rpc("next_ticket", { p_register_id: register.id });
+    if (tErr) { showToast("No se pudo generar el número de ticket."); return; }
+
+    const obs = document.getElementById("obs").value.trim();
+    const items = keys.map(id => ({ name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty }));
+    const now = new Date();
+
+    const { data: order, error } = await sb.from("orders").insert({
+      register_id: register.id, event_id: activeEvent.id, ticket_num: ticketNum,
+      items, total, payment_method: selectedPago, status: "pendiente_entrega",
+      obs, paid_at: now.toISOString()
+    }).select().single();
+
+    if (error) { showToast("No se pudo registrar el pedido."); return; }
+
+    lastOrderId = order.id; lastTicketNum = ticketNum;
+    document.getElementById("void-btn").style.display = "block";
+    document.getElementById("void-num").textContent = ticketNum;
+    document.getElementById("next-ticket").textContent = ticketNum + 1;
+
+    printReceipt(ticketNum, items, total, obs, now);
+    showToast("Pedido #" + ticketNum + " enviado a Entrega.");
+    vaciarCarro();
+  }
+
+  function printReceipt(ticketNum, items, total, obs, now){
+    const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
+    function buildCopy(label){
+      let html = '<div class="receipt-copy"><h3>South Media — ' + label + '</h3>';
+      html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div><hr>';
+      items.forEach(l => html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span>$' + Math.round(l.subtotal) + '</span></div>');
+      if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
+      html += '<hr><div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div></div>';
+      return html;
+    }
+    document.getElementById("receipt-area").innerHTML = buildCopy("COPIA BARRA") + '<div class="cut">- - - CORTAR AQUÍ - - -</div>' + buildCopy("COPIA CLIENTE");
+    window.print();
+  }
+
+  async function anularUltimo(){
+    if (!lastOrderId) return;
+    await sb.from("orders").update({ status:"anulado" }).eq("id", lastOrderId);
+    document.getElementById("void-btn").style.display = "none";
+    showToast("Ticket #" + lastTicketNum + " anulado.");
+    lastOrderId = null;
+  }
+
+  function toggleSummary(){
+    const s = document.getElementById("summary");
+    const willShow = s.style.display === "none";
+    s.style.display = willShow ? "block" : "none";
+    if (willShow) renderSummary();
+  }
+
+  async function renderSummary(){
+    if (!activeEvent) { document.getElementById("summary-body").innerHTML = "<p>No hay evento activo.</p>"; return; }
+    const { data: orders } = await sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","anulado");
+    const body = document.getElementById("summary-body");
+    if (!orders || orders.length === 0) { body.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>Aún no hay ventas en este evento.</p>"; return; }
+
+    const paid = orders.filter(o => o.payment_method !== "cortesia");
+    const courtesy = orders.filter(o => o.payment_method === "cortesia");
+    let total = 0, cash = 0, card = 0;
+    const byProduct = {};
+    paid.forEach(o => {
+      total += Number(o.total);
+      if (o.payment_method === "efectivo") cash += Number(o.total);
+      if (o.payment_method === "tarjeta") card += Number(o.total);
+      o.items.forEach(it => {
+        if (!byProduct[it.name]) byProduct[it.name] = { qty:0, total:0 };
+        byProduct[it.name].qty += it.qty; byProduct[it.name].total += it.subtotal;
+      });
+    });
+
+    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">Total vendido: $' + Math.round(total).toLocaleString("es-CL") + '</p>';
+    html += '<p style="font-size:13px; color:var(--muted);">Efectivo: $' + Math.round(cash).toLocaleString("es-CL") + ' &nbsp;|&nbsp; Tarjeta: $' + Math.round(card).toLocaleString("es-CL") + '</p>';
+    html += '<table class="tbl"><tr><th>Producto</th><th>Cant.</th><th>Total</th></tr>';
+    Object.keys(byProduct).sort((a,b) => byProduct[b].total - byProduct[a].total).forEach(name => {
+      html += '<tr><td>' + name + '</td><td>' + byProduct[name].qty + '</td><td>$' + Math.round(byProduct[name].total).toLocaleString("es-CL") + '</td></tr>';
+    });
+    html += '</table>';
+    if (courtesy.length){
+      html += '<p style="font-weight:600; margin-top:14px;">🎁 Cortesías entregadas</p><table class="tbl"><tr><th>Producto</th><th>Cant.</th></tr>';
+      const byC = {};
+      courtesy.forEach(o => o.items.forEach(it => byC[it.name] = (byC[it.name]||0) + it.qty));
+      Object.keys(byC).forEach(name => html += '<tr><td>'+name+'</td><td>'+byC[name]+'</td></tr>');
+      html += '</table>';
+    }
+    body.innerHTML = html;
+  }
+
+  async function exportarCSV(){
+    const { data: orders } = await sb.from("orders").select("*, events(name,event_date)").eq("register_id", register.id);
+    let csv = "Evento,Fecha,Ticket,Hora,Producto,Cantidad,PrecioUnitario,Subtotal,TotalTicket,MetodoPago,Estado,Observacion\n";
+    (orders||[]).forEach(o => {
+      const evName = o.events ? o.events.name : "";
+      const evDate = o.events ? o.events.event_date : "";
+      const time = new Date(o.paid_at).toLocaleString("es-CL");
+      o.items.forEach(it => {
+        csv += [evName, evDate, o.ticket_num, time, it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.status, (o.obs||"").replace(/,/g,";")].join(",") + "\n";
+      });
+    });
+    const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "ventas_productos.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  init();
+</script>
+</body>
+</html>

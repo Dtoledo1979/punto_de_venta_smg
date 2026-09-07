@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Punto de Venta — South Media Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
+    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
+    --danger:#E4483A; --warn:#D98B00; --border:#E2E6EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',Arial,sans-serif; min-height:100vh;}
+  .top{display:flex; align-items:center; gap:10px; padding:22px 24px 0;}
+  .mark{width:30px; height:30px; flex:none;}
+  .mark path{fill:var(--accent);}
+  .word{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:17px; letter-spacing:.2px;}
+  .word span{color:var(--accent);}
+  .hero{padding:44px 24px 8px; max-width:920px;}
+  .hero h1{color:#fff; font-family:'Sora',sans-serif; font-weight:800; font-size:clamp(28px,5vw,42px); line-height:1.12; margin:0 0 10px;}
+  .hero p{color:#9AA7B2; font-size:15px; margin:0; max-width:52ch; line-height:1.5;}
+  .event-pill{display:inline-flex; align-items:center; gap:8px; margin-top:18px; background:#171C24; border:1px solid #262E38; color:#C9D3DC; padding:8px 14px; border-radius:999px; font-size:13px;}
+  .event-pill .dot{width:7px; height:7px; border-radius:50%; background:#3AD16A;}
+  .event-pill .dot.off{background:#4A5563;}
+  main{max-width:920px; margin:0 auto; padding:28px 24px 60px;}
+  .tiles{display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
+  @media (max-width:720px){ .tiles{grid-template-columns:1fr;} }
+  .tile{border-radius:16px; padding:26px; text-decoration:none; display:block; position:relative; overflow:hidden; min-height:190px;}
+  .tile h2{font-family:'Sora',sans-serif; font-size:22px; margin:10px 0 6px;}
+  .tile p{font-size:14px; margin:0; line-height:1.5;}
+  .tile .go{position:absolute; right:22px; bottom:22px; font-size:22px;}
+  .tile-primary{background:var(--accent); color:var(--accent-ink);}
+  .tile-primary p{color:#31401C;}
+  .tile-secondary{background:var(--surface); color:var(--ink); border:1px solid var(--border);}
+  .tile-secondary p{color:var(--muted);}
+  .tag{display:inline-block; font-size:12px; padding:4px 10px; border-radius:999px; background:rgba(0,0,0,.08); color:inherit;}
+  .tile-secondary .tag{background:var(--surface-alt); color:var(--muted);}
+  .footer-row{display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;}
+  .footer-link{flex:1; min-width:220px; background:#151A21; border:1px solid #232A33; color:#C9D3DC; border-radius:12px; padding:16px 18px; text-decoration:none; display:flex; align-items:center; justify-content:space-between; font-size:14px;}
+  .footer-link b{color:#fff; font-weight:600;}
+  .footer-link .go{color:var(--accent); font-size:18px;}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <svg class="mark" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
+  <div class="word">SOUTH MEDIA <span>GROUP</span></div>
+</div>
+
+<div class="hero">
+  <h1>Punto de venta</h1>
+  <p>Elige el módulo con el que vas a trabajar en esta caja. El menú, los precios y el registro de ventas se editan directamente dentro de cada módulo.</p>
+  <div class="event-pill"><span class="dot off" id="event-dot"></span><span id="event-label">Cargando evento activo…</span></div>
+</div>
+
+<main>
+  <div class="tiles">
+    <a class="tile tile-primary" href="pos-productos.html">
+      <span class="tag">Requiere entrega</span>
+      <h2>Venta de productos</h2>
+      <p>Caja de barra/comida. El pedido queda "por entregar" hasta que Entrega confirma que salió al cliente.</p>
+      <span class="go">→</span>
+    </a>
+    <a class="tile tile-secondary" href="pos-tickets.html">
+      <span class="tag">Autoejecutado</span>
+      <h2>Venta de tickets</h2>
+      <p>Boletería. Al cobrar, el pedido queda cerrado de inmediato — no pasa por Entrega.</p>
+      <span class="go">→</span>
+    </a>
+  </div>
+
+  <div class="footer-row">
+    <a class="footer-link" href="despacho.html"><span>Pantalla de <b>Entrega</b> — para el personal de despacho</span><span class="go">→</span></a>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
+  const SUPABASE_ANON_KEY = "REEMPLAZA_CON_TU_ANON_KEY";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+
+  async function loadEvent() {
+    const dot = document.getElementById("event-dot");
+    const label = document.getElementById("event-label");
+    try {
+      const { data, error } = await sb.from("events").select("name").eq("active", true).limit(1).maybeSingle();
+      if (error) throw error;
+      if (data) { dot.classList.remove("off"); label.textContent = "Evento activo: " + data.name; }
+      else { dot.classList.add("off"); label.textContent = "Sin evento activo — actívalo desde cualquiera de los dos módulos."; }
+    } catch (e) {
+      dot.classList.add("off");
+      label.textContent = "No se pudo conectar a Supabase. Revisa la configuración.";
+    }
+  }
+  loadEvent();
+</script>
+</body>
+</html>
