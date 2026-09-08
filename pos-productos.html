@@ -62,8 +62,11 @@
   .edit-row button{border:none; background:#FBE6E4; color:#A3271D; border-radius:7px; padding:7px 10px; cursor:pointer; flex:none;}
   .stock-row{display:flex; gap:6px; align-items:center; margin-top:7px; padding-top:7px; border-top:1px dashed var(--border); flex-wrap:wrap;}
   .stock-row label{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; flex:none;}
-  .stock-row input[type=number]{width:80px; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12.5px;}
+  .stock-row input[type=number]{width:90px; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12.5px;}
   .stock-row button{border:none; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;}
+  .stock-actions .reset-btn{background:#FBE9D6; border-color:#EBC894;}
+  .stock-actions .add-btn{background:#DCF1E3; border-color:#9BD8B0;}
+  .stock-history{margin-top:7px; overflow-x:auto;}
   #stock-panel{display:none;}
   .stock-alert{color:#B8720A; font-weight:700;}
   .search-box{display:flex; gap:8px;}
@@ -365,6 +368,7 @@
     menu.forEach(item => {
       const wrap = document.createElement("div");
       wrap.className = "edit-item";
+      const stockInfo = item.track_stock ? (item.stock_qty + " / " + item.initial_stock + " actual") : "sin stock activado";
       wrap.innerHTML =
         '<div class="edit-row">' +
           '<input class="name" value="' + item.name.replace(/"/g,"&quot;") + '">' +
@@ -373,32 +377,69 @@
         '</div>' +
         '<div class="stock-row">' +
           '<label><input type="checkbox" class="stock-check" ' + (item.track_stock ? "checked" : "") + '> Controlar stock</label>' +
-          '<input type="number" class="stock-qty-input" placeholder="cantidad" value="' + (item.track_stock && item.stock_qty != null ? item.stock_qty : "") + '" ' + (item.track_stock ? "" : "disabled") + '>' +
-          '<button class="stock-save-btn">Guardar stock</button>' +
-        '</div>';
+          '<span style="font-size:12px; color:var(--muted);">' + stockInfo + '</span>' +
+        '</div>' +
+        '<div class="stock-row stock-actions" style="' + (item.track_stock ? "" : "display:none;") + '">' +
+          '<input type="number" class="reset-input" placeholder="reiniciar a">' +
+          '<button class="reset-btn">Reiniciar</button>' +
+          '<input type="number" class="add-input" placeholder="agregar +">' +
+          '<button class="add-btn">Agregar</button>' +
+          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleHistorial(this,\'' + item.id + '\')">Ver historial</a>' +
+        '</div>' +
+        '<div class="stock-history" style="display:none;"></div>';
       const [nameInput, priceInput] = wrap.querySelectorAll(".edit-row input");
       nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
       priceInput.onchange = () => updateItem(item.id, { price: Number(priceInput.value) });
       wrap.querySelector(".del-btn").onclick = () => removeItem(item.id);
 
       const stockCheck = wrap.querySelector(".stock-check");
-      const stockInput = wrap.querySelector(".stock-qty-input");
-      stockCheck.onchange = () => { stockInput.disabled = !stockCheck.checked; };
-      wrap.querySelector(".stock-save-btn").onclick = async () => {
+      const actionsRow = wrap.querySelector(".stock-actions");
+      stockCheck.onchange = async () => {
         if (!stockCheck.checked) {
-          await sb.rpc("set_item_stock", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_track_stock: false, p_qty: null });
-          await loadMenu(); renderMenu();
+          await sb.rpc("disable_stock", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id });
           showToast("Stock desactivado para " + item.name + ".");
+          await loadMenu(); renderMenu();
           return;
         }
-        if (stockInput.value === "" || isNaN(Number(stockInput.value))) { showToast("Ingresa una cantidad de stock válida."); return; }
-        const qty = Number(stockInput.value);
-        await sb.rpc("set_item_stock", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_track_stock: true, p_qty: qty });
-        await loadMenu(); renderMenu();
-        showToast("Stock de " + item.name + " cargado: " + qty + " unidades.");
+        actionsRow.style.display = "flex";
       };
+
+      wrap.querySelector(".reset-btn").onclick = async () => {
+        const input = wrap.querySelector(".reset-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida para reiniciar."); return; }
+        const qty = Number(input.value);
+        await sb.rpc("restock_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_mode: "reset", p_qty: qty, p_note: null, p_by: operatorName || null });
+        showToast(item.name + ": stock reiniciado a " + qty + ".");
+        await loadMenu(); renderMenu();
+      };
+
+      wrap.querySelector(".add-btn").onclick = async () => {
+        const input = wrap.querySelector(".add-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida para agregar."); return; }
+        const qty = Number(input.value);
+        await sb.rpc("restock_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_mode: "add", p_qty: qty, p_note: null, p_by: operatorName || null });
+        showToast(item.name + ": se agregaron " + qty + " unidades.");
+        await loadMenu(); renderMenu();
+      };
+
       list.appendChild(wrap);
     });
+  }
+
+  async function toggleHistorial(linkEl, itemId){
+    const box = linkEl.closest(".edit-item").querySelector(".stock-history");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = "Cargando…";
+    const { data, error } = await sb.from("stock_movements").select("*").eq("menu_item_id", itemId).order("created_at", { ascending:false }).limit(15);
+    if (error || !data || data.length === 0) { box.innerHTML = "<p style='font-size:12px; color:var(--muted);'>Sin movimientos registrados.</p>"; return; }
+    const labels = { carga_inicial:"Carga inicial", restock:"Reposición", venta:"Venta", ajuste:"Ajuste" };
+    box.innerHTML = '<table class="tbl" style="font-size:11.5px;"><tr><th>Fecha</th><th>Tipo</th><th>Cambio</th><th>Quedó</th><th>Quién</th></tr>' +
+      data.map(m => {
+        const when = new Date(m.created_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+        const change = (m.qty_change > 0 ? "+" : "") + m.qty_change;
+        return '<tr><td>' + when + '</td><td>' + (labels[m.type]||m.type) + '</td><td>' + change + '</td><td>' + m.qty_after + '</td><td>' + (m.created_by||"—") + '</td></tr>';
+      }).join("") + '</table>';
   }
 
   async function addItem(){
