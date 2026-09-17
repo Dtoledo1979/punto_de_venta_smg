@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insumos, Stock y Recetas — South Media Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
+    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
+    --danger:#E4483A; --warn:#D98B00; --ok:#1E7A3D; --border:#E2E6EA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--surface-alt); color:var(--ink); font-family:'Inter',Arial,sans-serif;}
+  header{background:var(--bg); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+  header .id{display:flex; align-items:center; gap:9px;}
+  header .mark path{fill:var(--accent);}
+  header h1{font-family:'Sora',sans-serif; font-size:15px; font-weight:700; margin:0;}
+  header .back{color:#C9D3DC; text-decoration:none; font-size:13px; margin-left:14px;}
+  main{max-width:900px; margin:0 auto; padding:20px 18px 60px;}
+  .card{background:var(--surface); border-radius:20px; padding:20px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); margin-bottom:18px;}
+  .card h2{font-family:'Sora',sans-serif; font-size:17px; margin:0 0 4px;}
+  .card .sub{font-size:12.5px; color:var(--muted); margin:0 0 14px;}
+  .toggle{color:#3E6BD6; font-size:12.5px; cursor:pointer; background:none; border:none; padding:0; text-decoration:underline;}
+
+  .item-card{border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:10px; background:var(--surface-alt);}
+  .item-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .item-row input.name{flex:2; min-width:110px; padding:9px; border:1px solid var(--border); border-radius:9px; font-size:13.5px; font-weight:600;}
+  .item-row input.price{flex:1; min-width:70px; padding:9px; border:1px solid var(--border); border-radius:9px; font-size:13.5px;}
+  .item-row button.del-btn{border:none; background:#FBE6E4; color:#A3271D; border-radius:9px; padding:9px 12px; cursor:pointer; flex:none; font-size:14px;}
+
+  .color-row{display:flex; gap:7px; align-items:center; margin-top:10px; flex-wrap:wrap;}
+  .color-row .lbl{font-size:11.5px; color:var(--muted); margin-right:2px;}
+  .swatch{width:24px; height:24px; border-radius:50%; cursor:pointer; border:2px solid transparent; display:inline-flex; align-items:center; justify-content:center; font-size:12px; color:#fff; padding:0;}
+  .swatch.none{background:#fff; color:var(--muted); border:1.5px dashed var(--border);}
+  .swatch.selected{border-color:var(--ink); box-shadow:0 0 0 2px #fff inset;}
+
+  .prog-bar{background:#E2E6EA; border-radius:999px; height:10px; overflow:hidden; margin:8px 0 4px;}
+  .prog-fill{height:100%; border-radius:999px;}
+  .qty-line{font-size:13.5px; font-weight:600;}
+  .qty-sub{font-size:12px; color:var(--muted);}
+
+  .stock-row{display:flex; gap:6px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); flex-wrap:wrap;}
+  .stock-row label{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; flex:none;}
+  .stock-row input[type=number], .stock-row input[type=text]{width:100px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:12.5px;}
+  .stock-row button{border:none; border-radius:8px; padding:8px 12px; font-size:12.5px; cursor:pointer; font-weight:600;}
+  .reset-btn{background:#FBE9D6; border:1px solid #EBC894 !important;}
+  .add-btn{background:#DCF1E3; border:1px solid #9BD8B0 !important;}
+  .stock-alert{color:var(--warn); font-weight:700;}
+  .stock-history{margin-top:10px; overflow-x:auto;}
+  .links-row{display:flex; gap:14px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);}
+  .recipe-box, .promo-box{margin-top:8px;}
+
+  .add-form{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
+  .add-form input{flex:1; min-width:110px; padding:9px; border:1px solid var(--border); border-radius:9px; font-size:13px;}
+  .btn{border:none; border-radius:10px; padding:9px 14px; font-size:13.5px; font-weight:600; cursor:pointer;}
+  .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .btn-secondary{background:var(--surface-alt); color:var(--ink); border:1px solid var(--border);}
+  .btn-danger{background:#FBE6E4; color:#A3271D;}
+
+  table.tbl{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px;}
+  table.tbl th, table.tbl td{text-align:left; padding:6px 4px; border-bottom:1px solid var(--border);}
+  table.tbl th{color:var(--muted); font-weight:500;}
+
+  #pin-overlay{position:fixed; inset:0; background:rgba(10,13,18,.6); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
+  .modal{background:#fff; border-radius:18px; padding:24px; max-width:340px; width:100%; text-align:center;}
+  .modal h3{font-family:'Sora',sans-serif; margin:0 0 6px; font-size:17px;}
+  .modal p{font-size:13.5px; color:var(--muted); margin:0 0 16px;}
+  .modal input{width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; font-size:16px; margin-bottom:8px;}
+  .modal .row{display:flex; gap:8px; margin-top:6px;}
+  .modal .row .btn{flex:1;}
+  #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="id">
+    <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
+    <h1>🧰 Insumos, Stock y Recetas</h1>
+  </div>
+  <div>
+    <a class="back" onclick="abrirAdmin()" style="cursor:pointer;">⚙️ Administración</a>
+    <a class="back" href="index.html">← Inicio</a>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>📋 Productos</h2>
+    <p class="sub">Nombre, precio y color de cada producto. El color ayuda a distinguir variantes de un vistazo (ej. Piscola con Sprite vs con Coca-Cola).</p>
+    <div id="edit-list"></div>
+    <div class="add-form">
+      <input type="text" id="new-name" placeholder="Nombre (ej. Terremoto)">
+      <input type="number" id="new-price" placeholder="Precio $">
+      <button class="btn btn-primary" onclick="addItem()">Agregar producto</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🧪 Insumos</h2>
+    <p class="sub">Ingredientes con su propio stock (ml, gr, un). Se usan en las recetas de arriba para descontar automáticamente al vender.</p>
+    <div id="ingredients-list"></div>
+    <div class="add-form">
+      <input type="text" id="new-ing-name" placeholder="Nombre (ej. Vino)">
+      <input type="text" id="new-ing-unit" placeholder="Unidad (ml, gr, un)">
+      <input type="number" id="new-ing-container" placeholder="ej. 750 (opcional)">
+      <input type="text" id="new-ing-container-label" placeholder="botella (opcional)">
+      <button class="btn btn-primary" onclick="addIngredient()">Agregar insumo</button>
+    </div>
+  </div>
+</main>
+
+<div id="pin-overlay">
+  <div class="modal">
+    <h3>Ingresa el PIN</h3>
+    <p>Tu nombre y el PIN de la caja para entrar a configuración.</p>
+    <input type="text" id="operator-name-input" placeholder="Tu nombre" autofocus>
+    <input type="password" id="pin-input" inputmode="numeric" maxlength="8">
+    <div class="row">
+      <button class="btn btn-secondary" onclick="location.href='index.html'">Cancelar</button>
+      <button class="btn btn-primary" onclick="checkPin()">Entrar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+
+  const PALETTE = ["#E4483A","#F0A202","#F5D547","#3AD16A","#4FB3E8","#3E6BD6","#8B5FBF","#E85D9C","#8A97A3"];
+
+  let register = null;
+  let operatorName = "";
+  let menu = [];
+  let ingredients = [];
+  let promotions = [];
+
+  function showToast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.style.display = "block";
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.style.display = "none", 2600);
+  }
+
+  async function init() {
+    const { data: registers, error } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type","producto").eq("active", true).order("created_at").limit(1);
+    if (error || !registers || registers.length === 0) { showToast("No hay una caja de tipo Producto configurada."); return; }
+    register = registers[0];
+
+    const savedPin = sessionStorage.getItem("pos_pin_" + register.id);
+    const savedName = sessionStorage.getItem("pos_operator_" + register.id);
+    if (savedPin && savedName) {
+      const { data: ok } = await sb.rpc("verify_register_pin", { p_register_id: register.id, p_pin: savedPin });
+      if (ok) {
+        operatorName = savedName;
+        document.getElementById("pin-overlay").style.display = "none";
+        await afterUnlock();
+      }
+    }
+  }
+
+  function myPin(){ return sessionStorage.getItem("pos_pin_" + register.id) || ""; }
+
+  async function checkPin() {
+    const name = document.getElementById("operator-name-input").value.trim();
+    const val = document.getElementById("pin-input").value;
+    if (!name) { showToast("Escribe tu nombre."); return; }
+    const { data: ok } = await sb.rpc("verify_register_pin", { p_register_id: register.id, p_pin: val });
+    if (ok) {
+      operatorName = name;
+      sessionStorage.setItem("pos_pin_" + register.id, val);
+      sessionStorage.setItem("pos_operator_" + register.id, name);
+      document.getElementById("pin-overlay").style.display = "none";
+      afterUnlock();
+    } else showToast("PIN incorrecto.");
+  }
+
+  async function afterUnlock() {
+    await loadMenu();
+    await loadIngredients();
+    renderAll();
+  }
+
+  async function loadMenu(){
+    const { data } = await sb.from("menu_items").select("*").eq("register_id", register.id).eq("active", true).order("sort_order");
+    menu = data || [];
+    const { data: promoData } = await sb.from("promotions").select("*").eq("register_id", register.id);
+    promotions = promoData || [];
+  }
+
+  async function loadIngredients(){
+    const { data } = await sb.from("ingredients").select("*").eq("register_id", register.id).eq("active", true).order("created_at");
+    ingredients = data || [];
+  }
+
+  function renderAll(){
+    renderEditList();
+    renderIngredientsList();
+  }
+
+  // ---------------------------------------------------------------------
+  // Productos
+  // ---------------------------------------------------------------------
+  function renderEditList(){
+    const list = document.getElementById("edit-list");
+    list.innerHTML = "";
+    menu.forEach(item => {
+      const wrap = document.createElement("div");
+      wrap.className = "item-card";
+      const stockInfo = item.track_stock ? (item.stock_qty + " / " + item.initial_stock + " unidades") : "sin stock activado";
+      const swatches = PALETTE.map(hex =>
+        '<span class="swatch ' + (item.color === hex ? "selected" : "") + '" style="background:' + hex + ';" data-color="' + hex + '"></span>'
+      ).join("");
+      wrap.innerHTML =
+        '<div class="item-row">' +
+          '<input class="name" value="' + item.name.replace(/"/g,"&quot;") + '">' +
+          '<input class="price" type="number" value="' + item.price + '">' +
+          '<button class="del-btn">✕</button>' +
+        '</div>' +
+        '<div class="color-row">' +
+          '<span class="lbl">Color:</span>' +
+          '<span class="swatch none ' + (!item.color ? "selected" : "") + '" data-color="">∅</span>' +
+          swatches +
+        '</div>' +
+        '<div class="stock-row">' +
+          '<label><input type="checkbox" class="stock-check" ' + (item.track_stock ? "checked" : "") + '> Controlar stock</label>' +
+          '<span class="qty-sub">' + stockInfo + '</span>' +
+        '</div>' +
+        '<div class="stock-row stock-actions" style="' + (item.track_stock ? "" : "display:none;") + '">' +
+          '<input type="number" class="reset-input" placeholder="reiniciar a">' +
+          '<button class="reset-btn">Reiniciar</button>' +
+          '<input type="number" class="add-input" placeholder="agregar +">' +
+          '<button class="add-btn">Agregar</button>' +
+        '</div>' +
+        '<div class="stock-history" style="display:none;"></div>' +
+        '<div class="links-row">' +
+          '<a class="toggle" onclick="toggleHistorial(this,\'' + item.id + '\')">Ver historial de stock</a>' +
+          '<a class="toggle" onclick="toggleReceta(this,\'' + item.id + '\')">🍹 Receta</a>' +
+          '<a class="toggle" onclick="togglePromo(this,\'' + item.id + '\')">🏷️ Promoción' + (promotions.some(p=>p.menu_item_id===item.id) ? " ✓" : "") + '</a>' +
+        '</div>' +
+        '<div class="recipe-box" style="display:none;"></div>' +
+        '<div class="promo-box" style="display:none;"></div>';
+
+      const [nameInput, priceInput] = wrap.querySelectorAll(".item-row input");
+      nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
+      priceInput.onchange = () => updateItem(item.id, { price: Number(priceInput.value) });
+      wrap.querySelector(".del-btn").onclick = () => removeItem(item.id);
+
+      wrap.querySelectorAll(".swatch").forEach(sw => {
+        sw.onclick = async () => {
+          const color = sw.dataset.color || null;
+          await sb.rpc("set_item_color", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_color: color });
+          await loadMenu(); renderAll();
+        };
+      });
+
+      const stockCheck = wrap.querySelector(".stock-check");
+      const actionsRow = wrap.querySelector(".stock-actions");
+      stockCheck.onchange = async () => {
+        if (!stockCheck.checked) {
+          await sb.rpc("disable_stock", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id });
+          showToast("Stock desactivado para " + item.name + ".");
+          await loadMenu(); renderAll();
+          return;
+        }
+        actionsRow.style.display = "flex";
+      };
+      wrap.querySelector(".reset-btn").onclick = async () => {
+        const input = wrap.querySelector(".reset-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida."); return; }
+        await sb.rpc("restock_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_mode: "reset", p_qty: Number(input.value), p_note: null, p_by: operatorName || null });
+        showToast(item.name + ": stock reiniciado.");
+        await loadMenu(); renderAll();
+      };
+      wrap.querySelector(".add-btn").onclick = async () => {
+        const input = wrap.querySelector(".add-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida."); return; }
+        await sb.rpc("restock_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_mode: "add", p_qty: Number(input.value), p_note: null, p_by: operatorName || null });
+        showToast(item.name + ": se agregó stock.");
+        await loadMenu(); renderAll();
+      };
+
+      list.appendChild(wrap);
+    });
+    if (!menu.length) list.innerHTML = "<p class='qty-sub'>Todavía no agregas productos.</p>";
+  }
+
+  async function addItem(){
+    const name = document.getElementById("new-name").value.trim();
+    const price = Number(document.getElementById("new-price").value);
+    if (!name || !price) { showToast("Completa nombre y precio."); return; }
+    await sb.rpc("add_menu_item", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_price: price, p_sort_order: menu.length });
+    document.getElementById("new-name").value = ""; document.getElementById("new-price").value = "";
+    await loadMenu(); renderAll();
+  }
+
+  async function updateItem(id, patch){
+    await sb.rpc("update_menu_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: id, p_name: patch.name ?? null, p_price: patch.price ?? null });
+    await loadMenu(); renderAll();
+  }
+
+  async function removeItem(id){
+    if (!confirm("¿Quitar este producto del menú?")) return;
+    await sb.rpc("remove_menu_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: id });
+    await loadMenu(); renderAll();
+  }
+
+  // ---------------------------------------------------------------------
+  // Historial (compartido entre productos e insumos)
+  // ---------------------------------------------------------------------
+  async function toggleHistorial(linkEl, itemId){
+    const box = linkEl.closest(".item-card").querySelector(".stock-history");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = "Cargando…";
+    const { data, error } = await sb.from("stock_movements").select("*").or("menu_item_id.eq." + itemId + ",ingredient_id.eq." + itemId).order("created_at", { ascending:false }).limit(15);
+    if (error || !data || data.length === 0) { box.innerHTML = "<p class='qty-sub'>Sin movimientos registrados.</p>"; return; }
+    const labels = { carga_inicial:"Carga inicial", restock:"Reposición", venta:"Venta", ajuste:"Ajuste" };
+    box.innerHTML = '<table class="tbl"><tr><th>Fecha</th><th>Tipo</th><th>Cambio</th><th>Quedó</th><th>Quién</th></tr>' +
+      data.map(m => {
+        const when = new Date(m.created_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+        const change = (m.qty_change > 0 ? "+" : "") + m.qty_change;
+        return '<tr><td>' + when + '</td><td>' + (labels[m.type]||m.type) + '</td><td>' + change + '</td><td>' + m.qty_after + '</td><td>' + (m.created_by||"—") + '</td></tr>';
+      }).join("") + '</table>';
+  }
+
+  // ---------------------------------------------------------------------
+  // Recetas
+  // ---------------------------------------------------------------------
+  async function toggleReceta(linkEl, itemId){
+    const box = linkEl.closest(".item-card").querySelector(".recipe-box");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    await renderRecipeBox(box, itemId);
+  }
+
+  async function renderRecipeBox(box, itemId){
+    if (ingredients.length === 0) { box.innerHTML = "<p class='qty-sub'>Primero agrega al menos un insumo más abajo.</p>"; return; }
+    const { data } = await sb.from("recipe_items").select("*").eq("menu_item_id", itemId);
+    const lines = data || [];
+    const options = ingredients.map(i => '<option value="' + i.id + '">' + i.name + ' (' + i.unit + ')</option>').join("");
+    let html = "";
+    if (lines.length) {
+      html += '<table class="tbl"><tr><th>Insumo</th><th>Por unidad vendida</th><th></th></tr>';
+      lines.forEach(l => {
+        const ing = ingredients.find(i => i.id === l.ingredient_id);
+        html += '<tr><td>' + (ing ? ing.name : "?") + '</td><td>' + l.qty_per_unit + ' ' + (ing ? ing.unit : "") + '</td><td><button class="recipe-del" data-id="' + l.ingredient_id + '" style="border:none; background:#FBE6E4; color:#A3271D; border-radius:6px; padding:4px 8px; cursor:pointer;">✕</button></td></tr>';
+      });
+      html += '</table>';
+    } else {
+      html += "<p class='qty-sub'>Esta receta está vacía todavía.</p>";
+    }
+    html += '<div class="stock-row" style="border-top:none; padding-top:6px;">' +
+      '<select class="recipe-ing-select" style="padding:8px; border:1px solid var(--border); border-radius:8px;">' + options + '</select>' +
+      '<input type="number" class="recipe-qty-input" placeholder="cantidad">' +
+      '<button class="add-btn recipe-add-btn">Agregar a la receta</button></div>';
+    box.innerHTML = html;
+
+    box.querySelectorAll(".recipe-del").forEach(btn => {
+      btn.onclick = async () => {
+        const newLines = lines.filter(l => l.ingredient_id !== btn.dataset.id).map(l => ({ ingredient_id: l.ingredient_id, qty_per_unit: l.qty_per_unit }));
+        await sb.rpc("set_recipe", { p_register_id: register.id, p_pin: myPin(), p_menu_item_id: itemId, p_recipe: newLines });
+        showToast("Receta actualizada.");
+        renderRecipeBox(box, itemId);
+      };
+    });
+    box.querySelector(".recipe-add-btn").onclick = async () => {
+      const ingId = box.querySelector(".recipe-ing-select").value;
+      const qtyInput = box.querySelector(".recipe-qty-input");
+      if (qtyInput.value === "" || isNaN(Number(qtyInput.value))) { showToast("Ingresa una cantidad válida."); return; }
+      const newLines = lines.filter(l => l.ingredient_id !== ingId).map(l => ({ ingredient_id: l.ingredient_id, qty_per_unit: l.qty_per_unit }));
+      newLines.push({ ingredient_id: ingId, qty_per_unit: Number(qtyInput.value) });
+      await sb.rpc("set_recipe", { p_register_id: register.id, p_pin: myPin(), p_menu_item_id: itemId, p_recipe: newLines });
+      showToast("Receta actualizada.");
+      renderRecipeBox(box, itemId);
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Promociones
+  // ---------------------------------------------------------------------
+  function toLocalInputValue(iso){
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2,"0");
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function togglePromo(linkEl, itemId){
+    const box = linkEl.closest(".item-card").querySelector(".promo-box");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    renderPromoBox(box, itemId);
+  }
+
+  function renderPromoBox(box, itemId){
+    const promo = promotions.find(p => p.menu_item_id === itemId);
+    box.innerHTML =
+      '<div class="stock-row" style="border-top:none; padding-top:0;">' +
+        '<label>Cada <input type="number" class="promo-qty" style="width:55px;" value="' + (promo ? promo.bundle_qty : "") + '" placeholder="2"></label>' +
+        '<label>unid. por $ <input type="number" class="promo-price" style="width:75px;" value="' + (promo ? promo.bundle_price : "") + '" placeholder="5"></label>' +
+        '<label><input type="checkbox" class="promo-active" ' + (promo && promo.active ? "checked" : "") + ' style="width:auto;"> Activa</label>' +
+      '</div>' +
+      '<div class="qty-sub" style="margin:6px 0;">Opcional: prográmala con fecha/hora (vacío = corre mientras esté "Activa").</div>' +
+      '<div class="stock-row" style="border-top:none; padding-top:0;">' +
+        '<label>Desde <input type="datetime-local" class="promo-start" value="' + (promo && promo.starts_at ? toLocalInputValue(promo.starts_at) : "") + '" style="width:auto;"></label>' +
+        '<label>Hasta <input type="datetime-local" class="promo-end" value="' + (promo && promo.ends_at ? toLocalInputValue(promo.ends_at) : "") + '" style="width:auto;"></label>' +
+      '</div>' +
+      '<div class="stock-row" style="border-top:none; padding-top:0;">' +
+        '<button class="add-btn promo-save-btn">Guardar</button>' +
+        (promo ? '<button class="reset-btn promo-del-btn">Quitar promoción</button>' : '') +
+      '</div>';
+
+    box.querySelector(".promo-save-btn").onclick = async () => {
+      const qty = Number(box.querySelector(".promo-qty").value);
+      const priceVal = box.querySelector(".promo-price").value;
+      if (!qty || qty < 2 || priceVal === "" || isNaN(Number(priceVal))) { showToast("Completa la cantidad (2 o más) y el precio del combo."); return; }
+      const active = box.querySelector(".promo-active").checked;
+      const startVal = box.querySelector(".promo-start").value;
+      const endVal = box.querySelector(".promo-end").value;
+      const { error } = await sb.rpc("upsert_promotion", {
+        p_register_id: register.id, p_pin: myPin(), p_promotion_id: promo ? promo.id : null,
+        p_menu_item_id: itemId, p_name: null, p_bundle_qty: qty, p_bundle_price: Number(priceVal),
+        p_active: active, p_starts_at: startVal ? new Date(startVal).toISOString() : null, p_ends_at: endVal ? new Date(endVal).toISOString() : null
+      });
+      if (error) { showToast("No se pudo guardar la promoción."); return; }
+      showToast("Promoción guardada.");
+      await loadMenu(); renderAll();
+    };
+    if (promo) {
+      box.querySelector(".promo-del-btn").onclick = async () => {
+        await sb.rpc("delete_promotion", { p_register_id: register.id, p_pin: myPin(), p_promotion_id: promo.id });
+        showToast("Promoción eliminada.");
+        await loadMenu(); renderAll();
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Insumos — con conversión amigable (ml→L, gr→kg) y barra de progreso
+  // ---------------------------------------------------------------------
+  function formatQty(qty, unit){
+    if (qty == null) return "—";
+    if (unit === "ml" && qty >= 1000) return (Math.round(qty/10)/100) + " L";
+    if (unit === "gr" && qty >= 1000) return (Math.round(qty/10)/100) + " kg";
+    return qty + " " + unit;
+  }
+
+  function renderIngredientsList(){
+    const list = document.getElementById("ingredients-list");
+    if (!ingredients.length) { list.innerHTML = "<p class='qty-sub'>Todavía no registras insumos.</p>"; return; }
+    list.innerHTML = "";
+    ingredients.forEach(ing => {
+      const hasStock = ing.stock_qty != null && ing.initial_stock != null;
+      const pct = hasStock && ing.initial_stock > 0 ? Math.round((ing.stock_qty / ing.initial_stock) * 100) : 0;
+      const barColor = pct > 50 ? "var(--ok)" : pct > 25 ? "var(--warn)" : "var(--danger)";
+      const containerTxt = (ing.container_size && hasStock) ? ("≈ " + (ing.stock_qty / ing.container_size).toFixed(1) + " " + (ing.container_label || "envases") + " de " + formatQty(ing.container_size, ing.unit) + " c/u") : "";
+      const wrap = document.createElement("div");
+      wrap.className = "item-card";
+      wrap.innerHTML =
+        '<div class="item-row">' +
+          '<span class="name" style="flex:2; font-weight:700; font-size:14.5px;">' + ing.name + '</span>' +
+          '<button class="del-btn">✕</button>' +
+        '</div>' +
+        (hasStock ?
+          '<div class="prog-bar"><div class="prog-fill" style="width:' + Math.min(100,pct) + '%; background:' + barColor + ';"></div></div>' +
+          '<div class="qty-line">' + formatQty(ing.stock_qty, ing.unit) + ' de ' + formatQty(ing.initial_stock, ing.unit) + ' (' + pct + '%)' + (pct <= 25 ? ' <span class="stock-alert">¡Reponer!</span>' : '') + '</div>' +
+          (containerTxt ? '<div class="qty-sub">' + containerTxt + '</div>' : '')
+          : '<div class="qty-sub">Sin stock cargado todavía — usa "Reiniciar a" para cargar el primero.</div>') +
+        '<div class="stock-row">' +
+          '<input type="number" class="reset-input" placeholder="reiniciar a">' +
+          '<button class="reset-btn">Reiniciar</button>' +
+          '<input type="number" class="add-input" placeholder="agregar +">' +
+          '<button class="add-btn">Agregar</button>' +
+        '</div>' +
+        '<div class="stock-history" style="display:none;"></div>' +
+        '<div class="links-row" style="border-top:none; padding-top:4px;">' +
+          '<a class="toggle" onclick="toggleHistorial(this,\'' + ing.id + '\')">Ver historial</a>' +
+        '</div>';
+
+      wrap.querySelector(".del-btn").onclick = async () => {
+        if (!confirm("¿Quitar este insumo?")) return;
+        await sb.rpc("remove_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id });
+        showToast(ing.name + " eliminado.");
+        await loadIngredients(); renderAll();
+      };
+      wrap.querySelector(".reset-btn").onclick = async () => {
+        const input = wrap.querySelector(".reset-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida (en " + ing.unit + ")."); return; }
+        await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "reset", p_qty: Number(input.value), p_by: operatorName || null });
+        showToast(ing.name + ": stock reiniciado.");
+        await loadIngredients(); renderAll();
+      };
+      wrap.querySelector(".add-btn").onclick = async () => {
+        const input = wrap.querySelector(".add-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida (en " + ing.unit + ")."); return; }
+        await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "add", p_qty: Number(input.value), p_by: operatorName || null });
+        showToast(ing.name + ": se agregó stock.");
+        await loadIngredients(); renderAll();
+      };
+      list.appendChild(wrap);
+    });
+  }
+
+  async function addIngredient(){
+    const name = document.getElementById("new-ing-name").value.trim();
+    const unit = document.getElementById("new-ing-unit").value.trim();
+    const containerSize = document.getElementById("new-ing-container").value ? Number(document.getElementById("new-ing-container").value) : null;
+    const containerLabel = document.getElementById("new-ing-container-label").value.trim() || null;
+    if (!name || !unit) { showToast("Completa nombre y unidad (ml, gr, un)."); return; }
+    await sb.rpc("upsert_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: null, p_name: name, p_unit: unit, p_container_size: containerSize, p_container_label: containerLabel });
+    document.getElementById("new-ing-name").value = "";
+    document.getElementById("new-ing-unit").value = "";
+    document.getElementById("new-ing-container").value = "";
+    document.getElementById("new-ing-container-label").value = "";
+    showToast("Insumo agregado — ahora cárgale stock desde la lista.");
+    await loadIngredients(); renderAll();
+  }
+
+  // ---------------------------------------------------------------------
+  // Administración
+  // ---------------------------------------------------------------------
+  async function abrirAdmin(){
+    if (!register) return;
+    const pin = prompt("PIN de administrador:");
+    if (pin === null) return;
+    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
+    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
+
+    const nuevoNombre = prompt("Nombre de esta caja:", register.name);
+    const nuevoPin = prompt("Nuevo PIN de la caja (deja vacío para no cambiarlo):");
+    const nuevoDespachoPin = prompt("Nuevo PIN de Entrega (deja vacío para no cambiarlo):");
+
+    const nombreCambio = nuevoNombre && nuevoNombre.trim() && nuevoNombre.trim() !== register.name ? nuevoNombre.trim() : null;
+    if (nombreCambio || nuevoPin || nuevoDespachoPin) {
+      await sb.rpc("admin_update_register", {
+        p_admin_pin: pin, p_register_id: register.id,
+        p_name: nombreCambio, p_pin: nuevoPin || null, p_despacho_pin: nuevoDespachoPin || null
+      });
+      if (nombreCambio) register.name = nombreCambio;
+      if (nuevoPin) sessionStorage.setItem("pos_pin_" + register.id, nuevoPin);
+      showToast("Datos de la caja actualizados.");
+    }
+
+    const nuevoAdminPin = prompt("Nuevo PIN de administrador (deja vacío para no cambiarlo):");
+    if (nuevoAdminPin) {
+      await sb.rpc("admin_update_admin_pin", { p_admin_pin: pin, p_new_pin: nuevoAdminPin });
+      showToast("PIN de administrador actualizado.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

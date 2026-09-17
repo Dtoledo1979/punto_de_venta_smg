@@ -19,17 +19,28 @@
   .mark path{fill:var(--accent);}
   .word{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:17px; letter-spacing:.2px;}
   .word span{color:var(--accent);}
-  .hero{padding:44px 24px 8px; max-width:920px; margin:0 auto;}
-  .hero h1{color:#fff; font-family:'Sora',sans-serif; font-weight:800; font-size:clamp(28px,5vw,42px); line-height:1.12; margin:0 0 10px;}
-  .hero p{color:#9AA7B2; font-size:15px; margin:0; max-width:52ch; line-height:1.5;}
-  .event-pill{display:inline-flex; align-items:center; gap:8px; margin-top:18px; background:#171C24; border:1px solid #262E38; color:#C9D3DC; padding:8px 14px; border-radius:999px; font-size:13px;}
-  .event-pill .dot{width:7px; height:7px; border-radius:50%; background:#3AD16A;}
-  .event-pill .dot.off{background:#4A5563;}
-  main{max-width:920px; margin:0 auto; padding:28px 24px 60px;}
-  .tiles{display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
+  .hero{padding:36px 24px 8px; max-width:920px; margin:0 auto;}
+  .hero h1{color:#fff; font-family:'Sora',sans-serif; font-weight:800; font-size:clamp(26px,5vw,38px); line-height:1.15; margin:0 0 8px;}
+  .hero p{color:#9AA7B2; font-size:14.5px; margin:0; max-width:56ch; line-height:1.5;}
+  main{max-width:920px; margin:0 auto; padding:20px 24px 60px;}
+
+  .step-title{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; margin:26px 0 10px; display:flex; align-items:center; gap:8px;}
+  .step-title .num{background:var(--accent); color:var(--accent-ink); width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px;}
+
+  .event-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:10px;}
+  .event-card{background:#151B23; border:2px solid #232B36; border-radius:18px; padding:16px; cursor:pointer; text-align:left; color:#fff; font-family:inherit;}
+  .event-card:hover{border-color:#3A4552;}
+  .event-card.selected{border-color:var(--accent); background:#1A2314;}
+  .event-card .ename{font-weight:700; font-size:15px;}
+  .event-card .edate{font-size:12.5px; color:#9AA7B2; margin-top:3px;}
+  .event-card .check{float:right; color:var(--accent); font-weight:800; display:none;}
+  .event-card.selected .check{display:inline;}
+  .no-events{color:#9AA7B2; font-size:13.5px; background:#151B23; border:1px solid #232B36; border-radius:16px; padding:16px;}
+
+  .tiles{display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-top:2px;}
   @media (max-width:720px){ .tiles{grid-template-columns:1fr;} }
-  .tile{border-radius:16px; padding:26px; text-decoration:none; display:block; position:relative; overflow:hidden; min-height:190px;}
-  .tile h2{font-family:'Sora',sans-serif; font-size:22px; margin:10px 0 6px;}
+  .tile{border-radius:20px; padding:26px; text-decoration:none; display:block; position:relative; overflow:hidden; min-height:180px; transition:opacity .15s, filter .15s;}
+  .tile h2{font-family:'Sora',sans-serif; font-size:21px; margin:10px 0 6px;}
   .tile p{font-size:14px; margin:0; line-height:1.5;}
   .tile .go{position:absolute; right:22px; bottom:22px; font-size:22px;}
   .tile-primary{background:var(--accent); color:var(--accent-ink);}
@@ -38,10 +49,13 @@
   .tile-secondary p{color:var(--muted);}
   .tag{display:inline-block; font-size:12px; padding:4px 10px; border-radius:999px; background:rgba(0,0,0,.08); color:inherit;}
   .tile-secondary .tag{background:var(--surface-alt); color:var(--muted);}
-  .footer-row{display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;}
-  .footer-link{flex:1; min-width:220px; background:#151A21; border:1px solid #232A33; color:#C9D3DC; border-radius:12px; padding:16px 18px; text-decoration:none; display:flex; align-items:center; justify-content:space-between; font-size:14px;}
+  .tile.disabled{pointer-events:none; opacity:.4; filter:grayscale(60%);}
+
+  .footer-row{display:flex; gap:12px; margin-top:14px; flex-wrap:wrap;}
+  .footer-link{flex:1; min-width:220px; background:#151A21; border:1px solid #232A33; color:#C9D3DC; border-radius:16px; padding:16px 18px; text-decoration:none; display:flex; align-items:center; justify-content:space-between; font-size:14px;}
   .footer-link b{color:#fff; font-weight:600;}
   .footer-link .go{color:var(--accent); font-size:18px;}
+  .hint{color:#5C6A77; font-size:12.5px; margin-top:8px;}
 </style>
 </head>
 <body>
@@ -53,28 +67,33 @@
 
 <div class="hero">
   <h1>Punto de venta</h1>
-  <p>Elige el módulo con el que vas a trabajar en esta caja. El menú, los precios y el registro de ventas se editan directamente dentro de cada módulo.</p>
-  <div class="event-pill"><span class="dot off" id="event-dot"></span><span id="event-label">Cargando evento activo…</span></div>
+  <p>Primero elige el evento en el que vas a trabajar, y después el módulo (Productos o Tickets). Entrega e Insumos no dependen de un evento específico.</p>
 </div>
 
 <main>
+  <div class="step-title"><span class="num">1</span> Elige el evento</div>
+  <div id="event-area"></div>
+
+  <div class="step-title"><span class="num">2</span> Elige el módulo</div>
   <div class="tiles">
-    <a class="tile tile-primary" href="pos-productos.html">
+    <a class="tile tile-primary disabled" id="tile-productos" href="pos-productos.html">
       <span class="tag">Requiere entrega</span>
       <h2>Venta de productos</h2>
       <p>Caja de barra/comida. El pedido queda "por entregar" hasta que Entrega confirma que salió al cliente.</p>
       <span class="go">→</span>
     </a>
-    <a class="tile tile-secondary" href="pos-tickets.html">
+    <a class="tile tile-secondary disabled" id="tile-tickets" href="pos-tickets.html">
       <span class="tag">Autoejecutado</span>
       <h2>Venta de tickets</h2>
       <p>Boletería. Al cobrar, el pedido queda cerrado de inmediato — no pasa por Entrega.</p>
       <span class="go">→</span>
     </a>
   </div>
+  <div class="hint" id="module-hint">Elige un evento arriba para habilitar estos dos módulos.</div>
 
   <div class="footer-row">
     <a class="footer-link" href="despacho.html"><span>Pantalla de <b>Entrega</b> — para el personal de despacho</span><span class="go">→</span></a>
+    <a class="footer-link" href="insumos.html"><span><b>Insumos, stock y recetas</b> — configuración de productos</span><span class="go">→</span></a>
   </div>
 </main>
 
@@ -84,20 +103,70 @@
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
 
-  async function loadEvent() {
-    const dot = document.getElementById("event-dot");
-    const label = document.getElementById("event-label");
+  let openEvents = [];
+  let selectedId = sessionStorage.getItem("pos_selected_event_id");
+
+  async function loadEvents() {
+    const area = document.getElementById("event-area");
     try {
-      const { data, error } = await sb.from("events").select("name").eq("active", true).limit(1).maybeSingle();
+      const { data, error } = await sb.from("events").select("*").eq("active", true).order("created_at");
       if (error) throw error;
-      if (data) { dot.classList.remove("off"); label.textContent = "Evento activo: " + data.name; }
-      else { dot.classList.add("off"); label.textContent = "Sin evento activo — actívalo desde cualquiera de los dos módulos."; }
+      openEvents = data || [];
+
+      if (openEvents.length === 0) {
+        area.innerHTML = '<div class="no-events">Sin eventos activos todavía — entra a Venta de productos o Venta de tickets y usa "Iniciar nuevo evento" para crear el primero.</div>';
+        selectedId = null;
+        updateModules();
+        return;
+      }
+
+      if (selectedId && !openEvents.some(e => e.id === selectedId)) selectedId = null;
+      if (!selectedId && openEvents.length === 1) selectedId = openEvents[0].id;
+
+      renderEvents();
+      updateModules();
     } catch (e) {
-      dot.classList.add("off");
-      label.textContent = "No se pudo conectar a Supabase. Revisa la configuración.";
+      area.innerHTML = '<div class="no-events">No se pudo conectar a Supabase. Revisa la configuración.</div>';
     }
   }
-  loadEvent();
+
+  function renderEvents(){
+    const area = document.getElementById("event-area");
+    area.innerHTML = '<div class="event-grid">' + openEvents.map(e =>
+      '<button class="event-card ' + (e.id === selectedId ? "selected" : "") + '" onclick="selectEvent(\'' + e.id + '\')">' +
+        '<span class="check">✓</span>' +
+        '<div class="ename">' + e.name + '</div>' +
+        (e.event_date ? '<div class="edate">' + e.event_date + '</div>' : '') +
+      '</button>'
+    ).join("") + '</div>';
+  }
+
+  function selectEvent(id){
+    selectedId = id;
+    const ev = openEvents.find(e => e.id === id);
+    sessionStorage.setItem("pos_selected_event_id", id);
+    sessionStorage.setItem("pos_selected_event_name", ev ? ev.name : "");
+    renderEvents();
+    updateModules();
+  }
+
+  function updateModules(){
+    const productos = document.getElementById("tile-productos");
+    const tickets = document.getElementById("tile-tickets");
+    const hint = document.getElementById("module-hint");
+    if (selectedId) {
+      productos.classList.remove("disabled");
+      tickets.classList.remove("disabled");
+      const ev = openEvents.find(e => e.id === selectedId);
+      hint.textContent = "Trabajando en: " + (ev ? ev.name : "") + " — puedes cambiar de evento arriba cuando quieras.";
+    } else {
+      productos.classList.add("disabled");
+      tickets.classList.add("disabled");
+      hint.textContent = openEvents.length ? "Elige un evento arriba para habilitar estos dos módulos." : "";
+    }
+  }
+
+  loadEvents();
 </script>
 </body>
 </html>

@@ -296,3 +296,50 @@ cambia el precio**: la cantidad de stock/insumos descontada es siempre la
 cantidad real de unidades vendidas, tenga o no promoción aplicada. Los
 productos con promoción activa muestran una etiqueta 🏷️ en el menú, en el
 carrito y en la boleta impresa.
+
+### Reestructuración en dos páginas + evento primero (07-09-2026)
+
+**`index.html`** ahora es "evento primero": eliges el evento activo arriba
+(si hay varios, eliges cuál) y recién ahí se habilitan los módulos de
+Productos y Tickets para ese evento. Entrega e Insumos no dependen de un
+evento — siempre están disponibles.
+
+**`pos-productos.html`** — Sala de Ventas, quedó enfocada solo en vender:
+el menú (con color e indicador de stock bajo), el carrito, el cobro, un
+panel de **"🧾 Órdenes activas"** (solo lectura, en vivo) que muestra cada
+pedido pendiente como "#3 Daniel — 4 min" y se puede tocar para ver qué
+productos faltan por entregar (sin poder marcarlos desde acá — confirmar
+la entrega sigue siendo trabajo de Entrega), buscador de tickets, y el
+resumen de ventas.
+
+**`insumos.html`** (nueva) — toda la configuración: agregar/editar/quitar
+productos, **color por producto** (paleta simple, útil para diferenciar
+variantes como Piscola con Sprite vs con Coca-Cola), stock por producto,
+insumos con su propio stock (con conversión automática ml→L, gr→kg y
+barra de progreso visual), recetas por producto, promociones, y
+Administración (PIN de caja/Entrega/admin). Usa el mismo PIN de caja que
+Productos — si ya entraste a uno en el mismo dispositivo, no te lo vuelve
+a pedir en el otro.
+
+### Segunda caja desde un celular, en la misma red (07-09-2026)
+
+No hace falta nada especial en el sistema para esto — cualquier
+dispositivo (celular, tablet, notebook) que se conecte a la **misma red**
+donde está el POS (el mismo wifi/hotspot que usa la caja principal y la
+impresora) y abra la URL del sitio, funciona automáticamente como una caja
+más: pide PIN igual que cualquier otro dispositivo, y todo lo que vende
+queda en el mismo Supabase, visible para Entrega y en los reportes.
+
+Dos cosas separadas a tener en cuenta:
+- **Conectar el celular a esa red**: es un paso del sistema operativo del
+  celular (buscar la red wifi en Ajustes y poner la clave), no algo que la
+  app controle. Si el "router" es un hotspot móvil, comparte su nombre de
+  red y clave con quien vaya a usar la segunda caja.
+- **Imprimir desde el celular**: eso es aparte de "tomar pedidos". El
+  celular puede vender sin problema aunque no pueda imprimir — si además
+  necesitas que imprima en la misma Epson, un celular normalmente no
+  imprime directo a una impresora térmica de red sin una app o servicio de
+  impresión específico para Android/iOS (por ejemplo, la app Epson iPrint,
+  si es compatible con tu modelo). Es un tema de impresión desde el
+  celular, no del código del POS — avísame si quieres que lo revisemos
+  aparte una vez que tengas la segunda caja andando.

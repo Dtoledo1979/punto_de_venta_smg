@@ -26,12 +26,13 @@
   .event-pick-row .actions button{padding:6px 10px; font-size:12px; margin:0;}
   main{max-width:1100px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
   @media (max-width:860px){ main{grid-template-columns:1fr;} }
-  .card{background:var(--surface); border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
+  .card{background:var(--surface); border-radius:20px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
   .card h2{font-family:'Sora',sans-serif; font-size:16px; margin:0 0 12px;}
   .toggle{color:#3E6BD6; font-size:13px; cursor:pointer; background:none; border:none; padding:0; margin-bottom:10px; display:inline-block;}
   .menu-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:8px;}
-  .item-btn{padding:14px 10px; border:1px solid var(--border); border-radius:11px; background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14px; font-weight:500; color:var(--ink); min-height:58px; transition:background .1s, transform .05s;}
+  .item-btn{padding:14px 10px; border:1px solid var(--border); border-radius:16px; background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14px; font-weight:500; color:var(--ink); min-height:58px; transition:background .1s, transform .05s;}
   .item-btn:active{background:#E4EEFB; border-color:#B9D2F5; transform:scale(0.98);}
+  .item-btn .color-bar{display:block; height:6px; border-radius:4px; margin:6px 0;}
   .item-btn .price{display:block; font-size:12px; color:var(--muted); margin-top:3px; font-weight:400;}
   .item-btn .stock-badge{display:block; font-size:10.5px; color:var(--warn); margin-top:2px; font-weight:600;}
   .item-btn .promo-badge{display:block; font-size:10.5px; color:#1E7A3D; margin-top:2px; font-weight:700;}
@@ -39,6 +40,16 @@
     .menu-grid{grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:6px;}
     .item-btn{padding:10px 8px; font-size:13px; min-height:50px;}
   }
+  .orders-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:10px;}
+  .order-card{background:var(--surface-alt); border:1px solid var(--border); border-radius:16px; padding:12px 14px; cursor:pointer;}
+  .order-card .row1{display:flex; justify-content:space-between; align-items:baseline; font-weight:700; font-family:'Sora',sans-serif; font-size:14px;}
+  .order-card .mins{font-size:12.5px; color:var(--muted); font-weight:600;}
+  .order-card .mins.warn{color:var(--warn);}
+  .order-card .mins.danger{color:var(--danger);}
+  .order-card .items{display:none; margin-top:8px; font-size:12.5px; color:var(--muted); border-top:1px dashed var(--border); padding-top:8px;}
+  .order-card .items div{padding:2px 0;}
+  .order-card .items .done{text-decoration:line-through; opacity:.55;}
+  .order-card.open .items{display:block;}
   .cart-row{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px; gap:8px;}
   .cart-row .name{flex:1;}
   .qty{display:flex; align-items:center; gap:7px;}
@@ -118,6 +129,7 @@
     <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
     <h1 id="register-name">POS Productos</h1>
   </div>
+  <a class="back" href="insumos.html">⚙️ Insumos</a>
   <a class="back" href="index.html">← Inicio</a>
 </header>
 
@@ -143,21 +155,6 @@
 <main>
   <div class="card">
     <h2>Menú</h2>
-    <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / precios / stock)</button>
-    <button class="toggle" style="margin-left:14px;" onclick="toggleStock()">📦 Ver stock</button>
-    <button class="toggle" style="margin-left:14px;" onclick="toggleIngredients()">🧪 Insumos</button>
-    <div id="edit-panel" style="display:none; margin-bottom:14px;">
-      <button class="toggle" style="font-size:12px;" onclick="abrirAdmin()">⚙️ Administración (renombrar / PIN de caja, Entrega y admin)</button>
-      <div id="edit-list"></div>
-      <div class="add-form">
-        <input type="text" id="new-name" placeholder="Nombre (ej. Terremoto)">
-        <input type="number" id="new-price" placeholder="$" style="width:70px;">
-        <button class="btn btn-secondary btn-small" onclick="addItem()">Agregar</button>
-      </div>
-    </div>
-    <div id="stock-panel" style="display:none;">
-      <div id="stock-body"></div>
-    </div>
     <div class="menu-grid" id="menu-grid"></div>
   </div>
 
@@ -187,17 +184,10 @@
   </div>
 </main>
 
-<div class="card wide-card" id="ingredients-card" style="display:none; margin-bottom:16px;">
-  <h2>🧪 Insumos</h2>
-  <p style="font-size:12.5px; color:var(--muted); margin:-8px 0 12px;">Registra acá los ingredientes (vino, granadina, hielo, pisco, etc.) para poder descontarlos automáticamente según la receta de cada producto.</p>
-  <div id="ingredients-list"></div>
-  <div class="add-form">
-    <input type="text" id="new-ing-name" placeholder="Nombre (ej. Vino)">
-    <input type="text" id="new-ing-unit" placeholder="Unidad (ml, gr, un)" style="width:110px;">
-    <input type="number" id="new-ing-container" placeholder="ej. 750 (opcional)" style="width:130px;">
-    <input type="text" id="new-ing-container-label" placeholder="botella (opcional)" style="width:110px;">
-    <button class="btn btn-secondary btn-small" onclick="addIngredient()">Agregar insumo</button>
-  </div>
+<div class="card wide-card" style="margin-bottom:16px;">
+  <h2>🧾 Órdenes activas</h2>
+  <p style="font-size:12px; color:var(--muted); margin:-8px 0 12px;">Solo lectura — confirmar la entrega se hace desde la pantalla de Entrega. Toca una orden para ver qué falta.</p>
+  <div id="orders-panel"><p style="color:#9AA7B2; font-size:13px;">Sin órdenes pendientes.</p></div>
 </div>
 
 <div class="card wide-card" style="margin-bottom:16px;">
@@ -256,7 +246,7 @@
   let activeEvent = null;   // fila de pos.events activa (elegida por el operador)
   let openEvents = [];       // todos los eventos abiertos (active=true)
   let menu = [];             // pos.menu_items
-  let ingredients = [];       // pos.ingredients
+  let pendingOrders = [];     // para el panel de "Órdenes activas" (solo lectura)
   let promotions = [];        // pos.promotions
   let cart = {};             // { itemId: {name, price, qty} }
   let operatorName = "";
@@ -313,23 +303,29 @@
     document.getElementById("register-name").textContent = register.name + " · " + operatorName;
     await loadActiveEvent();
     await loadMenu();
-    await loadIngredients();
     renderMenu();
     renderCart();
+    await loadOrdersPanel();
+    subscribeOrdersPanel();
+    setInterval(renderOrdersPanel, 1000);
   }
 
   async function loadActiveEvent() {
     const { data } = await sb.from("events").select("*").eq("active", true).order("created_at");
     openEvents = data || [];
 
-    const savedId = sessionStorage.getItem("pos_event_" + register.id);
+    const globalId = sessionStorage.getItem("pos_selected_event_id");
+    const localId = sessionStorage.getItem("pos_event_" + register.id);
+    const preferredId = (globalId && openEvents.some(e => e.id === globalId)) ? globalId : localId;
+
     if (openEvents.length === 0) {
       activeEvent = null;
     } else if (openEvents.length === 1) {
       activeEvent = openEvents[0];
     } else {
-      activeEvent = openEvents.find(e => e.id === savedId) || null;
+      activeEvent = openEvents.find(e => e.id === preferredId) || null;
     }
+    if (activeEvent) sessionStorage.setItem("pos_event_" + register.id, activeEvent.id);
     updateEventLabel();
     if (!activeEvent && openEvents.length > 1) {
       document.getElementById("event-picker").style.display = "block";
@@ -373,6 +369,8 @@
     if (!ev) return;
     activeEvent = ev;
     sessionStorage.setItem("pos_event_" + register.id, id);
+    sessionStorage.setItem("pos_selected_event_id", id);
+    sessionStorage.setItem("pos_selected_event_name", ev.name);
     updateEventLabel();
     document.getElementById("event-picker").style.display = "none";
     showToast("Trabajando en: " + ev.name);
@@ -407,21 +405,18 @@
     promotions = promoData || [];
   }
 
-  async function loadIngredients(){
-    const { data } = await sb.from("ingredients").select("*").eq("register_id", register.id).eq("active", true).order("created_at");
-    ingredients = data || [];
-  }
-
   function renderMenu(){
     const grid = document.getElementById("menu-grid");
     grid.innerHTML = "";
     menu.forEach(item => {
       const b = document.createElement("button");
       b.className = "item-btn";
-      let html = item.name + '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
+      let html = item.name;
+      if (item.color) html += '<span class="color-bar" style="background:' + item.color + ';"></span>';
+      html += '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
       if (item.track_stock && item.stock_qty !== null) {
         const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : 1;
-        html += '<span class="stock-badge">' + item.stock_qty + ' en stock' + (pct <= 0.25 ? " ⚠️" : "") + '</span>';
+        if (pct <= 0.25) html += '<span class="stock-badge">⚠️ Queda poco stock</span>';
       }
       const promo = activePromoFor(item.id);
       if (promo) html += '<span class="promo-badge">🏷️ ' + promo.bundle_qty + 'x$' + Math.round(promo.bundle_price).toLocaleString("es-CL") + '</span>';
@@ -429,344 +424,33 @@
       b.onclick = () => addToCart(item);
       grid.appendChild(b);
     });
-    renderEditList();
-    renderStockPanel();
-    renderIngredientsList();
   }
 
-  function toggleStock(){
-    const p = document.getElementById("stock-panel");
-    p.style.display = p.style.display === "none" ? "block" : "none";
+  async function loadOrdersPanel(){
+    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","pendiente_entrega").order("paid_at");
+    pendingOrders = data || [];
+    renderOrdersPanel();
   }
 
-  function toggleIngredients(){
-    const p = document.getElementById("ingredients-card");
-    p.style.display = p.style.display === "none" ? "block" : "none";
+  function subscribeOrdersPanel(){
+    sb.channel("orders-sala-venta")
+      .on("postgres_changes", { event:"*", schema:"pos", table:"orders", filter:"register_id=eq." + register.id },
+        () => loadOrdersPanel())
+      .subscribe();
   }
 
-  function renderIngredientsList(){
-    const list = document.getElementById("ingredients-list");
-    if (!ingredients.length) {
-      list.innerHTML = "<p style='font-size:13px; color:var(--muted);'>Todavía no registras insumos.</p>";
-      return;
-    }
-    list.innerHTML = "";
-    ingredients.forEach(ing => {
-      const pct = ing.initial_stock > 0 ? Math.round((ing.stock_qty / ing.initial_stock) * 100) : 0;
-      const containerTxt = (ing.container_size && ing.stock_qty != null) ? (" ≈ " + (ing.stock_qty / ing.container_size).toFixed(1) + " " + (ing.container_label || "envases")) : "";
-      const wrap = document.createElement("div");
-      wrap.className = "edit-item";
-      wrap.innerHTML =
-        '<div class="edit-row">' +
-          '<span style="flex:2; font-weight:600;">' + ing.name + '</span>' +
-          '<span style="flex:1; font-size:12.5px; color:var(--muted);">' + (ing.stock_qty != null ? (ing.stock_qty + " / " + ing.initial_stock + " " + ing.unit) : "sin stock cargado") + (pct ? " (" + pct + "%)" : "") + containerTxt + (pct && pct <= 25 ? ' <span class="stock-alert">¡Reponer!</span>' : '') + '</span>' +
-          '<button class="del-btn">✕</button>' +
-        '</div>' +
-        '<div class="stock-row stock-actions">' +
-          '<input type="number" class="reset-input" placeholder="reiniciar a">' +
-          '<button class="reset-btn">Reiniciar</button>' +
-          '<input type="number" class="add-input" placeholder="agregar +">' +
-          '<button class="add-btn">Agregar</button>' +
-          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleHistorial(this,\'' + ing.id + '\')">Ver historial</a>' +
-        '</div>' +
-        '<div class="stock-history" style="display:none;"></div>';
-
-      wrap.querySelector(".del-btn").onclick = async () => {
-        await sb.rpc("remove_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id });
-        showToast(ing.name + " eliminado.");
-        await loadIngredients(); renderIngredientsList();
-      };
-      wrap.querySelector(".reset-btn").onclick = async () => {
-        const input = wrap.querySelector(".reset-input");
-        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida."); return; }
-        await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "reset", p_qty: Number(input.value), p_by: operatorName || null });
-        showToast(ing.name + ": stock reiniciado.");
-        await loadIngredients(); renderIngredientsList();
-      };
-      wrap.querySelector(".add-btn").onclick = async () => {
-        const input = wrap.querySelector(".add-input");
-        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida."); return; }
-        await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "add", p_qty: Number(input.value), p_by: operatorName || null });
-        showToast(ing.name + ": se agregó stock.");
-        await loadIngredients(); renderIngredientsList();
-      };
-      list.appendChild(wrap);
-    });
-  }
-
-  async function addIngredient(){
-    const name = document.getElementById("new-ing-name").value.trim();
-    const unit = document.getElementById("new-ing-unit").value.trim();
-    const containerSize = document.getElementById("new-ing-container").value ? Number(document.getElementById("new-ing-container").value) : null;
-    const containerLabel = document.getElementById("new-ing-container-label").value.trim() || null;
-    if (!name || !unit) { showToast("Completa nombre y unidad (ml, gr, un)."); return; }
-    await sb.rpc("upsert_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: null, p_name: name, p_unit: unit, p_container_size: containerSize, p_container_label: containerLabel });
-    document.getElementById("new-ing-name").value = "";
-    document.getElementById("new-ing-unit").value = "";
-    document.getElementById("new-ing-container").value = "";
-    document.getElementById("new-ing-container-label").value = "";
-    showToast("Insumo agregado — ahora cárgale stock desde la lista.");
-    await loadIngredients(); renderIngredientsList();
-  }
-
-  function renderStockPanel(){
-    const box = document.getElementById("stock-body");
-    const tracked = menu.filter(m => m.track_stock);
-    if (!tracked.length) {
-      box.innerHTML = "<p style='color:#9AA7B2; font-size:13px; margin-top:8px;'>Ningún producto tiene el stock activado todavía. Actívalo desde \"Editar menú\".</p>";
-      return;
-    }
-    let html = '<table class="tbl"><tr><th>Producto</th><th>Stock actual</th><th>% restante</th><th></th></tr>';
-    tracked.forEach(m => {
-      const pct = m.initial_stock > 0 ? Math.round((m.stock_qty / m.initial_stock) * 100) : 0;
-      html += '<tr><td>' + m.name + '</td><td>' + m.stock_qty + ' / ' + m.initial_stock + '</td><td>' + pct + '%</td><td>' + (pct <= 25 ? '<span class="stock-alert">¡Reponer!</span>' : '') + '</td></tr>';
-    });
-    html += '</table>';
-    box.innerHTML = html;
-  }
-
-  function toggleEdit(){
-    const p = document.getElementById("edit-panel");
-    p.style.display = p.style.display === "none" ? "block" : "none";
-  }
-
-  function renderEditList(){
-    const list = document.getElementById("edit-list");
-    list.innerHTML = "";
-    menu.forEach(item => {
-      const wrap = document.createElement("div");
-      wrap.className = "edit-item";
-      const stockInfo = item.track_stock ? (item.stock_qty + " / " + item.initial_stock + " actual") : "sin stock activado";
-      wrap.innerHTML =
-        '<div class="edit-row">' +
-          '<input class="name" value="' + item.name.replace(/"/g,"&quot;") + '">' +
-          '<input class="price" type="number" value="' + item.price + '">' +
-          '<button class="del-btn">✕</button>' +
-        '</div>' +
-        '<div class="stock-row">' +
-          '<label><input type="checkbox" class="stock-check" ' + (item.track_stock ? "checked" : "") + '> Controlar stock</label>' +
-          '<span style="font-size:12px; color:var(--muted);">' + stockInfo + '</span>' +
-        '</div>' +
-        '<div class="stock-row stock-actions" style="' + (item.track_stock ? "" : "display:none;") + '">' +
-          '<input type="number" class="reset-input" placeholder="reiniciar a">' +
-          '<button class="reset-btn">Reiniciar</button>' +
-          '<input type="number" class="add-input" placeholder="agregar +">' +
-          '<button class="add-btn">Agregar</button>' +
-          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleHistorial(this,\'' + item.id + '\')">Ver historial</a>' +
-        '</div>' +
-        '<div class="stock-history" style="display:none;"></div>' +
-        '<div class="stock-row">' +
-          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleReceta(this,\'' + item.id + '\')">🍹 Receta</a>' +
-          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="togglePromo(this,\'' + item.id + '\')">🏷️ Promoción' + (promotions.some(p=>p.menu_item_id===item.id) ? " (activa)" : "") + '</a>' +
-        '</div>' +
-        '<div class="recipe-box" style="display:none;"></div>' +
-        '<div class="promo-box" style="display:none;"></div>';
-      const [nameInput, priceInput] = wrap.querySelectorAll(".edit-row input");
-      nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
-      priceInput.onchange = () => updateItem(item.id, { price: Number(priceInput.value) });
-      wrap.querySelector(".del-btn").onclick = () => removeItem(item.id);
-
-      const stockCheck = wrap.querySelector(".stock-check");
-      const actionsRow = wrap.querySelector(".stock-actions");
-      stockCheck.onchange = async () => {
-        if (!stockCheck.checked) {
-          await sb.rpc("disable_stock", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id });
-          showToast("Stock desactivado para " + item.name + ".");
-          await loadMenu(); renderMenu();
-          return;
-        }
-        actionsRow.style.display = "flex";
-      };
-
-      wrap.querySelector(".reset-btn").onclick = async () => {
-        const input = wrap.querySelector(".reset-input");
-        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida para reiniciar."); return; }
-        const qty = Number(input.value);
-        await sb.rpc("restock_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_mode: "reset", p_qty: qty, p_note: null, p_by: operatorName || null });
-        showToast(item.name + ": stock reiniciado a " + qty + ".");
-        await loadMenu(); renderMenu();
-      };
-
-      wrap.querySelector(".add-btn").onclick = async () => {
-        const input = wrap.querySelector(".add-input");
-        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida para agregar."); return; }
-        const qty = Number(input.value);
-        await sb.rpc("restock_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_mode: "add", p_qty: qty, p_note: null, p_by: operatorName || null });
-        showToast(item.name + ": se agregaron " + qty + " unidades.");
-        await loadMenu(); renderMenu();
-      };
-
-      list.appendChild(wrap);
-    });
-  }
-
-  async function toggleHistorial(linkEl, itemId){
-    const box = linkEl.closest(".edit-item").querySelector(".stock-history");
-    if (box.style.display !== "none") { box.style.display = "none"; return; }
-    box.style.display = "block";
-    box.innerHTML = "Cargando…";
-    const { data, error } = await sb.from("stock_movements").select("*").or("menu_item_id.eq." + itemId + ",ingredient_id.eq." + itemId).order("created_at", { ascending:false }).limit(15);
-    if (error || !data || data.length === 0) { box.innerHTML = "<p style='font-size:12px; color:var(--muted);'>Sin movimientos registrados.</p>"; return; }
-    const labels = { carga_inicial:"Carga inicial", restock:"Reposición", venta:"Venta", ajuste:"Ajuste" };
-    box.innerHTML = '<table class="tbl" style="font-size:11.5px;"><tr><th>Fecha</th><th>Tipo</th><th>Cambio</th><th>Quedó</th><th>Quién</th></tr>' +
-      data.map(m => {
-        const when = new Date(m.created_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
-        const change = (m.qty_change > 0 ? "+" : "") + m.qty_change;
-        return '<tr><td>' + when + '</td><td>' + (labels[m.type]||m.type) + '</td><td>' + change + '</td><td>' + m.qty_after + '</td><td>' + (m.created_by||"—") + '</td></tr>';
-      }).join("") + '</table>';
-  }
-
-  async function toggleReceta(linkEl, itemId){
-    const box = linkEl.closest(".edit-item").querySelector(".recipe-box");
-    if (box.style.display !== "none") { box.style.display = "none"; return; }
-    box.style.display = "block";
-    await renderRecipeBox(box, itemId);
-  }
-
-  async function renderRecipeBox(box, itemId){
-    if (ingredients.length === 0) { box.innerHTML = "<p style='font-size:12px; color:var(--muted);'>Primero registra al menos un insumo en la sección 🧪 Insumos.</p>"; return; }
-    const { data } = await sb.from("recipe_items").select("*").eq("menu_item_id", itemId);
-    const lines = data || [];
-    const options = ingredients.map(i => '<option value="' + i.id + '">' + i.name + ' (' + i.unit + ')</option>').join("");
-    let html = "";
-    if (lines.length) {
-      html += '<table class="tbl" style="font-size:12px;"><tr><th>Insumo</th><th>Por unidad</th><th></th></tr>';
-      lines.forEach(l => {
-        const ing = ingredients.find(i => i.id === l.ingredient_id);
-        html += '<tr><td>' + (ing ? ing.name : "?") + '</td><td>' + l.qty_per_unit + ' ' + (ing ? ing.unit : "") + '</td><td><button class="recipe-del" data-id="' + l.ingredient_id + '">✕</button></td></tr>';
-      });
-      html += '</table>';
-    } else {
-      html += "<p style='font-size:12px; color:var(--muted);'>Sin receta todavía.</p>";
-    }
-    html += '<div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">' +
-      '<select class="recipe-ing-select">' + options + '</select>' +
-      '<input type="number" class="recipe-qty-input" placeholder="cantidad" style="width:90px;">' +
-      '<button class="recipe-add-btn">Agregar a la receta</button></div>';
-    box.innerHTML = html;
-
-    box.querySelectorAll(".recipe-del").forEach(btn => {
-      btn.onclick = async () => {
-        const newLines = lines.filter(l => l.ingredient_id !== btn.dataset.id).map(l => ({ ingredient_id: l.ingredient_id, qty_per_unit: l.qty_per_unit }));
-        await sb.rpc("set_recipe", { p_register_id: register.id, p_pin: myPin(), p_menu_item_id: itemId, p_recipe: newLines });
-        showToast("Receta actualizada.");
-        renderRecipeBox(box, itemId);
-      };
-    });
-    box.querySelector(".recipe-add-btn").onclick = async () => {
-      const ingId = box.querySelector(".recipe-ing-select").value;
-      const qtyInput = box.querySelector(".recipe-qty-input");
-      if (qtyInput.value === "" || isNaN(Number(qtyInput.value))) { showToast("Ingresa una cantidad válida."); return; }
-      const newLines = lines.filter(l => l.ingredient_id !== ingId).map(l => ({ ingredient_id: l.ingredient_id, qty_per_unit: l.qty_per_unit }));
-      newLines.push({ ingredient_id: ingId, qty_per_unit: Number(qtyInput.value) });
-      await sb.rpc("set_recipe", { p_register_id: register.id, p_pin: myPin(), p_menu_item_id: itemId, p_recipe: newLines });
-      showToast("Receta actualizada.");
-      renderRecipeBox(box, itemId);
-    };
-  }
-
-  function toLocalInputValue(iso){
-    const d = new Date(iso);
-    const pad = n => String(n).padStart(2,"0");
-    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
-  }
-
-  function togglePromo(linkEl, itemId){
-    const box = linkEl.closest(".edit-item").querySelector(".promo-box");
-    if (box.style.display !== "none") { box.style.display = "none"; return; }
-    box.style.display = "block";
-    renderPromoBox(box, itemId);
-  }
-
-  function renderPromoBox(box, itemId){
-    const promo = promotions.find(p => p.menu_item_id === itemId);
-    box.innerHTML =
-      '<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">' +
-        '<label style="font-size:12px;">Cada</label>' +
-        '<input type="number" class="promo-qty" style="width:60px;" value="' + (promo ? promo.bundle_qty : "") + '" placeholder="2">' +
-        '<label style="font-size:12px;">unid. por $</label>' +
-        '<input type="number" class="promo-price" style="width:80px;" value="' + (promo ? promo.bundle_price : "") + '" placeholder="5">' +
-        '<label style="font-size:12px;"><input type="checkbox" class="promo-active" ' + (promo && promo.active ? "checked" : "") + '> Activa</label>' +
-        '<button class="promo-save-btn">Guardar</button>' +
-        (promo ? '<button class="promo-del-btn">Quitar</button>' : '') +
-      '</div>' +
-      '<div style="margin-top:6px; font-size:11.5px; color:var(--muted);">Opcional: prográmala con fecha/hora (si la dejas vacía, corre mientras esté "Activa").</div>' +
-      '<div style="display:flex; gap:10px; margin-top:4px; flex-wrap:wrap;">' +
-        '<label style="font-size:11.5px;">Desde<br><input type="datetime-local" class="promo-start" value="' + (promo && promo.starts_at ? toLocalInputValue(promo.starts_at) : "") + '"></label>' +
-        '<label style="font-size:11.5px;">Hasta<br><input type="datetime-local" class="promo-end" value="' + (promo && promo.ends_at ? toLocalInputValue(promo.ends_at) : "") + '"></label>' +
+  function renderOrdersPanel(){
+    const box = document.getElementById("orders-panel");
+    if (!pendingOrders.length) { box.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">Sin órdenes pendientes.</p>'; return; }
+    box.innerHTML = '<div class="orders-grid">' + pendingOrders.map(o => {
+      const mins = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/60000));
+      const cls = mins >= 5 ? "danger" : mins >= 2 ? "warn" : "";
+      const itemsHtml = o.items.map(it => '<div class="' + (it.delivered ? "done" : "") + '">' + it.qty + 'x ' + it.name + '</div>').join("");
+      return '<div class="order-card" onclick="this.classList.toggle(\'open\')">' +
+        '<div class="row1"><span>#' + o.ticket_num + (o.customer_name ? " " + o.customer_name : "") + '</span><span class="mins ' + cls + '">' + mins + ' min</span></div>' +
+        '<div class="items">' + itemsHtml + '</div>' +
       '</div>';
-
-    box.querySelector(".promo-save-btn").onclick = async () => {
-      const qty = Number(box.querySelector(".promo-qty").value);
-      const priceVal = box.querySelector(".promo-price").value;
-      if (!qty || qty < 2 || priceVal === "" || isNaN(Number(priceVal))) { showToast("Completa la cantidad (2 o más) y el precio del combo."); return; }
-      const active = box.querySelector(".promo-active").checked;
-      const startVal = box.querySelector(".promo-start").value;
-      const endVal = box.querySelector(".promo-end").value;
-      const { error } = await sb.rpc("upsert_promotion", {
-        p_register_id: register.id, p_pin: myPin(), p_promotion_id: promo ? promo.id : null,
-        p_menu_item_id: itemId, p_name: null, p_bundle_qty: qty, p_bundle_price: Number(priceVal),
-        p_active: active, p_starts_at: startVal ? new Date(startVal).toISOString() : null, p_ends_at: endVal ? new Date(endVal).toISOString() : null
-      });
-      if (error) { showToast("No se pudo guardar la promoción."); return; }
-      showToast("Promoción guardada.");
-      await loadMenu(); renderMenu();
-    };
-
-    if (promo) {
-      box.querySelector(".promo-del-btn").onclick = async () => {
-        await sb.rpc("delete_promotion", { p_register_id: register.id, p_pin: myPin(), p_promotion_id: promo.id });
-        showToast("Promoción eliminada.");
-        await loadMenu(); renderMenu();
-      };
-    }
-  }
-
-  async function addItem(){
-    const name = document.getElementById("new-name").value.trim();
-    const price = Number(document.getElementById("new-price").value);
-    if (!name || !price) { showToast("Completa nombre y precio."); return; }
-    await sb.rpc("add_menu_item", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_price: price, p_sort_order: menu.length });
-    document.getElementById("new-name").value = ""; document.getElementById("new-price").value = "";
-    await loadMenu(); renderMenu();
-  }
-
-  async function updateItem(id, patch){
-    await sb.rpc("update_menu_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: id, p_name: patch.name ?? null, p_price: patch.price ?? null });
-    await loadMenu(); renderMenu();
-  }
-
-  async function removeItem(id){
-    await sb.rpc("remove_menu_item", { p_register_id: register.id, p_pin: myPin(), p_item_id: id });
-    await loadMenu(); renderMenu();
-  }
-
-  async function abrirAdmin(){
-    const pin = prompt("PIN de administrador:");
-    if (pin === null) return;
-    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
-    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
-
-    const nuevoNombre = prompt("Nombre de este punto de venta:", register.name);
-    const nuevoPin = prompt("Nuevo PIN de esta caja (deja vacío para no cambiarlo):");
-    const nuevoDespachoPin = prompt("Nuevo PIN de Entrega (deja vacío para no cambiarlo):");
-
-    const nombreCambio = nuevoNombre && nuevoNombre.trim() && nuevoNombre.trim() !== register.name ? nuevoNombre.trim() : null;
-    if (nombreCambio || nuevoPin || nuevoDespachoPin) {
-      await sb.rpc("admin_update_register", {
-        p_admin_pin: pin, p_register_id: register.id,
-        p_name: nombreCambio, p_pin: nuevoPin || null, p_despacho_pin: nuevoDespachoPin || null
-      });
-      if (nombreCambio) { register.name = nombreCambio; document.getElementById("register-name").textContent = register.name + " · " + operatorName; }
-      if (nuevoPin) { sessionStorage.setItem("pos_pin_" + register.id, nuevoPin); }
-      showToast("Datos de la caja actualizados.");
-    }
-
-    const nuevoAdminPin = prompt("Nuevo PIN de administrador (deja vacío para no cambiarlo):");
-    if (nuevoAdminPin) {
-      await sb.rpc("admin_update_admin_pin", { p_admin_pin: pin, p_new_pin: nuevoAdminPin });
-      showToast("PIN de administrador actualizado.");
-    }
+    }).join("") + '</div>';
   }
 
   function addToCart(item){

@@ -44,6 +44,7 @@ create table pos.menu_items (
   price numeric(10,2) not null,
   active boolean not null default true,
   sort_order int not null default 0,
+  color text,
   track_stock boolean not null default false,
   stock_qty numeric(10,2),
   initial_stock numeric(10,2),
@@ -384,6 +385,16 @@ begin
 end;
 $$;
 grant execute on function pos.remove_menu_item(uuid, text, uuid) to anon, authenticated;
+
+create or replace function pos.set_item_color(p_register_id uuid, p_pin text, p_item_id uuid, p_color text)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  update pos.menu_items set color = p_color where id = p_item_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.set_item_color(uuid, text, uuid, text) to anon, authenticated;
 
 create or replace function pos.set_item_stock(p_register_id uuid, p_pin text, p_item_id uuid, p_track_stock boolean, p_qty numeric)
 returns boolean language plpgsql security definer set search_path = pos as $$
