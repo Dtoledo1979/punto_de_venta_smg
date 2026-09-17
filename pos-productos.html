@@ -698,23 +698,32 @@
     printingNow = true;
     const job = printQueue.shift();
     const area = document.getElementById("receipt-area");
-    area.innerHTML = job.copyBarra;
-    window.print();
 
-    function afterBarra(){
-      window.removeEventListener("afterprint", afterBarra);
-      area.innerHTML = job.copyCliente;
+    function printCopy(html, onDone){
+      area.innerHTML = html;
+      let done = false;
+      function finish(){
+        if (done) return;
+        done = true;
+        window.removeEventListener("afterprint", finish);
+        onDone();
+      }
+      window.addEventListener("afterprint", finish);
+      window.print();
+      // Red de seguridad: en algunos navegadores/config "afterprint" no
+      // dispara de forma confiable. Si no llega en unos segundos, seguimos
+      // igual — así nunca se queda pegado esperando la segunda copia.
+      setTimeout(finish, 4000);
+    }
+
+    printCopy(job.copyBarra, () => {
       setTimeout(() => {
-        window.print();
-        function afterCliente(){
-          window.removeEventListener("afterprint", afterCliente);
+        printCopy(job.copyCliente, () => {
           printingNow = false;
           processPrintQueue();
-        }
-        window.addEventListener("afterprint", afterCliente);
+        });
       }, 300);
-    }
-    window.addEventListener("afterprint", afterBarra);
+    });
   }
 
   async function anularUltimo(){

@@ -637,13 +637,18 @@
     if (printingNow || printQueue.length === 0) return;
     printingNow = true;
     document.getElementById("receipt-area").innerHTML = printQueue.shift();
-    window.print();
-    function afterThis(){
-      window.removeEventListener("afterprint", afterThis);
+    let done = false;
+    function finish(){
+      if (done) return;
+      done = true;
+      window.removeEventListener("afterprint", finish);
       printingNow = false;
       processPrintQueue();
     }
-    window.addEventListener("afterprint", afterThis);
+    window.addEventListener("afterprint", finish);
+    window.print();
+    // Red de seguridad: si "afterprint" no dispara, igual seguimos.
+    setTimeout(finish, 4000);
   }
 
   async function anularUltimo(){
