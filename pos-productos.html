@@ -108,7 +108,7 @@
   .modal .row{display:flex; gap:8px; margin-top:14px;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
   #receipt-area{display:none;}
-  @page{ size:80mm auto; margin:4mm 3mm; }
+  @page{ size:80mm auto; margin:4mm; }
   @media print{
     body *{visibility:hidden;}
     #receipt-area, #receipt-area *{visibility:visible;}
@@ -682,24 +682,39 @@
       return html;
     }
 
-    // Dos tickets físicos independientes: se imprime la copia de barra, se
-    // espera a que ese trabajo termine (evento "afterprint"), y recién ahí
-    // se envía la copia de cliente. Cada trabajo termina en un corte
-    // automático real (según la config "Auto Cut" del driver de la Epson),
-    // en vez de un solo documento con una línea de "cortar aquí".
-    const area = document.getElementById("receipt-area");
-    const copyBarra = buildCopy("COPIA BARRA");
-    const copyCliente = buildCopy("COPIA CLIENTE");
+    // Se encola en vez de imprimir directo: si el pedido anterior todavía
+    // no termina sus dos copias (por ejemplo, porque el cajero todavía no
+    // confirma el diálogo de impresión de Windows), este pedido espera su
+    // turno en vez de mezclarse con el anterior.
+    printQueue.push({ copyBarra: buildCopy("COPIA BARRA"), copyCliente: buildCopy("COPIA CLIENTE") });
+    processPrintQueue();
+  }
 
-    area.innerHTML = copyBarra;
+  let printQueue = [];
+  let printingNow = false;
+
+  function processPrintQueue(){
+    if (printingNow || printQueue.length === 0) return;
+    printingNow = true;
+    const job = printQueue.shift();
+    const area = document.getElementById("receipt-area");
+    area.innerHTML = job.copyBarra;
     window.print();
 
-    function afterFirst(){
-      window.removeEventListener("afterprint", afterFirst);
-      area.innerHTML = copyCliente;
-      setTimeout(() => window.print(), 300);
+    function afterBarra(){
+      window.removeEventListener("afterprint", afterBarra);
+      area.innerHTML = job.copyCliente;
+      setTimeout(() => {
+        window.print();
+        function afterCliente(){
+          window.removeEventListener("afterprint", afterCliente);
+          printingNow = false;
+          processPrintQueue();
+        }
+        window.addEventListener("afterprint", afterCliente);
+      }, 300);
     }
-    window.addEventListener("afterprint", afterFirst);
+    window.addEventListener("afterprint", afterBarra);
   }
 
   async function anularUltimo(){

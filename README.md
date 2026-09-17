@@ -373,3 +373,21 @@ a la derecha y completo.
 impresora tenga "Auto Cut: Enable" en las preferencias de Windows (ver
 sección de configuración de impresora más arriba) — si no está activado,
 va a imprimir ambas copias seguidas sin cortar entre ellas.
+
+### Márgenes y cola de impresión (07-09-2026)
+
+**Márgenes**: subidos a 4mm parejo por los 4 lados (antes eran 4mm arriba/abajo
+y 3mm a los costados) — si seguía cortando el inicio o el final del ticket
+físico, era justo ese margen insuficiente.
+
+**Copias mezcladas entre clientes**: pasaba porque, sin el modo de
+impresión silenciosa activado, cada copia muestra el diálogo de Windows y
+alguien tiene que confirmarlo a mano — si se empezaba a cobrar al
+siguiente cliente antes de terminar de imprimir el pedido anterior, las
+dos impresiones se pisaban. Ahora hay una **cola de impresión real**: cada
+pedido espera su turno (sus dos copias, una tras otra) antes de que
+empiece el siguiente, sin importar qué tan rápido se cobre. Esto es
+además de, no en reemplazo de, activar `--kiosk-printing` — con eso
+activado no debería haber diálogos que confirmar y el flujo es
+prácticamente instantáneo; sin él, sigue funcionando bien pero cada copia
+va a pedir confirmación manual, en el orden correcto.

@@ -78,7 +78,7 @@
   .modal .row{display:flex; gap:8px; margin-top:14px;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
   #receipt-area{display:none;}
-  @page{ size:80mm auto; margin:4mm 3mm; }
+  @page{ size:80mm auto; margin:4mm; }
   @media print{
     body *{visibility:hidden;}
     #receipt-area, #receipt-area *{visibility:visible;}
@@ -626,8 +626,24 @@
       }
     }
     html += '</div>';
-    document.getElementById("receipt-area").innerHTML = html;
+    printQueue.push(html);
+    processPrintQueue();
+  }
+
+  let printQueue = [];
+  let printingNow = false;
+
+  function processPrintQueue(){
+    if (printingNow || printQueue.length === 0) return;
+    printingNow = true;
+    document.getElementById("receipt-area").innerHTML = printQueue.shift();
     window.print();
+    function afterThis(){
+      window.removeEventListener("afterprint", afterThis);
+      printingNow = false;
+      processPrintQueue();
+    }
+    window.addEventListener("afterprint", afterThis);
   }
 
   async function anularUltimo(){
