@@ -21,6 +21,9 @@
   header .back{color:#C9D3DC; text-decoration:none; font-size:13px;}
   .event-strip{background:#171C24; color:#C9D3DC; font-size:13px; padding:9px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
   .event-strip a{color:var(--accent); font-size:12.5px; cursor:pointer; text-decoration:underline;}
+  .event-pick-row{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:13.5px; gap:8px; flex-wrap:wrap;}
+  .event-pick-row .actions{display:flex; gap:6px;}
+  .event-pick-row .actions button{padding:6px 10px; font-size:12px; margin:0;}
   main{max-width:1100px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
   @media (max-width:860px){ main{grid-template-columns:1fr;} }
   .card{background:var(--surface); border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
@@ -75,16 +78,19 @@
   .modal .row{display:flex; gap:8px; margin-top:14px;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
   #receipt-area{display:none;}
-  @page{ size:80mm auto; margin:2mm; }
+  @page{ size:80mm auto; margin:4mm 3mm; }
   @media print{
     body *{visibility:hidden;}
     #receipt-area, #receipt-area *{visibility:visible;}
-    #receipt-area{display:block !important; position:absolute; top:0; left:0; width:80mm;}
-    .receipt-copy{padding:4px 6px; font-family:monospace; width:100%;}
-    .receipt-copy h3{text-align:center; margin:0 0 4px; font-size:13px;}
-    .receipt-copy .line{display:flex; justify-content:space-between; font-size:12px;}
-    .receipt-copy .obs{font-size:11px; margin:4px 0; word-wrap:break-word;}
-    .receipt-copy hr{border:none; border-top:1px dashed #000;}
+    #receipt-area{display:block !important; position:absolute; top:0; left:0; width:100%;}
+    .receipt-copy{width:100%; font-family:Arial,Helvetica,sans-serif; color:#000;}
+    .receipt-copy h3{text-align:center; margin:0; font-size:19px; font-weight:800; letter-spacing:.5px;}
+    .receipt-copy .line{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; font-size:15px; padding:2px 0;}
+    .receipt-copy .line.total{font-size:17px; font-weight:800; border-top:2px solid #000; margin-top:4px; padding-top:6px;}
+    .receipt-copy .iname{flex:1 1 auto; min-width:0; overflow-wrap:break-word;}
+    .receipt-copy .iprice{flex:0 0 auto; white-space:nowrap; font-variant-numeric:tabular-nums;}
+    .receipt-copy .obs{font-size:13.5px; margin:6px 0; overflow-wrap:break-word;}
+    .receipt-copy hr{border:none; border-top:1px dashed #000; margin:6px 0;}
   }
 </style>
 </head>
@@ -100,7 +106,14 @@
 
 <div class="event-strip">
   <span id="event-label">Cargando evento…</span>
-  <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
+  <span>
+    <a onclick="toggleEventPicker()">Cambiar evento</a> ·
+    <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
+  </span>
+</div>
+<div id="event-picker" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
+  <p style="margin:0 0 10px; font-size:13px; color:var(--muted);">Elige el evento en el que vas a trabajar:</p>
+  <div id="event-picker-list"></div>
 </div>
 <div id="event-form" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -191,6 +204,7 @@
   }
 
   let register = null, activeEvent = null, menu = [], cart = {};
+  let openEvents = [];
   let operatorName = "";
   let lastOrderId = null, lastTicketNum = null;
 
@@ -245,14 +259,77 @@
   }
 
   async function loadActiveEvent() {
-    const { data } = await sb.from("events").select("*").eq("active", true).limit(1).maybeSingle();
-    activeEvent = data || null;
-    document.getElementById("event-label").textContent = activeEvent ? ("Evento activo: " + activeEvent.name) : "Sin evento activo — crea uno para empezar a vender.";
+    const { data } = await sb.from("events").select("*").eq("active", true).order("created_at");
+    openEvents = data || [];
+
+    const globalId = sessionStorage.getItem("pos_selected_event_id");
+    const localId = sessionStorage.getItem("pos_event_" + register.id);
+    const preferredId = (globalId && openEvents.some(e => e.id === globalId)) ? globalId : localId;
+
+    if (openEvents.length === 0) {
+      activeEvent = null;
+    } else if (openEvents.length === 1) {
+      activeEvent = openEvents[0];
+    } else {
+      activeEvent = openEvents.find(e => e.id === preferredId) || null;
+    }
+    if (activeEvent) sessionStorage.setItem("pos_event_" + register.id, activeEvent.id);
+    updateEventLabel();
+    if (!activeEvent && openEvents.length > 1) {
+      document.getElementById("event-picker").style.display = "block";
+      renderEventPicker();
+    }
+  }
+
+  function updateEventLabel(){
+    const extra = openEvents.length > 1 ? " (" + openEvents.length + " eventos abiertos)" : "";
+    document.getElementById("event-label").textContent = activeEvent
+      ? ("Evento activo: " + activeEvent.name + extra)
+      : (openEvents.length > 1 ? "Elige un evento para empezar a vender." + extra : "Sin evento activo — crea uno para empezar a vender.");
   }
 
   function toggleEventForm(){
     const f = document.getElementById("event-form");
     f.style.display = f.style.display === "none" ? "block" : "none";
+  }
+
+  function toggleEventPicker(){
+    const p = document.getElementById("event-picker");
+    const willShow = p.style.display === "none";
+    p.style.display = willShow ? "block" : "none";
+    if (willShow) renderEventPicker();
+  }
+
+  function renderEventPicker(){
+    const list = document.getElementById("event-picker-list");
+    if (openEvents.length === 0) { list.innerHTML = "<p style='font-size:13px; color:var(--muted);'>No hay eventos abiertos — crea uno con \"Iniciar nuevo evento\".</p>"; return; }
+    list.innerHTML = openEvents.map(e =>
+      '<div class="event-pick-row"><span>' + e.name + (e.event_date ? " — " + e.event_date : "") + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
+      '<span class="actions">' +
+        '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">Trabajar aquí</button>' +
+        '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">Cerrar evento</button>' +
+      '</span></div>'
+    ).join("");
+  }
+
+  function seleccionarEvento(id){
+    const ev = openEvents.find(e => e.id === id);
+    if (!ev) return;
+    activeEvent = ev;
+    sessionStorage.setItem("pos_event_" + register.id, id);
+    sessionStorage.setItem("pos_selected_event_id", id);
+    sessionStorage.setItem("pos_selected_event_name", ev.name);
+    updateEventLabel();
+    document.getElementById("event-picker").style.display = "none";
+    showToast("Trabajando en: " + ev.name);
+  }
+
+  async function cerrarEvento(id){
+    if (!confirm("¿Cerrar este evento? Dejará de aparecer para seguir vendiendo ahí.")) return;
+    await sb.rpc("close_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    showToast("Evento cerrado.");
+    await loadActiveEvent();
+    renderEventPicker();
   }
 
   async function crearEvento(){
@@ -261,8 +338,10 @@
     if (!name) { showToast("Escribe el nombre del evento."); return; }
     const { data, error } = await sb.rpc("create_event", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_event_date: date });
     if (error) { showToast("No se pudo crear el evento."); return; }
+    openEvents.push(data);
     activeEvent = data;
-    document.getElementById("event-label").textContent = "Evento activo: " + data.name;
+    sessionStorage.setItem("pos_event_" + register.id, data.id);
+    updateEventLabel();
     toggleEventForm();
     showToast("Evento iniciado.");
   }
@@ -521,28 +600,29 @@
   function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash){
     const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
     const isCortesia = paymentMethod === "cortesia";
-    let html = '<div class="receipt-copy"><h3>South Media — Ticket</h3>';
+    let html = '<div class="receipt-copy"><h3>South Media</h3><h4>Ticket</h4>';
     html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
-    if (customerName) html += '<div class="line"><span>Cliente</span><span>' + customerName + '</span></div>';
+    if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + customerName + '</span></div>';
+    if (operatorName) html += '<div class="line"><span class="iname">Atendió</span><span class="iprice">' + operatorName + '</span></div>';
     html += '<hr>';
     items.forEach(l => {
-      if (isCortesia) html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
-      else html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span>$' + Math.round(l.subtotal) + '</span></div>';
+      if (isCortesia) html += '<div class="line"><span class="iname">' + l.qty + 'x ' + l.name + '</span><span class="iprice"><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
+      else html += '<div class="line"><span class="iname">' + l.qty + 'x ' + l.name + '</span><span class="iprice">$' + Math.round(l.subtotal) + '</span></div>';
     });
     if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
     html += '<hr>';
     if (isCortesia) {
       html += '<div class="line"><b>🎁 CORTESÍA — 100% DCTO.</b></div>';
-      html += '<div class="line"><span>Valor referencial</span><span>$' + Math.round(total) + '</span></div>';
-      html += '<div class="line"><b>TOTAL A PAGAR</b><b>$0</b></div>';
+      html += '<div class="line"><span class="iname">Valor referencial</span><span class="iprice">$' + Math.round(total) + '</span></div>';
+      html += '<div class="line total"><span class="iname">TOTAL A PAGAR</span><span class="iprice">$0</span></div>';
     } else {
-      html += '<div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div>';
+      html += '<div class="line total"><span class="iname">TOTAL</span><span class="iprice">$' + Math.round(total) + '</span></div>';
       if (paymentMethod === "mixto") {
-        html += '<div class="line"><span>Efectivo</span><span>$' + Math.round(cash) + '</span></div>';
-        html += '<div class="line"><span>Tarjeta</span><span>$' + Math.round(card) + '</span></div>';
+        html += '<div class="line"><span class="iname">Efectivo</span><span class="iprice">$' + Math.round(cash) + '</span></div>';
+        html += '<div class="line"><span class="iname">Tarjeta</span><span class="iprice">$' + Math.round(card) + '</span></div>';
       } else if (paymentMethod === "efectivo" && receivedCash > total) {
-        html += '<div class="line"><span>Recibido</span><span>$' + Math.round(receivedCash) + '</span></div>';
-        html += '<div class="line"><span>Vuelto</span><span>$' + Math.round(receivedCash - total) + '</span></div>';
+        html += '<div class="line"><span class="iname">Recibido</span><span class="iprice">$' + Math.round(receivedCash) + '</span></div>';
+        html += '<div class="line"><span class="iname">Vuelto</span><span class="iprice">$' + Math.round(receivedCash - total) + '</span></div>';
       }
     }
     html += '</div>';

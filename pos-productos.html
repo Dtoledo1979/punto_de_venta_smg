@@ -108,17 +108,20 @@
   .modal .row{display:flex; gap:8px; margin-top:14px;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
   #receipt-area{display:none;}
-  @page{ size:80mm auto; margin:2mm; }
+  @page{ size:80mm auto; margin:4mm 3mm; }
   @media print{
     body *{visibility:hidden;}
     #receipt-area, #receipt-area *{visibility:visible;}
-    #receipt-area{display:block !important; position:absolute; top:0; left:0; width:80mm;}
-    .receipt-copy{padding:4px 6px; font-family:monospace; width:100%;}
-    .receipt-copy h3{text-align:center; margin:0 0 4px; font-size:13px;}
-    .receipt-copy .line{display:flex; justify-content:space-between; font-size:12px;}
-    .receipt-copy .obs{font-size:11px; margin:4px 0; word-wrap:break-word;}
-    .receipt-copy hr{border:none; border-top:1px dashed #000;}
-    .cut{text-align:center; font-size:11px; margin:10px 0; letter-spacing:2px;}
+    #receipt-area{display:block !important; position:absolute; top:0; left:0; width:100%;}
+    .receipt-copy{width:100%; font-family:Arial,Helvetica,sans-serif; color:#000;}
+    .receipt-copy h3{text-align:center; margin:0; font-size:19px; font-weight:800; letter-spacing:.5px;}
+    .receipt-copy h4{text-align:center; margin:2px 0 8px; font-size:15px; font-weight:700;}
+    .receipt-copy .line{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; font-size:15px; padding:2px 0;}
+    .receipt-copy .line.total{font-size:17px; font-weight:800; border-top:2px solid #000; margin-top:4px; padding-top:6px;}
+    .receipt-copy .iname{flex:1 1 auto; min-width:0; overflow-wrap:break-word;}
+    .receipt-copy .iprice{flex:0 0 auto; white-space:nowrap; font-variant-numeric:tabular-nums;}
+    .receipt-copy .obs{font-size:13.5px; margin:6px 0; overflow-wrap:break-word;}
+    .receipt-copy hr{border:none; border-top:1px dashed #000; margin:6px 0;}
   }
 </style>
 </head>
@@ -416,7 +419,7 @@
       html += '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
       if (item.track_stock && item.stock_qty !== null) {
         const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : 1;
-        if (pct <= 0.25) html += '<span class="stock-badge">⚠️ Queda poco stock</span>';
+        html += '<span class="stock-badge">' + item.stock_qty + ' en stock' + (pct <= 0.25 ? " ⚠️" : "") + '</span>';
       }
       const promo = activePromoFor(item.id);
       if (promo) html += '<span class="promo-badge">🏷️ ' + promo.bundle_qty + 'x$' + Math.round(promo.bundle_price).toLocaleString("es-CL") + '</span>';
@@ -439,6 +442,8 @@
       .subscribe();
   }
 
+  let openOrderIds = new Set();
+
   function renderOrdersPanel(){
     const box = document.getElementById("orders-panel");
     if (!pendingOrders.length) { box.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">Sin órdenes pendientes.</p>'; return; }
@@ -446,11 +451,17 @@
       const mins = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/60000));
       const cls = mins >= 5 ? "danger" : mins >= 2 ? "warn" : "";
       const itemsHtml = o.items.map(it => '<div class="' + (it.delivered ? "done" : "") + '">' + it.qty + 'x ' + it.name + '</div>').join("");
-      return '<div class="order-card" onclick="this.classList.toggle(\'open\')">' +
+      const isOpen = openOrderIds.has(o.id);
+      return '<div class="order-card ' + (isOpen ? "open" : "") + '" onclick="toggleOrderCard(\'' + o.id + '\')">' +
         '<div class="row1"><span>#' + o.ticket_num + (o.customer_name ? " " + o.customer_name : "") + '</span><span class="mins ' + cls + '">' + mins + ' min</span></div>' +
         '<div class="items">' + itemsHtml + '</div>' +
       '</div>';
     }).join("") + '</div>';
+  }
+
+  function toggleOrderCard(id){
+    if (openOrderIds.has(id)) openOrderIds.delete(id); else openOrderIds.add(id);
+    renderOrdersPanel();
   }
 
   function addToCart(item){
@@ -638,39 +649,57 @@
     const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
     const isCortesia = paymentMethod === "cortesia";
     function buildCopy(label){
-      let html = '<div class="receipt-copy"><h3>South Media — ' + label + '</h3>';
+      let html = '<div class="receipt-copy"><h3>South Media</h3><h4>' + label + '</h4>';
       html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
-      if (customerName) html += '<div class="line"><span>Cliente</span><span>' + customerName + '</span></div>';
+      if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + customerName + '</span></div>';
+      if (operatorName) html += '<div class="line"><span class="iname">Atendió</span><span class="iprice">' + operatorName + '</span></div>';
       html += '<hr>';
       items.forEach(l => {
         const promoTag = activePromoFor(l.id) ? " 🏷️" : "";
         if (isCortesia) {
-          html += '<div class="line"><span>' + l.qty + 'x ' + l.name + promoTag + '</span><span><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
+          html += '<div class="line"><span class="iname">' + l.qty + 'x ' + l.name + promoTag + '</span><span class="iprice"><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
         } else {
-          html += '<div class="line"><span>' + l.qty + 'x ' + l.name + promoTag + '</span><span>$' + Math.round(l.subtotal) + '</span></div>';
+          html += '<div class="line"><span class="iname">' + l.qty + 'x ' + l.name + promoTag + '</span><span class="iprice">$' + Math.round(l.subtotal) + '</span></div>';
         }
       });
       if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
       html += '<hr>';
       if (isCortesia) {
         html += '<div class="line"><b>🎁 CORTESÍA — 100% DCTO.</b></div>';
-        html += '<div class="line"><span>Valor referencial</span><span>$' + Math.round(total) + '</span></div>';
-        html += '<div class="line"><b>TOTAL A PAGAR</b><b>$0</b></div>';
+        html += '<div class="line"><span class="iname">Valor referencial</span><span class="iprice">$' + Math.round(total) + '</span></div>';
+        html += '<div class="line total"><span class="iname">TOTAL A PAGAR</span><span class="iprice">$0</span></div>';
       } else {
-        html += '<div class="line"><b>TOTAL</b><b>$' + Math.round(total) + '</b></div>';
+        html += '<div class="line total"><span class="iname">TOTAL</span><span class="iprice">$' + Math.round(total) + '</span></div>';
         if (paymentMethod === "mixto") {
-          html += '<div class="line"><span>Efectivo</span><span>$' + Math.round(cash) + '</span></div>';
-          html += '<div class="line"><span>Tarjeta</span><span>$' + Math.round(card) + '</span></div>';
+          html += '<div class="line"><span class="iname">Efectivo</span><span class="iprice">$' + Math.round(cash) + '</span></div>';
+          html += '<div class="line"><span class="iname">Tarjeta</span><span class="iprice">$' + Math.round(card) + '</span></div>';
         } else if (paymentMethod === "efectivo" && receivedCash > total) {
-          html += '<div class="line"><span>Recibido</span><span>$' + Math.round(receivedCash) + '</span></div>';
-          html += '<div class="line"><span>Vuelto</span><span>$' + Math.round(receivedCash - total) + '</span></div>';
+          html += '<div class="line"><span class="iname">Recibido</span><span class="iprice">$' + Math.round(receivedCash) + '</span></div>';
+          html += '<div class="line"><span class="iname">Vuelto</span><span class="iprice">$' + Math.round(receivedCash - total) + '</span></div>';
         }
       }
       html += '</div>';
       return html;
     }
-    document.getElementById("receipt-area").innerHTML = buildCopy("COPIA BARRA") + '<div class="cut">- - - CORTAR AQUÍ - - -</div>' + buildCopy("COPIA CLIENTE");
+
+    // Dos tickets físicos independientes: se imprime la copia de barra, se
+    // espera a que ese trabajo termine (evento "afterprint"), y recién ahí
+    // se envía la copia de cliente. Cada trabajo termina en un corte
+    // automático real (según la config "Auto Cut" del driver de la Epson),
+    // en vez de un solo documento con una línea de "cortar aquí".
+    const area = document.getElementById("receipt-area");
+    const copyBarra = buildCopy("COPIA BARRA");
+    const copyCliente = buildCopy("COPIA CLIENTE");
+
+    area.innerHTML = copyBarra;
     window.print();
+
+    function afterFirst(){
+      window.removeEventListener("afterprint", afterFirst);
+      area.innerHTML = copyCliente;
+      setTimeout(() => window.print(), 300);
+    }
+    window.addEventListener("afterprint", afterFirst);
   }
 
   async function anularUltimo(){

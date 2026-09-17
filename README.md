@@ -343,3 +343,33 @@ Dos cosas separadas a tener en cuenta:
   si es compatible con tu modelo). Es un tema de impresión desde el
   celular, no del código del POS — avísame si quieres que lo revisemos
   aparte una vez que tengas la segunda caja andando.
+
+### Bugs corregidos + impresión rediseñada (07-09-2026)
+
+**Stock en el tile**: volvió a mostrar el número exacto ("18 en stock ⚠️")
+además del aviso, no solo el ícono.
+
+**Órdenes activas no se abrían al tocarlas**: el panel se refresca solo
+cada segundo para mantener el contador de minutos al día, y ese refresco
+borraba el estado "abierto" apenas lo tocabas. Ahora ese estado se guarda
+aparte y sobrevive al refresco — un clic abre, el siguiente cierra.
+
+**Impresión — dos tickets físicos independientes con corte real.** Antes
+era un solo documento con "- - - CORTAR AQUÍ - - -" en el medio y un único
+corte al final. Ahora `pos-productos.html` imprime la Copia Barra, espera
+a que ese trabajo termine, y recién ahí manda la Copia Cliente — dos
+trabajos de impresión separados. Como ya tienes "Auto Cut: Enable" en el
+driver de la Epson, **cada trabajo corta solo al terminar**, sin ESC/POS
+ni software adicional — se sigue usando exactamente el mismo mecanismo de
+`window.print()` de siempre. `pos-tickets.html` sigue siendo un solo
+ticket, se benefició del mismo rediseño de tipografía.
+
+También: letra más grande (15-19px en vez de 12-13px), y los precios ya no
+pueden salirse del papel — si un nombre de producto es muy largo, el
+nombre se va a una segunda línea pero el precio se queda siempre alineado
+a la derecha y completo.
+
+**Nota:** para las dos copias con doble corte, es importante que la
+impresora tenga "Auto Cut: Enable" en las preferencias de Windows (ver
+sección de configuración de impresora más arriba) — si no está activado,
+va a imprimir ambas copias seguidas sin cortar entre ellas.
