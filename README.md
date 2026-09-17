@@ -231,3 +231,68 @@ También se agregó protección contra doble clic al cobrar (un clic doble
 accidental ya no puede generar dos pedidos), y el desglose de cortesías del
 resumen ahora muestra **a quién** se le entregó cada una (cliente, ticket,
 hora y productos), no solo el total agregado por producto.
+
+### Reponer stock — con historial (07-09-2026)
+
+El botón único "Guardar stock" se reemplazó por dos acciones separadas,
+para no perder información al reponer:
+
+- **Reiniciar a [N]**: fija el stock (actual y de referencia) en N. Úsalo
+  para la carga inicial de un producto, o para recontar todo desde cero.
+- **Agregar +[N]**: suma N unidades tanto al stock actual como al de
+  referencia. Úsalo cuando llega más mercadería a mitad de un evento (no
+  pisa lo que ya tenías, lo incrementa).
+
+Cada una de estas acciones, y cada venta, queda registrada en la tabla
+`pos.stock_movements`. Con el link **"Ver historial"** al lado de cada
+producto en "Editar menú" puedes ver las últimas cargas, reposiciones y
+ventas de ese producto, con fecha, quién la hizo y cuánto quedó.
+
+**Sobre repetir un evento:** el menú (productos y precios) vive en la caja,
+no en el evento — al iniciar un evento nuevo, el menú completo ya está ahí
+sin que tengas que copiar nada. El stock tampoco se resetea solo al crear
+un evento nuevo (a propósito, para no borrar inventario real sin querer):
+si quieres partir un evento con el stock en un número específico, usa
+"Reiniciar a [N]" en cada producto que corresponda.
+
+### Varios eventos activos a la vez (07-09-2026)
+
+Antes solo podía haber un evento activo — crear uno nuevo cerraba
+automáticamente el anterior. Ahora se pueden tener **varios eventos
+abiertos al mismo tiempo**, y cada caja elige en cuál trabajar:
+
+- Si hay un solo evento abierto, se selecciona solo (sin fricción).
+- Si hay dos o más, aparece un selector — "Elige el evento en el que vas a
+  trabajar" — con un botón "Trabajar aquí" por evento.
+- El link **"Cambiar evento"** en la franja de arriba reabre ese selector
+  en cualquier momento, sin pedir el PIN de nuevo.
+- Cada evento se puede **cerrar** desde ese mismo selector (deja de
+  aparecer para seguir vendiendo ahí, pero el historial de pedidos de ese
+  evento queda intacto para siempre).
+- En Entrega, si hay pedidos de más de un evento abierto al mismo tiempo,
+  cada pedido muestra una etiqueta con el nombre de su evento para no
+  confundirlos.
+- El menú/precios de la caja no dependen del evento — siguen siendo los
+  mismos sin importar cuántos eventos tengas abiertos.
+
+### Insumos, recetas y promociones (07-09-2026)
+
+**Insumos** — ingredientes con su propia unidad y stock (ml, gr, un), en la
+sección "🧪 Insumos" dentro de Productos. Se gestionan igual que el stock
+de productos: "Reiniciar a [N]" / "Agregar +[N]", con historial.
+
+**Receta** — dentro de "Editar menú", cada producto tiene un link "🍹
+Receta" donde defines cuánto de cada insumo lleva (ej. Terremoto: 100gr
+Helado + 250ml Vino + 15ml Granadina). Al vender ese producto, el sistema
+descuenta automáticamente esas cantidades de cada insumo — puedes ver en
+"Ver insumos" cuánto vino, granadina o helado llevas usado, no solo cuántos
+Terremotos vendiste.
+
+**Promociones** — link "🏷️ Promoción" en cada producto: "cada N unidades
+por $X en total" (ej. Pin Bandera 2x$5). Se activa/desactiva con un
+interruptor, y opcionalmente se programa con fecha/hora de inicio y fin —
+si las dejas vacías, corre mientras esté "Activa". La promoción **solo
+cambia el precio**: la cantidad de stock/insumos descontada es siempre la
+cantidad real de unidades vendidas, tenga o no promoción aplicada. Los
+productos con promoción activa muestran una etiqueta 🏷️ en el menú, en el
+carrito y en la boleta impresa.

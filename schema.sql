@@ -81,12 +81,57 @@ create index idx_orders_register_status on pos.orders (register_id, status);
 create index idx_orders_event on pos.orders (event_id);
 
 -- ---------------------------------------------------------------------
+-- Insumos: ingredientes con su propia unidad y stock (ml, gr, un).
+-- ---------------------------------------------------------------------
+create table pos.ingredients (
+  id uuid primary key default gen_random_uuid(),
+  register_id uuid not null references pos.registers(id) on delete cascade,
+  name text not null,
+  unit text not null,                    -- 'ml', 'gr', 'un', etc.
+  stock_qty numeric(12,2),
+  initial_stock numeric(12,2),
+  container_size numeric(12,2),          -- ej: 750 (ml por botella) — para mostrar "botellas"
+  container_label text,                  -- ej: 'botella', 'kg'
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
+-- Receta: cuánto de cada insumo lleva un producto, por unidad vendida.
+-- ---------------------------------------------------------------------
+create table pos.recipe_items (
+  id uuid primary key default gen_random_uuid(),
+  menu_item_id uuid not null references pos.menu_items(id) on delete cascade,
+  ingredient_id uuid not null references pos.ingredients(id) on delete cascade,
+  qty_per_unit numeric(12,3) not null,
+  unique (menu_item_id, ingredient_id)
+);
+
+-- ---------------------------------------------------------------------
+-- Promociones: "cada N unidades de este producto, por $X en total".
+-- Si starts_at/ends_at son null, corre mientras "active" esté encendido.
+-- ---------------------------------------------------------------------
+create table pos.promotions (
+  id uuid primary key default gen_random_uuid(),
+  register_id uuid not null references pos.registers(id) on delete cascade,
+  menu_item_id uuid not null references pos.menu_items(id) on delete cascade,
+  name text,
+  bundle_qty int not null check (bundle_qty >= 2),
+  bundle_price numeric(10,2) not null,
+  active boolean not null default true,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
 -- Historial de stock: cada carga inicial, reposición y venta queda
 -- registrada acá, para poder ver de dónde salió cada número.
 -- ---------------------------------------------------------------------
 create table pos.stock_movements (
   id uuid primary key default gen_random_uuid(),
-  menu_item_id uuid not null references pos.menu_items(id) on delete cascade,
+  menu_item_id uuid references pos.menu_items(id) on delete cascade,
+  ingredient_id uuid references pos.ingredients(id) on delete cascade,
   register_id uuid not null references pos.registers(id),
   event_id uuid references pos.events(id),
   type text not null check (type in ('carga_inicial','restock','venta','ajuste')),
@@ -94,14 +139,31 @@ create table pos.stock_movements (
   qty_after numeric(10,2) not null,
   note text,
   created_by text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint stock_movements_target_chk check (
+    (menu_item_id is not null and ingredient_id is null) or
+    (menu_item_id is null and ingredient_id is not null)
+  )
 );
 create index idx_stock_mov_item on pos.stock_movements (menu_item_id, created_at desc);
+create index idx_stock_mov_ingredient on pos.stock_movements (ingredient_id, created_at desc);
 alter table pos.stock_movements enable row level security;
 create policy "acceso interno" on pos.stock_movements for all using (true) with check (true);
 -- Igual que el resto: solo lectura directa. Escribir acá solo lo hacen
 -- las funciones de más abajo (restock_item, y create_order al vender).
 revoke insert, update, delete on pos.stock_movements from anon, authenticated;
+
+alter table pos.ingredients enable row level security;
+create policy "acceso interno" on pos.ingredients for all using (true) with check (true);
+revoke insert, update, delete on pos.ingredients from anon, authenticated;
+
+alter table pos.recipe_items enable row level security;
+create policy "acceso interno" on pos.recipe_items for all using (true) with check (true);
+revoke insert, update, delete on pos.recipe_items from anon, authenticated;
+
+alter table pos.promotions enable row level security;
+create policy "acceso interno" on pos.promotions for all using (true) with check (true);
+revoke insert, update, delete on pos.promotions from anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- Número de ticket atómico por punto de venta (evita duplicados si dos
@@ -270,13 +332,22 @@ returns pos.events language plpgsql security definer set search_path = pos as $$
 declare v_event pos.events;
 begin
   if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
-  update pos.events set active = false where active = true;
   insert into pos.events (name, event_date, active) values (p_name, p_event_date, true)
     returning * into v_event;
   return v_event;
 end;
 $$;
 grant execute on function pos.create_event(uuid, text, text, date) to anon, authenticated;
+
+create or replace function pos.close_event(p_register_id uuid, p_pin text, p_event_id uuid)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  update pos.events set active = false where id = p_event_id;
+  return true;
+end;
+$$;
+grant execute on function pos.close_event(uuid, text, uuid) to anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- Menú y stock
@@ -370,6 +441,131 @@ end;
 $$;
 grant execute on function pos.restock_item(uuid, text, uuid, text, numeric, text, text) to anon, authenticated;
 
+-- ---------------------------------------------------------------------
+-- Insumos (ingredientes)
+-- ---------------------------------------------------------------------
+create or replace function pos.upsert_ingredient(
+  p_register_id uuid, p_pin text, p_ingredient_id uuid, p_name text, p_unit text,
+  p_container_size numeric, p_container_label text
+) returns pos.ingredients language plpgsql security definer set search_path = pos as $$
+declare v_row pos.ingredients;
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  if p_ingredient_id is null then
+    insert into pos.ingredients (register_id, name, unit, container_size, container_label)
+      values (p_register_id, p_name, p_unit, p_container_size, p_container_label)
+      returning * into v_row;
+  else
+    update pos.ingredients set
+      name = coalesce(p_name, name), unit = coalesce(p_unit, unit),
+      container_size = p_container_size, container_label = p_container_label
+    where id = p_ingredient_id and register_id = p_register_id
+    returning * into v_row;
+  end if;
+  return v_row;
+end;
+$$;
+grant execute on function pos.upsert_ingredient(uuid, text, uuid, text, text, numeric, text) to anon, authenticated;
+
+create or replace function pos.remove_ingredient(p_register_id uuid, p_pin text, p_ingredient_id uuid)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  update pos.ingredients set active = false where id = p_ingredient_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.remove_ingredient(uuid, text, uuid) to anon, authenticated;
+
+create or replace function pos.restock_ingredient(
+  p_register_id uuid, p_pin text, p_ingredient_id uuid, p_mode text, p_qty numeric, p_by text default null
+) returns pos.ingredients language plpgsql security definer set search_path = pos as $$
+declare
+  v_row pos.ingredients;
+  v_new_stock numeric;
+  v_new_initial numeric;
+  v_type text;
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  select * into v_row from pos.ingredients where id = p_ingredient_id and register_id = p_register_id;
+  if v_row is null then raise exception 'Insumo no encontrado'; end if;
+
+  if p_mode = 'reset' then
+    v_new_stock := p_qty; v_new_initial := p_qty; v_type := 'carga_inicial';
+  elsif p_mode = 'add' then
+    v_new_stock := coalesce(v_row.stock_qty,0) + p_qty;
+    v_new_initial := coalesce(v_row.initial_stock,0) + p_qty;
+    v_type := 'restock';
+  else
+    raise exception 'Modo inválido';
+  end if;
+
+  update pos.ingredients set stock_qty = v_new_stock, initial_stock = v_new_initial
+    where id = p_ingredient_id returning * into v_row;
+
+  insert into pos.stock_movements (ingredient_id, register_id, type, qty_change, qty_after, created_by)
+    values (p_ingredient_id, p_register_id, v_type, p_qty, v_new_stock, p_by);
+
+  return v_row;
+end;
+$$;
+grant execute on function pos.restock_ingredient(uuid, text, uuid, text, numeric, text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Receta de un producto — reemplaza la lista completa de una vez.
+-- p_recipe = [{"ingredient_id": "...", "qty_per_unit": 100}, ...]
+-- ---------------------------------------------------------------------
+create or replace function pos.set_recipe(p_register_id uuid, p_pin text, p_menu_item_id uuid, p_recipe jsonb)
+returns boolean language plpgsql security definer set search_path = pos as $$
+declare v_line jsonb;
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  delete from pos.recipe_items where menu_item_id = p_menu_item_id;
+  for v_line in select * from jsonb_array_elements(p_recipe) loop
+    insert into pos.recipe_items (menu_item_id, ingredient_id, qty_per_unit)
+      values (p_menu_item_id, (v_line->>'ingredient_id')::uuid, (v_line->>'qty_per_unit')::numeric);
+  end loop;
+  return true;
+end;
+$$;
+grant execute on function pos.set_recipe(uuid, text, uuid, jsonb) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Promociones
+-- ---------------------------------------------------------------------
+create or replace function pos.upsert_promotion(
+  p_register_id uuid, p_pin text, p_promotion_id uuid, p_menu_item_id uuid, p_name text,
+  p_bundle_qty int, p_bundle_price numeric, p_active boolean, p_starts_at timestamptz, p_ends_at timestamptz
+) returns pos.promotions language plpgsql security definer set search_path = pos as $$
+declare v_row pos.promotions;
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  if p_promotion_id is null then
+    insert into pos.promotions (register_id, menu_item_id, name, bundle_qty, bundle_price, active, starts_at, ends_at)
+      values (p_register_id, p_menu_item_id, p_name, p_bundle_qty, p_bundle_price, p_active, p_starts_at, p_ends_at)
+      returning * into v_row;
+  else
+    update pos.promotions set
+      name = p_name, bundle_qty = p_bundle_qty, bundle_price = p_bundle_price,
+      active = p_active, starts_at = p_starts_at, ends_at = p_ends_at
+    where id = p_promotion_id and register_id = p_register_id
+    returning * into v_row;
+  end if;
+  return v_row;
+end;
+$$;
+grant execute on function pos.upsert_promotion(uuid, text, uuid, uuid, text, int, numeric, boolean, timestamptz, timestamptz) to anon, authenticated;
+
+create or replace function pos.delete_promotion(p_register_id uuid, p_pin text, p_promotion_id uuid)
+returns boolean language plpgsql security definer set search_path = pos as $$
+begin
+  if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+  delete from pos.promotions where id = p_promotion_id and register_id = p_register_id;
+  return true;
+end;
+$$;
+grant execute on function pos.delete_promotion(uuid, text, uuid) to anon, authenticated;
+
 create or replace function pos.disable_stock(p_register_id uuid, p_pin text, p_item_id uuid)
 returns boolean language plpgsql security definer set search_path = pos as $$
 begin
@@ -398,6 +594,9 @@ declare
   v_order pos.orders;
   v_item jsonb;
   v_stock_after numeric;
+  v_recipe_line record;
+  v_ingredient_after numeric;
+  v_sold_qty numeric;
 begin
   select * into v_register from pos.registers where id = p_register_id;
   if v_register is null or v_register.pin <> p_pin then
@@ -441,8 +640,10 @@ begin
   -- siempre marcara 100%).
   for v_item in select * from jsonb_array_elements(p_items) loop
     if v_item ? 'id' then
+      v_sold_qty := coalesce((v_item->>'qty')::numeric, 0);
+
       update pos.menu_items
-        set stock_qty = greatest(0, stock_qty - coalesce((v_item->>'qty')::numeric, 0))
+        set stock_qty = greatest(0, stock_qty - v_sold_qty)
         where id = (v_item->>'id')::uuid
           and register_id = p_register_id
           and track_stock = true
@@ -451,9 +652,26 @@ begin
 
       if found then
         insert into pos.stock_movements (menu_item_id, register_id, event_id, type, qty_change, qty_after, created_by)
-          values ((v_item->>'id')::uuid, p_register_id, p_event_id, 'venta',
-                  -coalesce((v_item->>'qty')::numeric, 0), v_stock_after, p_attended_by);
+          values ((v_item->>'id')::uuid, p_register_id, p_event_id, 'venta', -v_sold_qty, v_stock_after, p_attended_by);
       end if;
+
+      -- Descontar insumos según la receta del producto (independiente del
+      -- stock del producto en sí — un producto puede tener receta, stock
+      -- propio, ambos, o ninguno).
+      for v_recipe_line in
+        select ri.ingredient_id, ri.qty_per_unit
+        from pos.recipe_items ri
+        where ri.menu_item_id = (v_item->>'id')::uuid
+      loop
+        update pos.ingredients
+          set stock_qty = greatest(0, coalesce(stock_qty,0) - (v_recipe_line.qty_per_unit * v_sold_qty))
+          where id = v_recipe_line.ingredient_id
+          returning stock_qty into v_ingredient_after;
+
+        insert into pos.stock_movements (ingredient_id, register_id, event_id, type, qty_change, qty_after, created_by)
+          values (v_recipe_line.ingredient_id, p_register_id, p_event_id, 'venta',
+                  -(v_recipe_line.qty_per_unit * v_sold_qty), v_ingredient_after, p_attended_by);
+      end loop;
     end if;
   end loop;
 

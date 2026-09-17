@@ -21,6 +21,9 @@
   header .back{color:#C9D3DC; text-decoration:none; font-size:13px;}
   .event-strip{background:#171C24; color:#C9D3DC; font-size:13px; padding:9px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
   .event-strip a{color:var(--accent); font-size:12.5px; cursor:pointer; text-decoration:underline;}
+  .event-pick-row{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:13.5px; gap:8px; flex-wrap:wrap;}
+  .event-pick-row .actions{display:flex; gap:6px;}
+  .event-pick-row .actions button{padding:6px 10px; font-size:12px; margin:0;}
   main{max-width:1100px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
   @media (max-width:860px){ main{grid-template-columns:1fr;} }
   .card{background:var(--surface); border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
@@ -31,6 +34,7 @@
   .item-btn:active{background:#E4EEFB; border-color:#B9D2F5; transform:scale(0.98);}
   .item-btn .price{display:block; font-size:12px; color:var(--muted); margin-top:3px; font-weight:400;}
   .item-btn .stock-badge{display:block; font-size:10.5px; color:var(--warn); margin-top:2px; font-weight:600;}
+  .item-btn .promo-badge{display:block; font-size:10.5px; color:#1E7A3D; margin-top:2px; font-weight:700;}
   @media (max-width:420px){
     .menu-grid{grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:6px;}
     .item-btn{padding:10px 8px; font-size:13px; min-height:50px;}
@@ -119,7 +123,14 @@
 
 <div class="event-strip">
   <span id="event-label">Cargando evento…</span>
-  <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
+  <span>
+    <a onclick="toggleEventPicker()">Cambiar evento</a> ·
+    <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
+  </span>
+</div>
+<div id="event-picker" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
+  <p style="margin:0 0 10px; font-size:13px; color:var(--muted);">Elige el evento en el que vas a trabajar:</p>
+  <div id="event-picker-list"></div>
 </div>
 <div id="event-form" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -134,6 +145,7 @@
     <h2>Menú</h2>
     <button class="toggle" onclick="toggleEdit()">✏️ Editar menú (agregar / quitar / precios / stock)</button>
     <button class="toggle" style="margin-left:14px;" onclick="toggleStock()">📦 Ver stock</button>
+    <button class="toggle" style="margin-left:14px;" onclick="toggleIngredients()">🧪 Insumos</button>
     <div id="edit-panel" style="display:none; margin-bottom:14px;">
       <button class="toggle" style="font-size:12px;" onclick="abrirAdmin()">⚙️ Administración (renombrar / PIN de caja, Entrega y admin)</button>
       <div id="edit-list"></div>
@@ -174,6 +186,19 @@
     <div class="ticket-note">Próximo N° de ticket: <b id="next-ticket">—</b></div>
   </div>
 </main>
+
+<div class="card wide-card" id="ingredients-card" style="display:none; margin-bottom:16px;">
+  <h2>🧪 Insumos</h2>
+  <p style="font-size:12.5px; color:var(--muted); margin:-8px 0 12px;">Registra acá los ingredientes (vino, granadina, hielo, pisco, etc.) para poder descontarlos automáticamente según la receta de cada producto.</p>
+  <div id="ingredients-list"></div>
+  <div class="add-form">
+    <input type="text" id="new-ing-name" placeholder="Nombre (ej. Vino)">
+    <input type="text" id="new-ing-unit" placeholder="Unidad (ml, gr, un)" style="width:110px;">
+    <input type="number" id="new-ing-container" placeholder="ej. 750 (opcional)" style="width:130px;">
+    <input type="text" id="new-ing-container-label" placeholder="botella (opcional)" style="width:110px;">
+    <button class="btn btn-secondary btn-small" onclick="addIngredient()">Agregar insumo</button>
+  </div>
+</div>
 
 <div class="card wide-card" style="margin-bottom:16px;">
   <button class="toggle" onclick="toggleSearch()">🔎 Buscar ticket (por cliente o número)</button>
@@ -228,8 +253,11 @@
   }
 
   let register = null;      // fila de pos.registers
-  let activeEvent = null;   // fila de pos.events activa
+  let activeEvent = null;   // fila de pos.events activa (elegida por el operador)
+  let openEvents = [];       // todos los eventos abiertos (active=true)
   let menu = [];             // pos.menu_items
+  let ingredients = [];       // pos.ingredients
+  let promotions = [];        // pos.promotions
   let cart = {};             // { itemId: {name, price, qty} }
   let operatorName = "";
   let lastOrderId = null, lastTicketNum = null;
@@ -285,19 +313,77 @@
     document.getElementById("register-name").textContent = register.name + " · " + operatorName;
     await loadActiveEvent();
     await loadMenu();
+    await loadIngredients();
     renderMenu();
     renderCart();
   }
 
   async function loadActiveEvent() {
-    const { data } = await sb.from("events").select("*").eq("active", true).limit(1).maybeSingle();
-    activeEvent = data || null;
-    document.getElementById("event-label").textContent = activeEvent ? ("Evento activo: " + activeEvent.name) : "Sin evento activo — crea uno para empezar a vender.";
+    const { data } = await sb.from("events").select("*").eq("active", true).order("created_at");
+    openEvents = data || [];
+
+    const savedId = sessionStorage.getItem("pos_event_" + register.id);
+    if (openEvents.length === 0) {
+      activeEvent = null;
+    } else if (openEvents.length === 1) {
+      activeEvent = openEvents[0];
+    } else {
+      activeEvent = openEvents.find(e => e.id === savedId) || null;
+    }
+    updateEventLabel();
+    if (!activeEvent && openEvents.length > 1) {
+      document.getElementById("event-picker").style.display = "block";
+      renderEventPicker();
+    }
+  }
+
+  function updateEventLabel(){
+    const extra = openEvents.length > 1 ? " (" + openEvents.length + " eventos abiertos)" : "";
+    document.getElementById("event-label").textContent = activeEvent
+      ? ("Evento activo: " + activeEvent.name + extra)
+      : (openEvents.length > 1 ? "Elige un evento para empezar a vender." + extra : "Sin evento activo — crea uno para empezar a vender.");
   }
 
   function toggleEventForm(){
     const f = document.getElementById("event-form");
     f.style.display = f.style.display === "none" ? "block" : "none";
+  }
+
+  function toggleEventPicker(){
+    const p = document.getElementById("event-picker");
+    const willShow = p.style.display === "none";
+    p.style.display = willShow ? "block" : "none";
+    if (willShow) renderEventPicker();
+  }
+
+  function renderEventPicker(){
+    const list = document.getElementById("event-picker-list");
+    if (openEvents.length === 0) { list.innerHTML = "<p style='font-size:13px; color:var(--muted);'>No hay eventos abiertos — crea uno con \"Iniciar nuevo evento\".</p>"; return; }
+    list.innerHTML = openEvents.map(e =>
+      '<div class="event-pick-row"><span>' + e.name + (e.event_date ? " — " + e.event_date : "") + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
+      '<span class="actions">' +
+        '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">Trabajar aquí</button>' +
+        '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">Cerrar evento</button>' +
+      '</span></div>'
+    ).join("");
+  }
+
+  function seleccionarEvento(id){
+    const ev = openEvents.find(e => e.id === id);
+    if (!ev) return;
+    activeEvent = ev;
+    sessionStorage.setItem("pos_event_" + register.id, id);
+    updateEventLabel();
+    document.getElementById("event-picker").style.display = "none";
+    showToast("Trabajando en: " + ev.name);
+  }
+
+  async function cerrarEvento(id){
+    if (!confirm("¿Cerrar este evento? Dejará de aparecer para seguir vendiendo ahí.")) return;
+    await sb.rpc("close_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    showToast("Evento cerrado.");
+    await loadActiveEvent();
+    renderEventPicker();
   }
 
   async function crearEvento(){
@@ -306,8 +392,10 @@
     if (!name) { showToast("Escribe el nombre del evento."); return; }
     const { data, error } = await sb.rpc("create_event", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_event_date: date });
     if (error) { showToast("No se pudo crear el evento."); return; }
+    openEvents.push(data);
     activeEvent = data;
-    document.getElementById("event-label").textContent = "Evento activo: " + data.name;
+    sessionStorage.setItem("pos_event_" + register.id, data.id);
+    updateEventLabel();
     toggleEventForm();
     showToast("Evento iniciado.");
   }
@@ -315,6 +403,13 @@
   async function loadMenu(){
     const { data } = await sb.from("menu_items").select("*").eq("register_id", register.id).eq("active", true).order("sort_order");
     menu = data || [];
+    const { data: promoData } = await sb.from("promotions").select("*").eq("register_id", register.id);
+    promotions = promoData || [];
+  }
+
+  async function loadIngredients(){
+    const { data } = await sb.from("ingredients").select("*").eq("register_id", register.id).eq("active", true).order("created_at");
+    ingredients = data || [];
   }
 
   function renderMenu(){
@@ -328,17 +423,90 @@
         const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : 1;
         html += '<span class="stock-badge">' + item.stock_qty + ' en stock' + (pct <= 0.25 ? " ⚠️" : "") + '</span>';
       }
+      const promo = activePromoFor(item.id);
+      if (promo) html += '<span class="promo-badge">🏷️ ' + promo.bundle_qty + 'x$' + Math.round(promo.bundle_price).toLocaleString("es-CL") + '</span>';
       b.innerHTML = html;
       b.onclick = () => addToCart(item);
       grid.appendChild(b);
     });
     renderEditList();
     renderStockPanel();
+    renderIngredientsList();
   }
 
   function toggleStock(){
     const p = document.getElementById("stock-panel");
     p.style.display = p.style.display === "none" ? "block" : "none";
+  }
+
+  function toggleIngredients(){
+    const p = document.getElementById("ingredients-card");
+    p.style.display = p.style.display === "none" ? "block" : "none";
+  }
+
+  function renderIngredientsList(){
+    const list = document.getElementById("ingredients-list");
+    if (!ingredients.length) {
+      list.innerHTML = "<p style='font-size:13px; color:var(--muted);'>Todavía no registras insumos.</p>";
+      return;
+    }
+    list.innerHTML = "";
+    ingredients.forEach(ing => {
+      const pct = ing.initial_stock > 0 ? Math.round((ing.stock_qty / ing.initial_stock) * 100) : 0;
+      const containerTxt = (ing.container_size && ing.stock_qty != null) ? (" ≈ " + (ing.stock_qty / ing.container_size).toFixed(1) + " " + (ing.container_label || "envases")) : "";
+      const wrap = document.createElement("div");
+      wrap.className = "edit-item";
+      wrap.innerHTML =
+        '<div class="edit-row">' +
+          '<span style="flex:2; font-weight:600;">' + ing.name + '</span>' +
+          '<span style="flex:1; font-size:12.5px; color:var(--muted);">' + (ing.stock_qty != null ? (ing.stock_qty + " / " + ing.initial_stock + " " + ing.unit) : "sin stock cargado") + (pct ? " (" + pct + "%)" : "") + containerTxt + (pct && pct <= 25 ? ' <span class="stock-alert">¡Reponer!</span>' : '') + '</span>' +
+          '<button class="del-btn">✕</button>' +
+        '</div>' +
+        '<div class="stock-row stock-actions">' +
+          '<input type="number" class="reset-input" placeholder="reiniciar a">' +
+          '<button class="reset-btn">Reiniciar</button>' +
+          '<input type="number" class="add-input" placeholder="agregar +">' +
+          '<button class="add-btn">Agregar</button>' +
+          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleHistorial(this,\'' + ing.id + '\')">Ver historial</a>' +
+        '</div>' +
+        '<div class="stock-history" style="display:none;"></div>';
+
+      wrap.querySelector(".del-btn").onclick = async () => {
+        await sb.rpc("remove_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id });
+        showToast(ing.name + " eliminado.");
+        await loadIngredients(); renderIngredientsList();
+      };
+      wrap.querySelector(".reset-btn").onclick = async () => {
+        const input = wrap.querySelector(".reset-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida."); return; }
+        await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "reset", p_qty: Number(input.value), p_by: operatorName || null });
+        showToast(ing.name + ": stock reiniciado.");
+        await loadIngredients(); renderIngredientsList();
+      };
+      wrap.querySelector(".add-btn").onclick = async () => {
+        const input = wrap.querySelector(".add-input");
+        if (input.value === "" || isNaN(Number(input.value))) { showToast("Ingresa una cantidad válida."); return; }
+        await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "add", p_qty: Number(input.value), p_by: operatorName || null });
+        showToast(ing.name + ": se agregó stock.");
+        await loadIngredients(); renderIngredientsList();
+      };
+      list.appendChild(wrap);
+    });
+  }
+
+  async function addIngredient(){
+    const name = document.getElementById("new-ing-name").value.trim();
+    const unit = document.getElementById("new-ing-unit").value.trim();
+    const containerSize = document.getElementById("new-ing-container").value ? Number(document.getElementById("new-ing-container").value) : null;
+    const containerLabel = document.getElementById("new-ing-container-label").value.trim() || null;
+    if (!name || !unit) { showToast("Completa nombre y unidad (ml, gr, un)."); return; }
+    await sb.rpc("upsert_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: null, p_name: name, p_unit: unit, p_container_size: containerSize, p_container_label: containerLabel });
+    document.getElementById("new-ing-name").value = "";
+    document.getElementById("new-ing-unit").value = "";
+    document.getElementById("new-ing-container").value = "";
+    document.getElementById("new-ing-container-label").value = "";
+    showToast("Insumo agregado — ahora cárgale stock desde la lista.");
+    await loadIngredients(); renderIngredientsList();
   }
 
   function renderStockPanel(){
@@ -386,7 +554,13 @@
           '<button class="add-btn">Agregar</button>' +
           '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleHistorial(this,\'' + item.id + '\')">Ver historial</a>' +
         '</div>' +
-        '<div class="stock-history" style="display:none;"></div>';
+        '<div class="stock-history" style="display:none;"></div>' +
+        '<div class="stock-row">' +
+          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="toggleReceta(this,\'' + item.id + '\')">🍹 Receta</a>' +
+          '<a class="toggle" style="font-size:11.5px; margin:0;" onclick="togglePromo(this,\'' + item.id + '\')">🏷️ Promoción' + (promotions.some(p=>p.menu_item_id===item.id) ? " (activa)" : "") + '</a>' +
+        '</div>' +
+        '<div class="recipe-box" style="display:none;"></div>' +
+        '<div class="promo-box" style="display:none;"></div>';
       const [nameInput, priceInput] = wrap.querySelectorAll(".edit-row input");
       nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
       priceInput.onchange = () => updateItem(item.id, { price: Number(priceInput.value) });
@@ -431,7 +605,7 @@
     if (box.style.display !== "none") { box.style.display = "none"; return; }
     box.style.display = "block";
     box.innerHTML = "Cargando…";
-    const { data, error } = await sb.from("stock_movements").select("*").eq("menu_item_id", itemId).order("created_at", { ascending:false }).limit(15);
+    const { data, error } = await sb.from("stock_movements").select("*").or("menu_item_id.eq." + itemId + ",ingredient_id.eq." + itemId).order("created_at", { ascending:false }).limit(15);
     if (error || !data || data.length === 0) { box.innerHTML = "<p style='font-size:12px; color:var(--muted);'>Sin movimientos registrados.</p>"; return; }
     const labels = { carga_inicial:"Carga inicial", restock:"Reposición", venta:"Venta", ajuste:"Ajuste" };
     box.innerHTML = '<table class="tbl" style="font-size:11.5px;"><tr><th>Fecha</th><th>Tipo</th><th>Cambio</th><th>Quedó</th><th>Quién</th></tr>' +
@@ -440,6 +614,112 @@
         const change = (m.qty_change > 0 ? "+" : "") + m.qty_change;
         return '<tr><td>' + when + '</td><td>' + (labels[m.type]||m.type) + '</td><td>' + change + '</td><td>' + m.qty_after + '</td><td>' + (m.created_by||"—") + '</td></tr>';
       }).join("") + '</table>';
+  }
+
+  async function toggleReceta(linkEl, itemId){
+    const box = linkEl.closest(".edit-item").querySelector(".recipe-box");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    await renderRecipeBox(box, itemId);
+  }
+
+  async function renderRecipeBox(box, itemId){
+    if (ingredients.length === 0) { box.innerHTML = "<p style='font-size:12px; color:var(--muted);'>Primero registra al menos un insumo en la sección 🧪 Insumos.</p>"; return; }
+    const { data } = await sb.from("recipe_items").select("*").eq("menu_item_id", itemId);
+    const lines = data || [];
+    const options = ingredients.map(i => '<option value="' + i.id + '">' + i.name + ' (' + i.unit + ')</option>').join("");
+    let html = "";
+    if (lines.length) {
+      html += '<table class="tbl" style="font-size:12px;"><tr><th>Insumo</th><th>Por unidad</th><th></th></tr>';
+      lines.forEach(l => {
+        const ing = ingredients.find(i => i.id === l.ingredient_id);
+        html += '<tr><td>' + (ing ? ing.name : "?") + '</td><td>' + l.qty_per_unit + ' ' + (ing ? ing.unit : "") + '</td><td><button class="recipe-del" data-id="' + l.ingredient_id + '">✕</button></td></tr>';
+      });
+      html += '</table>';
+    } else {
+      html += "<p style='font-size:12px; color:var(--muted);'>Sin receta todavía.</p>";
+    }
+    html += '<div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">' +
+      '<select class="recipe-ing-select">' + options + '</select>' +
+      '<input type="number" class="recipe-qty-input" placeholder="cantidad" style="width:90px;">' +
+      '<button class="recipe-add-btn">Agregar a la receta</button></div>';
+    box.innerHTML = html;
+
+    box.querySelectorAll(".recipe-del").forEach(btn => {
+      btn.onclick = async () => {
+        const newLines = lines.filter(l => l.ingredient_id !== btn.dataset.id).map(l => ({ ingredient_id: l.ingredient_id, qty_per_unit: l.qty_per_unit }));
+        await sb.rpc("set_recipe", { p_register_id: register.id, p_pin: myPin(), p_menu_item_id: itemId, p_recipe: newLines });
+        showToast("Receta actualizada.");
+        renderRecipeBox(box, itemId);
+      };
+    });
+    box.querySelector(".recipe-add-btn").onclick = async () => {
+      const ingId = box.querySelector(".recipe-ing-select").value;
+      const qtyInput = box.querySelector(".recipe-qty-input");
+      if (qtyInput.value === "" || isNaN(Number(qtyInput.value))) { showToast("Ingresa una cantidad válida."); return; }
+      const newLines = lines.filter(l => l.ingredient_id !== ingId).map(l => ({ ingredient_id: l.ingredient_id, qty_per_unit: l.qty_per_unit }));
+      newLines.push({ ingredient_id: ingId, qty_per_unit: Number(qtyInput.value) });
+      await sb.rpc("set_recipe", { p_register_id: register.id, p_pin: myPin(), p_menu_item_id: itemId, p_recipe: newLines });
+      showToast("Receta actualizada.");
+      renderRecipeBox(box, itemId);
+    };
+  }
+
+  function toLocalInputValue(iso){
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2,"0");
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function togglePromo(linkEl, itemId){
+    const box = linkEl.closest(".edit-item").querySelector(".promo-box");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    renderPromoBox(box, itemId);
+  }
+
+  function renderPromoBox(box, itemId){
+    const promo = promotions.find(p => p.menu_item_id === itemId);
+    box.innerHTML =
+      '<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">' +
+        '<label style="font-size:12px;">Cada</label>' +
+        '<input type="number" class="promo-qty" style="width:60px;" value="' + (promo ? promo.bundle_qty : "") + '" placeholder="2">' +
+        '<label style="font-size:12px;">unid. por $</label>' +
+        '<input type="number" class="promo-price" style="width:80px;" value="' + (promo ? promo.bundle_price : "") + '" placeholder="5">' +
+        '<label style="font-size:12px;"><input type="checkbox" class="promo-active" ' + (promo && promo.active ? "checked" : "") + '> Activa</label>' +
+        '<button class="promo-save-btn">Guardar</button>' +
+        (promo ? '<button class="promo-del-btn">Quitar</button>' : '') +
+      '</div>' +
+      '<div style="margin-top:6px; font-size:11.5px; color:var(--muted);">Opcional: prográmala con fecha/hora (si la dejas vacía, corre mientras esté "Activa").</div>' +
+      '<div style="display:flex; gap:10px; margin-top:4px; flex-wrap:wrap;">' +
+        '<label style="font-size:11.5px;">Desde<br><input type="datetime-local" class="promo-start" value="' + (promo && promo.starts_at ? toLocalInputValue(promo.starts_at) : "") + '"></label>' +
+        '<label style="font-size:11.5px;">Hasta<br><input type="datetime-local" class="promo-end" value="' + (promo && promo.ends_at ? toLocalInputValue(promo.ends_at) : "") + '"></label>' +
+      '</div>';
+
+    box.querySelector(".promo-save-btn").onclick = async () => {
+      const qty = Number(box.querySelector(".promo-qty").value);
+      const priceVal = box.querySelector(".promo-price").value;
+      if (!qty || qty < 2 || priceVal === "" || isNaN(Number(priceVal))) { showToast("Completa la cantidad (2 o más) y el precio del combo."); return; }
+      const active = box.querySelector(".promo-active").checked;
+      const startVal = box.querySelector(".promo-start").value;
+      const endVal = box.querySelector(".promo-end").value;
+      const { error } = await sb.rpc("upsert_promotion", {
+        p_register_id: register.id, p_pin: myPin(), p_promotion_id: promo ? promo.id : null,
+        p_menu_item_id: itemId, p_name: null, p_bundle_qty: qty, p_bundle_price: Number(priceVal),
+        p_active: active, p_starts_at: startVal ? new Date(startVal).toISOString() : null, p_ends_at: endVal ? new Date(endVal).toISOString() : null
+      });
+      if (error) { showToast("No se pudo guardar la promoción."); return; }
+      showToast("Promoción guardada.");
+      await loadMenu(); renderMenu();
+    };
+
+    if (promo) {
+      box.querySelector(".promo-del-btn").onclick = async () => {
+        await sb.rpc("delete_promotion", { p_register_id: register.id, p_pin: myPin(), p_promotion_id: promo.id });
+        showToast("Promoción eliminada.");
+        await loadMenu(); renderMenu();
+      };
+    }
   }
 
   async function addItem(){
@@ -498,8 +778,24 @@
     renderCart();
   }
 
+  function activePromoFor(itemId){
+    const now = new Date();
+    return promotions.find(p => p.menu_item_id === itemId && p.active &&
+      (!p.starts_at || new Date(p.starts_at) <= now) &&
+      (!p.ends_at || new Date(p.ends_at) >= now)
+    );
+  }
+
+  function lineTotal(itemId, qty, price){
+    const promo = activePromoFor(itemId);
+    if (!promo) return price * qty;
+    const bundles = Math.floor(qty / promo.bundle_qty);
+    const remainder = qty % promo.bundle_qty;
+    return bundles * promo.bundle_price + remainder * price;
+  }
+
   function cartTotal(){
-    return Object.keys(cart).reduce((s,id) => s + cart[id].price * cart[id].qty, 0);
+    return Object.keys(cart).reduce((s,id) => s + lineTotal(id, cart[id].qty, cart[id].price), 0);
   }
 
   function renderCart(){
@@ -510,9 +806,11 @@
     } else {
       list.innerHTML = keys.map(id => {
         const l = cart[id];
-        return '<div class="cart-row"><span class="name">' + l.name + '</span>' +
+        const promo = activePromoFor(id);
+        const lineHtml = lineTotal(id, l.qty, l.price);
+        return '<div class="cart-row"><span class="name">' + l.name + (promo ? ' <span class="promo-badge" style="display:inline;">🏷️</span>' : '') + '</span>' +
           '<div class="qty"><button onclick="changeQty(\'' + id + '\',-1)">−</button><span>' + l.qty + '</span><button onclick="changeQty(\'' + id + '\',1)">+</button></div>' +
-          '<span>$' + Math.round(l.price * l.qty).toLocaleString("es-CL") + '</span></div>';
+          '<span>$' + Math.round(lineHtml).toLocaleString("es-CL") + '</span></div>';
       }).join("");
     }
     document.getElementById("total").textContent = "$" + Math.round(cartTotal()).toLocaleString("es-CL");
@@ -610,7 +908,7 @@
       if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
       const obs = document.getElementById("obs").value.trim();
-      const items = keys.map(id => ({ id, name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: false }));
+      const items = keys.map(id => ({ id, name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: lineTotal(id, cart[id].qty, cart[id].price), delivered: false }));
 
       const { data: order, error } = await sb.rpc("create_order", {
         p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
@@ -661,10 +959,11 @@
       if (customerName) html += '<div class="line"><span>Cliente</span><span>' + customerName + '</span></div>';
       html += '<hr>';
       items.forEach(l => {
+        const promoTag = activePromoFor(l.id) ? " 🏷️" : "";
         if (isCortesia) {
-          html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
+          html += '<div class="line"><span>' + l.qty + 'x ' + l.name + promoTag + '</span><span><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
         } else {
-          html += '<div class="line"><span>' + l.qty + 'x ' + l.name + '</span><span>$' + Math.round(l.subtotal) + '</span></div>';
+          html += '<div class="line"><span>' + l.qty + 'x ' + l.name + promoTag + '</span><span>$' + Math.round(l.subtotal) + '</span></div>';
         }
       });
       if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
