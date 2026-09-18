@@ -108,7 +108,7 @@
   .modal .row{display:flex; gap:8px; margin-top:14px;}
   #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#12161C; color:#fff; padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; max-width:90%; text-align:center;}
   #receipt-area{display:none;}
-  @page{ size:80mm auto; margin:4mm; }
+  @page{ size:80mm auto; margin:6mm; }
   @media print{
     body *{visibility:hidden;}
     #receipt-area, #receipt-area *{visibility:visible;}
@@ -357,9 +357,13 @@
     setInterval(renderOrdersPanel, 1000);
   }
 
+  let closedEvents = [];     // eventos cerrados recientemente (por si hace falta reabrir)
+
   async function loadActiveEvent() {
     const { data } = await sb.from("events").select("*").eq("active", true).order("created_at");
     openEvents = data || [];
+    const { data: closedData } = await sb.from("events").select("*").eq("active", false).order("created_at", { ascending:false }).limit(10);
+    closedEvents = closedData || [];
 
     const globalId = sessionStorage.getItem("pos_selected_event_id");
     const localId = sessionStorage.getItem("pos_event_" + register.id);
@@ -401,14 +405,26 @@
 
   function renderEventPicker(){
     const list = document.getElementById("event-picker-list");
-    if (openEvents.length === 0) { list.innerHTML = "<p style='font-size:13px; color:var(--muted);'>No hay eventos abiertos — crea uno con \"Iniciar nuevo evento\".</p>"; return; }
-    list.innerHTML = openEvents.map(e =>
-      '<div class="event-pick-row"><span>' + e.name + (e.event_date ? " — " + e.event_date : "") + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
-      '<span class="actions">' +
-        '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">Trabajar aquí</button>' +
-        '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">Cerrar evento</button>' +
-      '</span></div>'
-    ).join("");
+    let html = "";
+    if (openEvents.length === 0) {
+      html += "<p style='font-size:13px; color:var(--muted);'>No hay eventos abiertos — crea uno con \"Iniciar nuevo evento\".</p>";
+    } else {
+      html += openEvents.map(e =>
+        '<div class="event-pick-row"><span>' + e.name + (e.event_date ? " — " + e.event_date : "") + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
+        '<span class="actions">' +
+          '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">Trabajar aquí</button>' +
+          '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">Cerrar evento</button>' +
+        '</span></div>'
+      ).join("");
+    }
+    if (closedEvents.length) {
+      html += '<p style="font-size:12px; color:var(--muted); margin:14px 0 4px;">Cerrados recientemente — ¿cerraste alguno por error?</p>';
+      html += closedEvents.map(e =>
+        '<div class="event-pick-row"><span style="color:var(--muted);">' + e.name + (e.event_date ? " — " + e.event_date : "") + '</span>' +
+        '<span class="actions"><button class="btn btn-secondary" onclick="reabrirEvento(\'' + e.id + '\')">Reabrir</button></span></div>'
+      ).join("");
+    }
+    list.innerHTML = html;
   }
 
   function seleccionarEvento(id){
@@ -427,6 +443,13 @@
     if (!confirm("¿Cerrar este evento? Dejará de aparecer para seguir vendiendo ahí.")) return;
     await sb.rpc("close_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
     showToast("Evento cerrado.");
+    await loadActiveEvent();
+    renderEventPicker();
+  }
+
+  async function reabrirEvento(id){
+    await sb.rpc("reopen_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    showToast("Evento reabierto.");
     await loadActiveEvent();
     renderEventPicker();
   }
@@ -694,6 +717,7 @@
     const isCortesia = paymentMethod === "cortesia";
     function buildCopy(label){
       let html = '<div class="receipt-copy"><h3>South Media</h3><h4>' + label + '</h4>';
+      if (activeEvent) html += '<div class="line" style="justify-content:center; font-weight:600;"><span>' + activeEvent.name + '</span></div>';
       html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
       if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + customerName + '</span></div>';
       if (operatorName) html += '<div class="line"><span class="iname">Atendió</span><span class="iprice">' + operatorName + '</span></div>';
