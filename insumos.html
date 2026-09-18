@@ -82,6 +82,8 @@
     <h1>🧰 Insumos, Stock y Recetas</h1>
   </div>
   <div>
+    <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;">📍 Cambiar ubicación</a>
+    <a class="back" onclick="crearUbicacion()" style="cursor:pointer;">➕ Nueva ubicación</a>
     <a class="back" onclick="abrirAdmin()" style="cursor:pointer;">⚙️ Administración</a>
     <a class="back" href="index.html">← Inicio</a>
   </div>
@@ -113,6 +115,13 @@
   </div>
 </main>
 
+<div id="register-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(10,13,18,.6); align-items:center; justify-content:center; z-index:9998; padding:16px;">
+  <div class="modal">
+    <h3>¿En qué caja/ubicación estás?</h3>
+    <p>Este dispositivo va a recordar tu elección — no se vuelve a preguntar salvo que la cambies.</p>
+    <div id="register-picker-list"></div>
+  </div>
+</div>
 <div id="pin-overlay">
   <div class="modal">
     <h3>Ingresa el PIN</h3>
@@ -148,10 +157,40 @@
     showToast._t = setTimeout(() => t.style.display = "none", 2600);
   }
 
+  async function resolveRegister(type){
+    const { data: registers, error } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type", type).eq("active", true).order("created_at");
+    if (error || !registers || registers.length === 0) return null;
+    if (registers.length === 1) return registers[0];
+
+    const savedId = localStorage.getItem("pos_register_" + type);
+    const saved = registers.find(r => r.id === savedId);
+    if (saved) return saved;
+
+    return new Promise(resolve => {
+      const overlay = document.getElementById("register-picker-overlay");
+      const list = document.getElementById("register-picker-list");
+      list.innerHTML = registers.map(r =>
+        '<button class="btn btn-secondary" style="display:block; width:100%; margin-bottom:8px;" data-id="' + r.id + '">' + r.name + '</button>'
+      ).join("");
+      overlay.style.display = "flex";
+      list.querySelectorAll("button").forEach(btn => {
+        btn.onclick = () => {
+          localStorage.setItem("pos_register_" + type, btn.dataset.id);
+          overlay.style.display = "none";
+          resolve(registers.find(r => r.id === btn.dataset.id));
+        };
+      });
+    });
+  }
+
+  function cambiarUbicacion(){
+    localStorage.removeItem("pos_register_producto");
+    location.reload();
+  }
+
   async function init() {
-    const { data: registers, error } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type","producto").eq("active", true).order("created_at").limit(1);
-    if (error || !registers || registers.length === 0) { showToast("No hay una caja de tipo Producto configurada."); return; }
-    register = registers[0];
+    register = await resolveRegister("producto");
+    if (!register) { showToast("No hay una caja de tipo Producto configurada."); return; }
 
     const savedPin = sessionStorage.getItem("pos_pin_" + register.id);
     const savedName = sessionStorage.getItem("pos_operator_" + register.id);
@@ -525,6 +564,25 @@
   // ---------------------------------------------------------------------
   // Administración
   // ---------------------------------------------------------------------
+  async function crearUbicacion(){
+    const pin = prompt("PIN de administrador:");
+    if (pin === null) return;
+    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
+    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
+
+    const nombre = prompt("Nombre de la nueva caja/ubicación (ej. \"Barra Wellington\"):");
+    if (!nombre) return;
+    const tipo = (prompt("¿Tipo? escribe: producto o ticket", "producto") || "").trim();
+    if (tipo !== "producto" && tipo !== "ticket") { showToast("Tipo inválido — debe ser 'producto' o 'ticket'."); return; }
+    const nuevoPin = prompt("PIN de esta caja (para vender):", "1234");
+    if (!nuevoPin) return;
+    const despachoPin = tipo === "producto" ? (prompt("PIN de Entrega para esta caja:", "5678") || "5678") : null;
+
+    const { data, error } = await sb.rpc("create_register", { p_admin_pin: pin, p_name: nombre, p_type: tipo, p_pin: nuevoPin, p_despacho_pin: despachoPin });
+    if (error) { showToast("No se pudo crear la ubicación."); return; }
+    showToast('"' + data.name + '" creada. El menú de productos empieza vacío — agrégalos abajo.');
+  }
+
   async function abrirAdmin(){
     if (!register) return;
     const pin = prompt("PIN de administrador:");

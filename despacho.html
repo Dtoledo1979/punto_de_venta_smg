@@ -24,6 +24,7 @@
   .empty{color:#5C6A77; text-align:center; padding:80px 20px; font-size:15px;}
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;}
   .order{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px;}
+  .event-tag{font-size:11px; font-weight:700; color:var(--accent-ink); background:var(--accent); display:inline-block; padding:2px 8px; border-radius:999px; align-self:flex-start;}
   .order .row1{display:flex; justify-content:space-between; align-items:baseline;}
   .order .tnum{font-family:'Sora',sans-serif; font-size:20px; font-weight:800;}
   .timer{font-family:'Sora',sans-serif; font-size:22px; font-weight:800; padding:3px 10px; border-radius:8px; background:#1E2A1F; color:var(--ok);}
@@ -74,6 +75,7 @@
     <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
     <h1>Entrega</h1>
   </div>
+  <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;">📍 Cambiar ubicación</a>
   <a class="back" href="index.html">← Inicio</a>
 </header>
 <div class="sub" id="event-label">Cargando…</div>
@@ -97,6 +99,13 @@
   <div id="delivered-list" class="delivered-list"></div>
 </main>
 
+<div id="register-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); align-items:center; justify-content:center; z-index:9998; padding:16px;">
+  <div class="modal">
+    <h3>¿En qué caja/ubicación estás?</h3>
+    <p>Este dispositivo va a recordar tu elección — no se vuelve a preguntar salvo que la cambies.</p>
+    <div id="register-picker-list"></div>
+  </div>
+</div>
 <div id="pin-overlay">
   <div class="modal">
     <h3>Ingresa el PIN</h3>
@@ -135,13 +144,44 @@
     showToast._t = setTimeout(() => t.style.display = "none", 2200);
   }
 
-  async function init(){
-    const { data: registers } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type","producto").eq("active", true).order("created_at").limit(1);
-    if (!registers || registers.length === 0){ showToast("No hay caja de tipo Producto configurada."); return; }
-    register = registers[0];
+  async function resolveRegister(type){
+    const { data: registers, error } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type", type).eq("active", true).order("created_at");
+    if (error || !registers || registers.length === 0) return null;
+    if (registers.length === 1) return registers[0];
 
-    const { data: ev } = await sb.from("events").select("name").eq("active", true).limit(1).maybeSingle();
-    document.getElementById("event-label").textContent = ev ? ("Evento activo: " + ev.name) : "Sin evento activo.";
+    const savedId = localStorage.getItem("pos_register_" + type);
+    const saved = registers.find(r => r.id === savedId);
+    if (saved) return saved;
+
+    return new Promise(resolve => {
+      const overlay = document.getElementById("register-picker-overlay");
+      const list = document.getElementById("register-picker-list");
+      list.innerHTML = registers.map(r =>
+        '<button class="ok" style="display:block; width:100%; margin-bottom:8px; padding:11px; border-radius:9px; border:none; cursor:pointer;" data-id="' + r.id + '">' + r.name + '</button>'
+      ).join("");
+      overlay.style.display = "flex";
+      list.querySelectorAll("button").forEach(btn => {
+        btn.onclick = () => {
+          localStorage.setItem("pos_register_" + type, btn.dataset.id);
+          overlay.style.display = "none";
+          resolve(registers.find(r => r.id === btn.dataset.id));
+        };
+      });
+    });
+  }
+
+  function cambiarUbicacion(){
+    localStorage.removeItem("pos_register_producto");
+    location.reload();
+  }
+
+  async function init(){
+    register = await resolveRegister("producto");
+    if (!register){ showToast("No hay caja de tipo Producto configurada."); return; }
+
+    const { data: evs } = await sb.from("events").select("name").eq("active", true).order("created_at");
+    const ev = (evs && evs.length) ? (evs.length === 1 ? "Evento activo: " + evs[0].name : "Eventos activos: " + evs.map(e=>e.name).join(", ")) : "Sin evento activo.";
+    document.getElementById("event-label").textContent = ev;
 
     const savedPin = sessionStorage.getItem("pos_despacho_pin_" + register.id);
     const savedName = sessionStorage.getItem("pos_despacho_operator_" + register.id);
@@ -192,7 +232,7 @@
   }
 
   async function loadPending(){
-    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","pendiente_entrega").order("paid_at");
+    const { data } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id).eq("status","pendiente_entrega").order("paid_at");
     pendingOrders = data || [];
   }
 
@@ -220,11 +260,13 @@
       board.innerHTML = ""; empty.style.display = "block";
     } else {
       empty.style.display = "none";
+      const multiEvent = new Set(pendingOrders.map(o => o.event_id)).size > 1;
       board.innerHTML = pendingOrders.map(o => {
         const elapsed = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/1000));
         const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
         const doneCount = o.items.filter(it => it.delivered).length;
         const allDone = doneCount === o.items.length;
+        const eventTag = multiEvent && o.events ? '<div class="event-tag">' + o.events.name + '</div>' : '';
         const itemsHtml = o.items.map((it, idx) => {
           const done = !!it.delivered;
           return '<div class="item-line ' + (done ? "done" : "") + '" onclick="toggleItem(\'' + o.id + '\',' + idx + ')">' +
@@ -232,6 +274,7 @@
             '<span>' + it.qty + 'x ' + it.name + '</span></div>';
         }).join("");
         return '<div class="order">' +
+          eventTag +
           '<div class="row1"><span class="tnum">#' + o.ticket_num + (o.customer_name ? ' · ' + o.customer_name : '') + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
           '<div class="progress">' + doneCount + ' de ' + o.items.length + ' entregados — toca un producto para marcarlo</div>' +
           '<div class="items">' + itemsHtml + '</div>' +
@@ -269,7 +312,7 @@
     const q = document.getElementById("search-input").value.trim();
     const results = document.getElementById("search-results");
     if (!q) { results.innerHTML = ""; return; }
-    let query = sb.from("orders").select("*").eq("register_id", register.id).order("paid_at", { ascending:false }).limit(20);
+    let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).order("paid_at", { ascending:false }).limit(20);
     query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
     const { data, error } = await query;
     if (error || !data || data.length === 0) { results.innerHTML = "<p style='color:#7C8996; font-size:13px;'>Sin resultados.</p>"; return; }
@@ -280,9 +323,10 @@
     const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
     const itemsTxt = o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", ");
     const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+    const evTxt = o.events ? o.events.name : "";
     return '<div class="search-row">' +
       '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + timeTxt + ' · ' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
         (o.status !== "pendiente_entrega" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
         (o.status !== "anulado" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
