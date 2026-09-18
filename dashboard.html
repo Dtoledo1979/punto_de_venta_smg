@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — South Media Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --surface:#FFFFFF; --surface-dark:#151B23; --surface-dark-2:#171C24; --surface-alt:#F4F6F8;
+    --text-primary:#12161C; --text-muted:#62707D;
+    --primary:#A8E020; --primary-hover:#96CB1D; --primary-active:#87B518; --primary-ink:#1A2333;
+    --danger:#E4483A; --danger-bg:#FBE6E4; --warning:#D98B00; --warning-bg:#FBEBD3; --success:#2FA35A; --success-bg:#E3F5EA;
+    --border:#E2E6EA; --border-dark:#232B36;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:#fff; font-family:'Inter',Arial,sans-serif; min-height:100vh;}
+
+  .app-nav{background:var(--bg); border-bottom:1px solid var(--border-dark); display:flex; align-items:center; justify-content:space-between; padding:0 20px; height:56px;}
+  .app-nav .brand{display:flex; align-items:center; gap:9px; font-family:'Sora',sans-serif; font-weight:700; font-size:14px; color:#fff;}
+  .app-nav .brand svg path{fill:var(--primary);}
+  .app-nav .links a{color:#9AA7B2; text-decoration:none; font-size:13px; font-weight:500; padding:9px 12px; border-radius:var(--r-md); min-height:36px; display:inline-flex; align-items:center;}
+  .app-nav .links a:hover{color:#fff; background:#1A2028;}
+
+  main{max-width:960px; margin:0 auto; padding:24px 20px 60px;}
+  .event-head{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:22px;}
+  .event-head h1{font-family:'Sora',sans-serif; font-size:24px; margin:0 0 4px;}
+  .event-head .sub{display:flex; align-items:center; gap:8px; font-size:13px; color:#9AA7B2;}
+  .live-dot{width:7px; height:7px; border-radius:50%; background:var(--primary); display:inline-block;}
+  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; border:none; border-radius:var(--r-md); padding:10px 16px; min-height:40px; cursor:pointer;}
+  .btn-secondary{background:var(--surface-dark); color:#fff; border:1px solid var(--border-dark);}
+  .btn-secondary:hover{background:#1A2028;}
+
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-bottom:28px;}
+  .metric-card{background:var(--surface-dark); border:1px solid var(--border-dark); border-radius:var(--r-card); padding:16px;}
+  .metric-card .label{font-size:11px; color:#7C8996; text-transform:uppercase; letter-spacing:.5px; font-weight:600;}
+  .metric-card .value{font-family:'Sora',sans-serif; font-weight:800; font-size:26px; margin-top:6px;}
+  .metric-card.warn .value{color:var(--warning);}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px;}
+  .tile{background:var(--surface); color:var(--text-primary); border-radius:var(--r-card); padding:22px; text-decoration:none; display:block; min-height:120px; position:relative; transition:transform .1s;}
+  .tile:active{transform:scale(.98);}
+  .tile h2{font-family:'Sora',sans-serif; font-size:17px; margin:0 0 6px;}
+  .tile p{font-size:12.5px; color:var(--text-muted); margin:0; line-height:1.4;}
+  .tile .go{position:absolute; right:18px; bottom:18px; font-size:18px; color:var(--text-muted);}
+  .tile.primary{background:var(--primary); color:var(--primary-ink);}
+  .tile.primary p{color:#31401C;}
+  .tile.primary .go{color:var(--primary-ink);}
+
+  .loading-txt{color:#7C8996; font-size:13px;}
+</style>
+</head>
+<body>
+
+<div class="app-nav">
+  <div class="brand">
+    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
+    SOUTH MEDIA GROUP
+  </div>
+  <div class="links"><a href="index.html">Cambiar evento</a></div>
+</div>
+
+<main>
+  <div class="event-head">
+    <div>
+      <h1 id="event-name">Cargando…</h1>
+      <div class="sub"><span class="live-dot"></span> <span id="event-date"></span></div>
+    </div>
+    <button class="btn btn-secondary" onclick="location.href='index.html'">Cambiar evento</button>
+  </div>
+
+  <div class="metrics" id="metrics">
+    <div class="metric-card"><div class="label">Ventas</div><div class="value loading-txt">—</div></div>
+    <div class="metric-card"><div class="label">Pedidos</div><div class="value loading-txt">—</div></div>
+    <div class="metric-card"><div class="label">Esperando</div><div class="value loading-txt">—</div></div>
+    <div class="metric-card"><div class="label">Stock bajo</div><div class="value loading-txt">—</div></div>
+  </div>
+
+  <div class="tiles">
+    <a class="tile primary" href="pos-productos.html"><h2>Venta de productos</h2><p>Caja de barra/comida.</p><span class="go">→</span></a>
+    <a class="tile" href="pos-tickets.html"><h2>Venta de tickets</h2><p>Boletería, autoejecutado.</p><span class="go">→</span></a>
+    <a class="tile" href="despacho.html"><h2>Entrega</h2><p>Confirmar pedidos entregados.</p><span class="go">→</span></a>
+    <a class="tile" href="insumos.html"><h2>Inventario</h2><p>Productos, insumos, recetas, promos.</p><span class="go">→</span></a>
+    <a class="tile" href="pos-productos.html#summary"><h2>Reportes</h2><p>Resumen de ventas y CSV.</p><span class="go">→</span></a>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+
+  const eventId = sessionStorage.getItem("pos_selected_event_id");
+  if (!eventId) location.href = "index.html";
+
+  async function load(){
+    const { data: ev } = await sb.from("events").select("*").eq("id", eventId).maybeSingle();
+    if (!ev) { location.href = "index.html"; return; }
+    document.getElementById("event-name").textContent = ev.name;
+    document.getElementById("event-date").textContent = ev.event_date ? ("EN CURSO · " + ev.event_date) : "EN CURSO";
+
+    const { data: orders } = await sb.from("orders").select("total,status,payment_method").eq("event_id", eventId).neq("status","anulado");
+    const list = orders || [];
+    const ventas = list.filter(o => o.payment_method !== "cortesia").reduce((s,o) => s + Number(o.total), 0);
+    const pendientes = list.filter(o => o.status === "pendiente_entrega").length;
+
+    const { data: menuItems } = await sb.from("menu_items").select("stock_qty,initial_stock,track_stock").eq("active", true).eq("track_stock", true);
+    const { data: ingredients } = await sb.from("ingredients").select("stock_qty,initial_stock").eq("active", true).not("stock_qty","is",null);
+    const lowStock = [...(menuItems||[]), ...(ingredients||[])].filter(i => i.initial_stock > 0 && (i.stock_qty / i.initial_stock) <= 0.25).length;
+
+    const cards = document.querySelectorAll("#metrics .metric-card .value");
+    cards[0].textContent = "$" + Math.round(ventas).toLocaleString("es-CL");
+    cards[0].classList.remove("loading-txt");
+    cards[1].textContent = list.length;
+    cards[1].classList.remove("loading-txt");
+    cards[2].textContent = pendientes;
+    cards[2].classList.remove("loading-txt");
+    cards[3].textContent = lowStock;
+    cards[3].classList.remove("loading-txt");
+    if (lowStock > 0) cards[3].closest(".metric-card").classList.add("warn");
+  }
+  load();
+</script>
+</body>
+</html>

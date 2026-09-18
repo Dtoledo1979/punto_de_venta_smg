@@ -11,8 +11,19 @@
     --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
     --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
     --danger:#E4483A; --warn:#D98B00; --ok:#1E7A3D; --border:#E2E6EA;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
   }
   *{box-sizing:border-box;}
+  .tabs{display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;}
+  .tab-btn{background:var(--surface); border:1px solid var(--border); color:var(--muted); font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; padding:11px 16px; border-radius:var(--r-md); cursor:pointer; min-height:44px;}
+  .tab-btn.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .overview-stats{display:flex; gap:10px; flex-wrap:wrap;}
+  .stat-box{flex:1; min-width:110px; border-radius:var(--r-lg); padding:14px; text-align:center; border:1px solid var(--border);}
+  .stat-box .num{display:block; font-family:'Sora',sans-serif; font-weight:800; font-size:26px;}
+  .stat-box .lbl{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:600;}
+  .stat-box.warn{background:#FBEBD3;} .stat-box.warn .num{color:#8A5800;}
+  .stat-box.danger{background:#FBE6E4;} .stat-box.danger .num{color:#A3271D;}
+  .stat-box.ok{background:#E3F5EA;} .stat-box.ok .num{color:#1E7A3D;}
   body{margin:0; background:var(--surface-alt); color:var(--ink); font-family:'Inter',Arial,sans-serif;}
   header{background:var(--bg); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
   header .id{display:flex; align-items:center; gap:9px;}
@@ -55,10 +66,15 @@
 
   .add-form{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
   .add-form input{flex:1; min-width:110px; padding:9px; border:1px solid var(--border); border-radius:9px; font-size:13px;}
-  .btn{border:none; border-radius:10px; padding:9px 14px; font-size:13.5px; font-weight:600; cursor:pointer;}
+  .btn{border:none; border-radius:var(--r-md); padding:11px 16px; font-size:13.5px; font-weight:600; cursor:pointer; min-height:44px; transition:background .12s, transform .08s, opacity .12s;}
+  .btn:active{transform:scale(.98);}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .btn-primary:hover{background:#96CB1D;}
   .btn-secondary{background:var(--surface-alt); color:var(--ink); border:1px solid var(--border);}
+  .btn-secondary:hover{background:#EAEEF1;}
   .btn-danger{background:#FBE6E4; color:#A3271D;}
+  .btn-danger:hover{background:#F6D3CF;}
 
   table.tbl{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px;}
   table.tbl th, table.tbl td{text-align:left; padding:6px 4px; border-bottom:1px solid var(--border);}
@@ -90,6 +106,26 @@
 </header>
 
 <main>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" data-tab="productos" onclick="switchTab('productos')">📋 Productos</button>
+    <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')">🧪 Insumos</button>
+  </div>
+
+  <div id="tab-overview" class="tab-panel">
+    <div class="card">
+      <h2>Resumen de inventario</h2>
+      <p class="sub">Productos e insumos con seguimiento de stock activado.</p>
+      <div class="overview-stats">
+        <div class="stat-box warn"><span class="num" id="ov-low">—</span><span class="lbl">Stock bajo</span></div>
+        <div class="stat-box danger"><span class="num" id="ov-critical">—</span><span class="lbl">Crítico</span></div>
+        <div class="stat-box ok"><span class="num" id="ov-ok">—</span><span class="lbl">OK</span></div>
+      </div>
+      <div id="overview-list" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <div id="tab-productos" class="tab-panel" style="display:none;">
   <div class="card">
     <h2>📋 Productos</h2>
     <p class="sub">Nombre, precio y color de cada producto. El color ayuda a distinguir variantes de un vistazo (ej. Piscola con Sprite vs con Coca-Cola).</p>
@@ -100,7 +136,9 @@
       <button class="btn btn-primary" onclick="addItem()">Agregar producto</button>
     </div>
   </div>
+  </div>
 
+  <div id="tab-insumos" class="tab-panel" style="display:none;">
   <div class="card">
     <h2>🧪 Insumos</h2>
     <p class="sub">Ingredientes con su propio stock (ml, gr, un). Se usan en las recetas de arriba para descontar automáticamente al vender.</p>
@@ -112,6 +150,7 @@
       <input type="text" id="new-ing-container-label" placeholder="botella (opcional)">
       <button class="btn btn-primary" onclick="addIngredient()">Agregar insumo</button>
     </div>
+  </div>
   </div>
 </main>
 
@@ -241,6 +280,39 @@
   function renderAll(){
     renderEditList();
     renderIngredientsList();
+    renderOverview();
+  }
+
+  function switchTab(name){
+    document.querySelectorAll(".tab-panel").forEach(p => p.style.display = "none");
+    document.getElementById("tab-" + name).style.display = "block";
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  }
+
+  function renderOverview(){
+    const tracked = [
+      ...menu.filter(m => m.track_stock && m.stock_qty != null).map(m => ({ name: m.name, stock_qty: m.stock_qty, initial_stock: m.initial_stock, kind: "Producto" })),
+      ...ingredients.filter(i => i.stock_qty != null).map(i => ({ name: i.name, stock_qty: i.stock_qty, initial_stock: i.initial_stock, kind: "Insumo" }))
+    ];
+    let low = 0, critical = 0, ok = 0;
+    const lowList = [];
+    tracked.forEach(t => {
+      const pct = t.initial_stock > 0 ? (t.stock_qty / t.initial_stock) : 0;
+      if (pct <= 0.10) { critical++; lowList.push({...t, pct}); }
+      else if (pct <= 0.25) { low++; lowList.push({...t, pct}); }
+      else ok++;
+    });
+    document.getElementById("ov-low").textContent = low;
+    document.getElementById("ov-critical").textContent = critical;
+    document.getElementById("ov-ok").textContent = ok;
+
+    const list = document.getElementById("overview-list");
+    if (!tracked.length) { list.innerHTML = "<p class='qty-sub'>Todavía no hay productos ni insumos con stock activado.</p>"; return; }
+    if (!lowList.length) { list.innerHTML = "<p class='qty-sub'>Todo el stock está en buen nivel.</p>"; return; }
+    lowList.sort((a,b) => a.pct - b.pct);
+    list.innerHTML = '<table class="tbl"><tr><th>Item</th><th>Tipo</th><th>Stock</th><th>%</th></tr>' +
+      lowList.map(t => '<tr><td>' + t.name + '</td><td>' + t.kind + '</td><td>' + t.stock_qty + ' / ' + t.initial_stock + '</td><td>' + Math.round(t.pct*100) + '%</td></tr>').join("") +
+      '</table>';
   }
 
   // ---------------------------------------------------------------------

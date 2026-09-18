@@ -11,6 +11,7 @@
     --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
     --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
     --danger:#E4483A; --warn:#D98B00; --border:#E2E6EA;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
   }
   *{box-sizing:border-box;}
   body{margin:0; background:var(--surface-alt); color:var(--ink); font-family:'Inter',Arial,sans-serif;}
@@ -18,7 +19,8 @@
   header .id{display:flex; align-items:center; gap:9px;}
   header .mark path{fill:var(--accent);}
   header h1{font-family:'Sora',sans-serif; font-size:15px; font-weight:700; margin:0;}
-  header .back{color:#C9D3DC; text-decoration:none; font-size:13px;}
+  header .back{color:#C9D3DC; text-decoration:none; font-size:13px; padding:8px 10px; border-radius:var(--r-md); min-height:36px; display:inline-flex; align-items:center;}
+  header .back:hover{color:#fff; background:#1A2028;}
   .event-strip{background:#171C24; color:#C9D3DC; font-size:13px; padding:9px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
   .event-strip a{color:var(--accent); font-size:12.5px; cursor:pointer; text-decoration:underline;}
   .event-pick-row{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:13.5px; gap:8px; flex-wrap:wrap;}
@@ -26,22 +28,23 @@
   .event-pick-row .actions button{padding:6px 10px; font-size:12px; margin:0;}
   main{max-width:1100px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
   @media (max-width:860px){ main{grid-template-columns:1fr;} }
-  .card{background:var(--surface); border-radius:20px; padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
+  .card{background:var(--surface); border-radius:var(--r-card); padding:18px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); transition:box-shadow .15s;}
   .card h2{font-family:'Sora',sans-serif; font-size:16px; margin:0 0 12px;}
   .toggle{color:#3E6BD6; font-size:13px; cursor:pointer; background:none; border:none; padding:0; margin-bottom:10px; display:inline-block;}
   .menu-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:8px;}
-  .item-btn{padding:14px 10px; border:1px solid var(--border); border-radius:16px; background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14px; font-weight:500; color:var(--ink); min-height:58px; transition:background .1s, transform .05s;}
+  .item-btn{padding:14px 10px; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface-alt); cursor:pointer; text-align:left; font-size:14px; font-weight:500; color:var(--ink); min-height:58px; transition:background .12s, transform .1s;}
   .item-btn:active{background:#E4EEFB; border-color:#B9D2F5; transform:scale(0.98);}
   .item-btn .color-bar{display:block; height:6px; border-radius:4px; margin:6px 0;}
   .item-btn .price{display:block; font-size:12px; color:var(--muted); margin-top:3px; font-weight:400;}
-  .item-btn .stock-badge{display:block; font-size:10.5px; color:var(--warn); margin-top:2px; font-weight:600;}
-  .item-btn .promo-badge{display:block; font-size:10.5px; color:#1E7A3D; margin-top:2px; font-weight:700;}
+  .badge{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; margin-top:4px;}
+  .badge-warning{background:#FBEBD3; color:#8A5800;}
+  .badge-success{background:#E3F5EA; color:#1E7A3D;}
   @media (max-width:420px){
     .menu-grid{grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:6px;}
     .item-btn{padding:10px 8px; font-size:13px; min-height:50px;}
   }
   .orders-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:10px;}
-  .order-card{background:var(--surface-alt); border:1px solid var(--border); border-radius:16px; padding:12px 14px; cursor:pointer;}
+  .order-card{background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--r-lg); padding:12px 14px; cursor:pointer;}
   .order-card .row1{display:flex; justify-content:space-between; align-items:baseline; font-weight:700; font-family:'Sora',sans-serif; font-size:14px;}
   .order-card .mins{font-size:12.5px; color:var(--muted); font-weight:600;}
   .order-card .mins.warn{color:var(--warn);}
@@ -53,13 +56,20 @@
   .cart-row{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px; gap:8px;}
   .cart-row .name{flex:1;}
   .qty{display:flex; align-items:center; gap:7px;}
-  .qty button{width:28px; height:28px; border-radius:7px; border:1px solid var(--border); background:#fff; font-size:15px; cursor:pointer;}
+  .qty button{width:38px; height:38px; border-radius:var(--r-sm); border:1px solid var(--border); background:#fff; font-size:17px; cursor:pointer;}
+  .qty button:active{background:var(--surface-alt);}
   .total-row{display:flex; justify-content:space-between; font-size:19px; font-weight:700; margin-top:12px; padding-top:12px; border-top:2px solid var(--ink); font-family:'Sora',sans-serif;}
-  .btn{display:block; width:100%; padding:14px; border:none; border-radius:10px; font-size:15.5px; font-weight:600; cursor:pointer; margin-top:9px; font-family:'Inter',sans-serif;}
+  .btn{display:block; width:100%; padding:14px; border:none; border-radius:var(--r-md); font-size:15.5px; font-weight:600; cursor:pointer; margin-top:9px; font-family:'Inter',sans-serif; min-height:44px; transition:background .12s, transform .08s, opacity .12s;}
+  .btn:active{transform:scale(.98);}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .btn:disabled{opacity:.5; cursor:not-allowed; pointer-events:none;}
   .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .btn-primary:hover{background:#96CB1D;}
   .btn-secondary{background:var(--surface-alt); color:var(--ink); border:1px solid var(--border);}
+  .btn-secondary:hover{background:#EAEEF1;}
   .btn-danger{background:#FBE6E4; color:#A3271D;}
-  .btn-small{width:auto; padding:8px 12px; margin:0; font-size:13px;}
+  .btn-danger:hover{background:#F6D3CF;}
+  .btn-small{width:auto; padding:8px 12px; margin:0; font-size:13px; min-height:36px;}
   .pay-buttons{display:flex; gap:8px; margin-top:10px;}
   .pay-buttons button{flex:1;}
   .customer-input{width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-top:10px; font-family:inherit;}
@@ -355,6 +365,7 @@
     await loadOrdersPanel();
     subscribeOrdersPanel();
     setInterval(renderOrdersPanel, 1000);
+    if (location.hash === "#summary") { toggleSummary(); document.getElementById("summary").scrollIntoView({ behavior:"smooth" }); }
   }
 
   let closedEvents = [];     // eventos cerrados recientemente (por si hace falta reabrir)
@@ -486,10 +497,10 @@
       html += '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
       if (item.track_stock && item.stock_qty !== null) {
         const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : (item.stock_qty > 0 ? 1 : 0);
-        html += '<span class="stock-badge">' + item.stock_qty + ' en stock' + (pct <= 0.25 ? " ⚠️" : "") + '</span>';
+        html += '<div><span class="badge ' + (pct <= 0.25 ? "badge-warning" : "badge-success") + '">' + (pct <= 0.25 ? "⚠️ " : "") + item.stock_qty + ' en stock</span></div>';
       }
       const promo = activePromoFor(item.id);
-      if (promo) html += '<span class="promo-badge">🏷️ ' + promo.bundle_qty + 'x$' + Math.round(promo.bundle_price).toLocaleString("es-CL") + '</span>';
+      if (promo) html += '<div><span class="badge badge-success">🏷️ ' + promo.bundle_qty + 'x$' + Math.round(promo.bundle_price).toLocaleString("es-CL") + '</span></div>';
       b.innerHTML = html;
       b.onclick = () => addToCart(item);
       grid.appendChild(b);
@@ -570,7 +581,7 @@
         const l = cart[id];
         const promo = activePromoFor(id);
         const lineHtml = lineTotal(id, l.qty, l.price);
-        return '<div class="cart-row"><span class="name">' + l.name + (promo ? ' <span class="promo-badge" style="display:inline;">🏷️</span>' : '') + '</span>' +
+        return '<div class="cart-row"><span class="name">' + l.name + (promo ? ' <span class="badge badge-success" style="margin:0;">🏷️</span>' : '') + '</span>' +
           '<div class="qty"><button onclick="changeQty(\'' + id + '\',-1)">−</button><span>' + l.qty + '</span><button onclick="changeQty(\'' + id + '\',1)">+</button></div>' +
           '<span>$' + Math.round(lineHtml).toLocaleString("es-CL") + '</span></div>';
       }).join("");

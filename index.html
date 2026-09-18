@@ -8,54 +8,54 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
-    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
-    --danger:#E4483A; --warn:#D98B00; --border:#E2E6EA;
+    --bg:#0E1116; --surface:#FFFFFF; --surface-dark:#151B23; --surface-dark-2:#171C24; --surface-alt:#F4F6F8;
+    --text-primary:#12161C; --text-muted:#62707D;
+    --primary:#A8E020; --primary-hover:#96CB1D; --primary-active:#87B518; --primary-ink:#1A2333;
+    --danger:#E4483A; --danger-bg:#FBE6E4; --warning:#D98B00; --warning-bg:#FBEBD3; --success:#2FA35A; --success-bg:#E3F5EA;
+    --border:#E2E6EA; --border-dark:#232B36;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',Arial,sans-serif; min-height:100vh;}
+  body{margin:0; background:var(--bg); color:var(--text-primary); font-family:'Inter',Arial,sans-serif; min-height:100vh;}
   .top{display:flex; align-items:center; gap:10px; padding:22px 24px 0;}
   .mark{width:30px; height:30px; flex:none;}
-  .mark path{fill:var(--accent);}
-  .word{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:17px; letter-spacing:.2px;}
-  .word span{color:var(--accent);}
+  .mark path{fill:var(--primary);}
+  .word{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; letter-spacing:.3px;}
+  .word span{color:var(--primary);}
   .hero{padding:36px 24px 8px; max-width:920px; margin:0 auto;}
   .hero h1{color:#fff; font-family:'Sora',sans-serif; font-weight:800; font-size:clamp(26px,5vw,38px); line-height:1.15; margin:0 0 8px;}
   .hero p{color:#9AA7B2; font-size:14.5px; margin:0; max-width:56ch; line-height:1.5;}
   main{max-width:920px; margin:0 auto; padding:20px 24px 60px;}
 
   .step-title{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; margin:26px 0 10px; display:flex; align-items:center; gap:8px;}
-  .step-title .num{background:var(--accent); color:var(--accent-ink); width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px;}
+  .step-title .num{background:var(--primary); color:var(--primary-ink); width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px;}
 
   .event-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:10px;}
-  .event-card{background:#151B23; border:2px solid #232B36; border-radius:18px; padding:16px; cursor:pointer; text-align:left; color:#fff; font-family:inherit;}
+  .event-card{background:var(--surface-dark); border:2px solid var(--border-dark); border-radius:var(--r-card); padding:16px; cursor:pointer; text-align:left; color:#fff; font-family:inherit; min-height:44px; transition:border-color .15s;}
   .event-card:hover{border-color:#3A4552;}
-  .event-card.selected{border-color:var(--accent); background:#1A2314;}
+  .event-card.selected{border-color:var(--primary); background:#1A2314;}
   .event-card .ename{font-weight:700; font-size:15px;}
   .event-card .edate{font-size:12.5px; color:#9AA7B2; margin-top:3px;}
-  .event-card .check{float:right; color:var(--accent); font-weight:800; display:none;}
+  .event-card .live{display:none; align-items:center; gap:5px; font-size:11px; font-weight:700; color:var(--primary); margin-top:8px;}
+  .event-card.selected .live{display:flex;}
+  .event-card .live .dot{width:6px; height:6px; border-radius:50%; background:var(--primary);}
+  .event-card .check{float:right; color:var(--primary); font-weight:800; display:none;}
   .event-card.selected .check{display:inline;}
-  .no-events{color:#9AA7B2; font-size:13.5px; background:#151B23; border:1px solid #232B36; border-radius:16px; padding:16px;}
+  .no-events{color:#9AA7B2; font-size:13.5px; background:var(--surface-dark); border:1px solid var(--border-dark); border-radius:var(--r-card); padding:16px;}
 
-  .tiles{display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-top:2px;}
-  @media (max-width:720px){ .tiles{grid-template-columns:1fr;} }
-  .tile{border-radius:20px; padding:26px; text-decoration:none; display:block; position:relative; overflow:hidden; min-height:180px; transition:opacity .15s, filter .15s;}
-  .tile h2{font-family:'Sora',sans-serif; font-size:21px; margin:10px 0 6px;}
-  .tile p{font-size:14px; margin:0; line-height:1.5;}
-  .tile .go{position:absolute; right:22px; bottom:22px; font-size:22px;}
-  .tile-primary{background:var(--accent); color:var(--accent-ink);}
-  .tile-primary p{color:#31401C;}
-  .tile-secondary{background:var(--surface); color:var(--ink); border:1px solid var(--border);}
-  .tile-secondary p{color:var(--muted);}
-  .tag{display:inline-block; font-size:12px; padding:4px 10px; border-radius:999px; background:rgba(0,0,0,.08); color:inherit;}
-  .tile-secondary .tag{background:var(--surface-alt); color:var(--muted);}
-  .tile.disabled{pointer-events:none; opacity:.4; filter:grayscale(60%);}
+  .enter-row{margin-top:18px;}
+  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px; border:none; border-radius:var(--r-md); padding:12px 20px; min-height:46px; cursor:pointer; transition:background .15s, transform .1s, opacity .15s; display:inline-flex; align-items:center; justify-content:center; gap:8px;}
+  .btn:active{transform:scale(.97);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .btn-primary{background:var(--primary); color:var(--primary-ink);}
+  .btn-primary:hover:not(:disabled){background:var(--primary-hover);}
+  .btn-primary:active:not(:disabled){background:var(--primary-active);}
 
-  .footer-row{display:flex; gap:12px; margin-top:14px; flex-wrap:wrap;}
-  .footer-link{flex:1; min-width:220px; background:#151A21; border:1px solid #232A33; color:#C9D3DC; border-radius:16px; padding:16px 18px; text-decoration:none; display:flex; align-items:center; justify-content:space-between; font-size:14px;}
-  .footer-link b{color:#fff; font-weight:600;}
-  .footer-link .go{color:var(--accent); font-size:18px;}
-  .hint{color:#5C6A77; font-size:12.5px; margin-top:8px;}
+  .quick-row{display:flex; gap:12px; margin-top:28px; flex-wrap:wrap;}
+  .quick-link{flex:1; min-width:220px; background:var(--surface-dark); border:1px solid var(--border-dark); color:#C9D3DC; border-radius:var(--r-card); padding:16px 18px; text-decoration:none; display:flex; align-items:center; justify-content:space-between; font-size:13.5px; min-height:44px;}
+  .quick-link b{color:#fff; font-weight:600;}
+  .quick-link .go{color:var(--primary); font-size:17px;}
+  .quick-title{color:#5C6A77; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-top:24px;}
 </style>
 </head>
 <body>
@@ -66,34 +66,22 @@
 </div>
 
 <div class="hero">
-  <h1>Punto de venta</h1>
-  <p>Primero elige el evento en el que vas a trabajar, y después el módulo (Productos o Tickets). Entrega e Insumos no dependen de un evento específico.</p>
+  <h1>Operación de eventos</h1>
+  <p>Elige el evento en el que vas a trabajar. Adentro vas a encontrar ventas, entrega, inventario y reportes de ese evento.</p>
 </div>
 
 <main>
   <div class="step-title"><span class="num">1</span> Elige el evento</div>
   <div id="event-area"></div>
 
-  <div class="step-title"><span class="num">2</span> Elige el módulo</div>
-  <div class="tiles">
-    <a class="tile tile-primary disabled" id="tile-productos" href="pos-productos.html">
-      <span class="tag">Requiere entrega</span>
-      <h2>Venta de productos</h2>
-      <p>Caja de barra/comida. El pedido queda "por entregar" hasta que Entrega confirma que salió al cliente.</p>
-      <span class="go">→</span>
-    </a>
-    <a class="tile tile-secondary disabled" id="tile-tickets" href="pos-tickets.html">
-      <span class="tag">Autoejecutado</span>
-      <h2>Venta de tickets</h2>
-      <p>Boletería. Al cobrar, el pedido queda cerrado de inmediato — no pasa por Entrega.</p>
-      <span class="go">→</span>
-    </a>
+  <div class="enter-row">
+    <button class="btn btn-primary" id="enter-btn" disabled onclick="enterEvent()">Entrar al evento →</button>
   </div>
-  <div class="hint" id="module-hint">Elige un evento arriba para habilitar estos dos módulos.</div>
 
-  <div class="footer-row">
-    <a class="footer-link" href="despacho.html"><span>Pantalla de <b>Entrega</b> — para el personal de despacho</span><span class="go">→</span></a>
-    <a class="footer-link" href="insumos.html"><span><b>Insumos, stock y recetas</b> — configuración de productos</span><span class="go">→</span></a>
+  <div class="quick-title">Acceso directo (sin pasar por el dashboard)</div>
+  <div class="quick-row">
+    <a class="quick-link" href="despacho.html"><span>Pantalla de <b>Entrega</b></span><span class="go">→</span></a>
+    <a class="quick-link" href="insumos.html"><span><b>Insumos, stock y recetas</b></span><span class="go">→</span></a>
   </div>
 </main>
 
@@ -114,9 +102,9 @@
       openEvents = data || [];
 
       if (openEvents.length === 0) {
-        area.innerHTML = '<div class="no-events">Sin eventos activos todavía — entra a Venta de productos o Venta de tickets y usa "Iniciar nuevo evento" para crear el primero.</div>';
+        area.innerHTML = '<div class="no-events">Sin eventos activos todavía — entra a "Insumos, stock y recetas" o abre una caja de Productos/Tickets y usa "Iniciar nuevo evento" para crear el primero.</div>';
         selectedId = null;
-        updateModules();
+        updateEnterBtn();
         return;
       }
 
@@ -124,7 +112,7 @@
       if (!selectedId && openEvents.length === 1) selectedId = openEvents[0].id;
 
       renderEvents();
-      updateModules();
+      updateEnterBtn();
     } catch (e) {
       area.innerHTML = '<div class="no-events">No se pudo conectar a Supabase. Revisa la configuración.</div>';
     }
@@ -137,6 +125,7 @@
         '<span class="check">✓</span>' +
         '<div class="ename">' + e.name + '</div>' +
         (e.event_date ? '<div class="edate">' + e.event_date + '</div>' : '') +
+        '<div class="live"><span class="dot"></span> EN CURSO</div>' +
       '</button>'
     ).join("") + '</div>';
   }
@@ -147,23 +136,16 @@
     sessionStorage.setItem("pos_selected_event_id", id);
     sessionStorage.setItem("pos_selected_event_name", ev ? ev.name : "");
     renderEvents();
-    updateModules();
+    updateEnterBtn();
   }
 
-  function updateModules(){
-    const productos = document.getElementById("tile-productos");
-    const tickets = document.getElementById("tile-tickets");
-    const hint = document.getElementById("module-hint");
-    if (selectedId) {
-      productos.classList.remove("disabled");
-      tickets.classList.remove("disabled");
-      const ev = openEvents.find(e => e.id === selectedId);
-      hint.textContent = "Trabajando en: " + (ev ? ev.name : "") + " — puedes cambiar de evento arriba cuando quieras.";
-    } else {
-      productos.classList.add("disabled");
-      tickets.classList.add("disabled");
-      hint.textContent = openEvents.length ? "Elige un evento arriba para habilitar estos dos módulos." : "";
-    }
+  function updateEnterBtn(){
+    document.getElementById("enter-btn").disabled = !selectedId;
+  }
+
+  function enterEvent(){
+    if (!selectedId) return;
+    location.href = "dashboard.html";
   }
 
   loadEvents();
