@@ -142,10 +142,15 @@
     <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
     <h1 id="register-name">POS Productos</h1>
   </div>
+  <a class="back" id="test-mode-toggle" onclick="toggleTestMode()" style="cursor:pointer;">🧪 Modo prueba: OFF</a>
   <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;">📍 Cambiar ubicación</a>
   <a class="back" href="insumos.html">⚙️ Insumos</a>
   <a class="back" href="index.html">← Inicio</a>
 </header>
+
+<div id="test-mode-banner" style="display:none; background:#E4483A; color:#fff; text-align:center; font-weight:800; font-size:13px; padding:8px; letter-spacing:.5px;">
+  ⚠️ MODO PRUEBA — LO QUE VENDAS ACÁ NO ES REAL, NO TOCA EL STOCK NI LOS REPORTES ⚠️
+</div>
 
 <div class="event-strip">
   <span id="event-label">Cargando evento…</span>
@@ -190,6 +195,16 @@
       <input type="number" id="cash-received" min="0" step="1" placeholder="$" oninput="onCashReceivedInput()">
       <div id="cash-feedback" class="cash-feedback"></div>
       <button class="btn btn-primary" id="cash-confirm-btn" style="display:none;"></button>
+    </div>
+
+    <div id="card-confirm-panel" class="cash-panel" style="display:none; background:#FFF8E8; border-color:#F0D9A0;">
+      <label style="text-align:center; font-weight:700; color:#8A5800;">💳 Cobra este monto en el terminal EFTPOS</label>
+      <div id="card-confirm-amount" style="font-family:'Sora',sans-serif; font-weight:800; font-size:32px; text-align:center; margin:6px 0;">$0</div>
+      <p style="font-size:12px; color:var(--muted); text-align:center; margin:0 0 10px;">Solo continúa después de que el terminal muestre <b>APROBADO</b>.</p>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary" style="margin:0;" onclick="cancelarConfirmacionTarjeta()">Cancelar</button>
+        <button class="btn btn-primary" id="card-confirm-btn" style="margin:0;" onclick="confirmarPagoTarjeta()">✓ Pago confirmado</button>
+      </div>
     </div>
 
     <button class="btn btn-secondary" onclick="vaciarCarro()">Vaciar pedido</button>
@@ -324,7 +339,6 @@
       return;
     }
     document.getElementById("register-name").textContent = register.name;
-    document.getElementById("next-ticket").textContent = register.next_ticket;
 
     const savedPin = sessionStorage.getItem("pos_pin_" + register.id);
     const savedName = sessionStorage.getItem("pos_operator_" + register.id);
@@ -359,6 +373,7 @@
   async function afterUnlock() {
     document.getElementById("register-name").textContent = register.name + " · " + operatorName;
     await loadActiveEvent();
+    await updateNextTicketDisplay();
     await loadMenu();
     renderMenu();
     renderCart();
@@ -366,6 +381,12 @@
     subscribeOrdersPanel();
     setInterval(renderOrdersPanel, 1000);
     if (location.hash === "#summary") { toggleSummary(); document.getElementById("summary").scrollIntoView({ behavior:"smooth" }); }
+  }
+
+  async function updateNextTicketDisplay(){
+    if (!activeEvent) { document.getElementById("next-ticket").textContent = "—"; return; }
+    const { data } = await sb.from("ticket_counters").select("next_ticket").eq("register_id", register.id).eq("event_id", activeEvent.id).maybeSingle();
+    document.getElementById("next-ticket").textContent = data ? data.next_ticket : 1;
   }
 
   let closedEvents = [];     // eventos cerrados recientemente (por si hace falta reabrir)
@@ -446,6 +467,7 @@
     sessionStorage.setItem("pos_selected_event_id", id);
     sessionStorage.setItem("pos_selected_event_name", ev.name);
     updateEventLabel();
+    updateNextTicketDisplay();
     document.getElementById("event-picker").style.display = "none";
     showToast("Trabajando en: " + ev.name);
   }
@@ -475,6 +497,7 @@
     activeEvent = data;
     sessionStorage.setItem("pos_event_" + register.id, data.id);
     updateEventLabel();
+    updateNextTicketDisplay();
     toggleEventForm();
     showToast("Evento iniciado.");
   }
@@ -531,7 +554,7 @@
       const itemsHtml = o.items.map(it => '<div class="' + (it.delivered ? "done" : "") + '">' + it.qty + 'x ' + it.name + '</div>').join("");
       const isOpen = openOrderIds.has(o.id);
       return '<div class="order-card ' + (isOpen ? "open" : "") + '" onclick="toggleOrderCard(\'' + o.id + '\')">' +
-        '<div class="row1"><span>#' + o.ticket_num + (o.customer_name ? " " + o.customer_name : "") + '</span><span class="mins ' + cls + '">' + mins + ' min</span></div>' +
+        '<div class="row1"><span>' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? " " + o.customer_name : "") + '</span><span class="mins ' + cls + '">' + mins + ' min</span></div>' +
         '<div class="items">' + itemsHtml + '</div>' +
       '</div>';
     }).join("") + '</div>';
@@ -607,6 +630,33 @@
     document.getElementById("cash-feedback").textContent = "";
     document.getElementById("cash-feedback").className = "cash-feedback";
     document.getElementById("cash-confirm-btn").style.display = "none";
+    document.getElementById("card-confirm-panel").style.display = "none";
+    pendingCardPayment = null;
+  }
+
+  let pendingCardPayment = null;
+
+  function showCardConfirm(cash, card, method, receivedCash){
+    pendingCardPayment = { cash, card, method, receivedCash };
+    document.getElementById("cash-panel").style.display = "none";
+    document.getElementById("card-confirm-amount").textContent = "$" + Math.round(card).toLocaleString("es-CL");
+    document.getElementById("card-confirm-panel").style.display = "block";
+  }
+
+  function cancelarConfirmacionTarjeta(){
+    pendingCardPayment = null;
+    document.getElementById("card-confirm-panel").style.display = "none";
+  }
+
+  async function confirmarPagoTarjeta(){
+    if (!pendingCardPayment) return;
+    const btn = document.getElementById("card-confirm-btn");
+    btn.disabled = true;
+    const p = pendingCardPayment;
+    pendingCardPayment = null;
+    document.getElementById("card-confirm-panel").style.display = "none";
+    await finalizarCobro(p.cash, p.card, p.method, p.receivedCash);
+    btn.disabled = false;
   }
 
   function round2(n){ return Math.round(n * 100) / 100; }
@@ -615,6 +665,7 @@
     const panel = document.getElementById("cash-panel");
     const showing = panel.style.display !== "none";
     if (showing) { resetCashPanel(); return; }
+    document.getElementById("card-confirm-panel").style.display = "none";
     panel.style.display = "block";
     document.getElementById("cash-received").focus();
   }
@@ -639,14 +690,14 @@
       feedback.className = "cash-feedback warn";
       btn.textContent = "Cobrar $" + Math.round(received).toLocaleString("es-CL") + " efectivo + $" + Math.round(remaining).toLocaleString("es-CL") + " tarjeta";
       btn.style.display = "block";
-      btn.onclick = () => finalizarCobro(received, remaining, "mixto", received);
+      btn.onclick = () => showCardConfirm(received, remaining, "mixto", received);
     }
   }
 
   function pagarConTarjeta(){
     const total = cartTotal();
     if (total <= 0) return;
-    finalizarCobro(0, total, "tarjeta", 0);
+    showCardConfirm(0, total, "tarjeta", 0);
   }
 
   async function pagarCortesia(){
@@ -660,6 +711,19 @@
   }
 
   let cobrando = false;
+  let testMode = sessionStorage.getItem("pos_test_mode") === "1";
+
+  function toggleTestMode(){
+    testMode = !testMode;
+    sessionStorage.setItem("pos_test_mode", testMode ? "1" : "0");
+    applyTestModeUI();
+  }
+
+  function applyTestModeUI(){
+    document.getElementById("test-mode-toggle").textContent = "🧪 Modo prueba: " + (testMode ? "ON" : "OFF");
+    document.getElementById("test-mode-banner").style.display = testMode ? "block" : "none";
+  }
+  applyTestModeUI();
 
   async function finalizarCobro(cash, card, paymentMethod, receivedCash, adminPin){
     if (cobrando) return;
@@ -687,7 +751,7 @@
         p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
         p_payment_method: paymentMethod, p_cash: cash, p_card: card,
         p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
-        p_admin_pin: adminPin || null
+        p_admin_pin: adminPin || null, p_is_test: testMode
       });
 
       if (error || !order) { showToast("No se pudo registrar el pedido: " + (error ? error.message : "")); return; }
@@ -698,8 +762,10 @@
       document.getElementById("void-num").textContent = ticketNum;
       document.getElementById("next-ticket").textContent = ticketNum + 1;
 
-      printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash);
-      showToast("Pedido #" + ticketNum + " enviado a Entrega.");
+      printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash, testMode);
+      showToast((testMode ? "🧪 [PRUEBA] " : "") + "Pedido #" + ticketNum + " enviado a Entrega.");
+
+      if (testMode) { vaciarCarro(); return; }
 
       const trackedSold = keys.filter(id => {
         const m = menu.find(x => x.id === id);
@@ -723,11 +789,12 @@
     }
   }
 
-  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash){
+  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash, isTest){
     const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
     const isCortesia = paymentMethod === "cortesia";
     function buildCopy(label){
       let html = '<div class="receipt-copy"><h3>South Media</h3><h4>' + label + '</h4>';
+      if (isTest) html += '<div class="line" style="justify-content:center; font-weight:800; color:#A3271D;"><span>***** PRUEBA — NO ES UNA VENTA REAL *****</span></div>';
       if (activeEvent) html += '<div class="line" style="justify-content:center; font-weight:600;"><span>' + activeEvent.name + '</span></div>';
       html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
       if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + customerName + '</span></div>';
@@ -876,7 +943,7 @@
 
   async function renderSummary(){
     if (!activeEvent) { document.getElementById("summary-body").innerHTML = "<p>No hay evento activo.</p>"; return; }
-    const { data: orders } = await sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","anulado");
+    const { data: orders } = await sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","anulado").eq("is_test", false);
     const body = document.getElementById("summary-body");
     if (!orders || orders.length === 0) { body.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>Aún no hay ventas en este evento.</p>"; return; }
 
@@ -921,7 +988,7 @@
 
   async function exportarCSV(){
     const allEvents = document.getElementById("csv-all-events").checked;
-    let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).neq("status","anulado");
+    let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).neq("status","anulado").eq("is_test", false);
     if (!allEvents && activeEvent) query = query.eq("event_id", activeEvent.id);
     const { data: orders } = await query;
     const rows = [["Evento","Fecha","Ticket","Hora","Cliente","Producto","Cantidad","PrecioUnitario","Subtotal","TotalTicket","MetodoPago","Efectivo","Tarjeta","Estado","Observacion"]];

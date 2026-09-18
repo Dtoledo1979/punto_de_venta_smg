@@ -102,7 +102,7 @@
     document.getElementById("event-name").textContent = ev.name;
     document.getElementById("event-date").textContent = ev.event_date ? ("EN CURSO · " + ev.event_date) : "EN CURSO";
 
-    const { data: orders } = await sb.from("orders").select("total,status,payment_method").eq("event_id", eventId).neq("status","anulado");
+    const { data: orders } = await sb.from("orders").select("total,status,payment_method").eq("event_id", eventId).neq("status","anulado").eq("is_test", false);
     const list = orders || [];
     const ventas = list.filter(o => o.payment_method !== "cortesia").reduce((s,o) => s + Number(o.total), 0);
     const pendientes = list.filter(o => o.status === "pendiente_entrega").length;

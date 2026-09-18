@@ -100,6 +100,7 @@
   <div>
     <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;">📍 Cambiar ubicación</a>
     <a class="back" onclick="crearUbicacion()" style="cursor:pointer;">➕ Nueva ubicación</a>
+    <a class="back" onclick="resetTicketNumbering()" style="cursor:pointer;">🔢 Reiniciar numeración</a>
     <a class="back" onclick="abrirAdmin()" style="cursor:pointer;">⚙️ Administración</a>
     <a class="back" href="index.html">← Inicio</a>
   </div>
@@ -425,6 +426,40 @@
   // ---------------------------------------------------------------------
   // Historial (compartido entre productos e insumos)
   // ---------------------------------------------------------------------
+  function toggleEditIngredient(linkEl, ingId){
+    const box = linkEl.closest(".item-card").querySelector(".edit-ing-box");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    const ing = ingredients.find(i => i.id === ingId);
+    if (!ing) return;
+    box.style.display = "block";
+    const hasStock = ing.stock_qty != null;
+    box.innerHTML =
+      '<div class="stock-row" style="border-top:none; padding-top:0; flex-wrap:wrap;">' +
+        '<input type="text" class="edit-name" value="' + ing.name.replace(/"/g,"&quot;") + '" placeholder="Nombre" style="width:140px;">' +
+        '<input type="text" class="edit-unit" value="' + ing.unit + '" placeholder="Unidad" style="width:80px;" ' + (hasStock ? 'disabled title="No se puede cambiar con stock cargado"' : '') + '>' +
+        '<input type="number" class="edit-container" value="' + (ing.container_size ?? "") + '" placeholder="Envase (ej. 750)" style="width:130px;">' +
+        '<input type="text" class="edit-container-label" value="' + (ing.container_label ?? "") + '" placeholder="botella" style="width:100px;">' +
+      '</div>' +
+      (hasStock ? '<div class="qty-sub" style="margin-top:6px;">La unidad está bloqueada porque ya tiene stock cargado. Para cambiarla: primero "Reiniciar a" 0, cambia la unidad, y vuelve a cargar el stock real.</div>' : '') +
+      '<div class="stock-row" style="border-top:none; padding-top:6px;"><button class="add-btn edit-ing-save">Guardar cambios</button></div>';
+
+    box.querySelector(".edit-ing-save").onclick = async () => {
+      const name = box.querySelector(".edit-name").value.trim();
+      const unit = box.querySelector(".edit-unit").value.trim();
+      const containerVal = box.querySelector(".edit-container").value;
+      const containerLabel = box.querySelector(".edit-container-label").value.trim() || null;
+      if (!name || !unit) { showToast("Nombre y unidad no pueden quedar vacíos."); return; }
+      const { error } = await sb.rpc("upsert_ingredient", {
+        p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ingId,
+        p_name: name, p_unit: unit,
+        p_container_size: containerVal === "" ? null : Number(containerVal), p_container_label: containerLabel
+      });
+      if (error) { showToast(error.message.includes("cambiar la unidad") ? error.message : "No se pudo guardar."); return; }
+      showToast("Insumo actualizado.");
+      await loadIngredients(); renderAll();
+    };
+  }
+
   async function toggleHistorial(linkEl, itemId){
     const box = linkEl.closest(".item-card").querySelector(".stock-history");
     if (box.style.display !== "none") { box.style.display = "none"; return; }
@@ -592,7 +627,9 @@
         '<div class="stock-history" style="display:none;"></div>' +
         '<div class="links-row" style="border-top:none; padding-top:4px;">' +
           '<a class="toggle" onclick="toggleHistorial(this,\'' + ing.id + '\')">Ver historial</a>' +
-        '</div>';
+          '<a class="toggle" onclick="toggleEditIngredient(this,\'' + ing.id + '\')">✏️ Editar</a>' +
+        '</div>' +
+        '<div class="edit-ing-box" style="display:none;"></div>';
 
       wrap.querySelector(".del-btn").onclick = async () => {
         if (!confirm("¿Quitar este insumo?")) return;
@@ -653,6 +690,24 @@
     const { data, error } = await sb.rpc("create_register", { p_admin_pin: pin, p_name: nombre, p_type: tipo, p_pin: nuevoPin, p_despacho_pin: despachoPin });
     if (error) { showToast("No se pudo crear la ubicación."); return; }
     showToast('"' + data.name + '" creada. El menú de productos empieza vacío — agrégalos abajo.');
+  }
+
+  async function resetTicketNumbering(){
+    const pin = prompt("PIN de administrador:");
+    if (pin === null) return;
+    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
+    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
+
+    const { data: events } = await sb.from("events").select("id,name").eq("active", true).order("created_at");
+    if (!events || !events.length) { showToast("No hay eventos activos."); return; }
+    const listTxt = events.map((e,i) => (i+1) + ". " + e.name).join("\n");
+    const choice = prompt("¿Para cuál evento, en esta caja (" + register.name + ")? Escribe el número:\n" + listTxt);
+    const idx = Number(choice) - 1;
+    if (!events[idx]) { showToast("Opción inválida."); return; }
+    const startAt = Number(prompt("¿Desde qué número empieza el próximo ticket?", "1")) || 1;
+    const { error } = await sb.rpc("reset_ticket_numbering", { p_admin_pin: pin, p_register_id: register.id, p_event_id: events[idx].id, p_start_at: startAt });
+    if (error) { showToast("No se pudo reiniciar la numeración."); return; }
+    showToast('Numeración de "' + events[idx].name + '" en esta caja reiniciada desde #' + startAt + '.');
   }
 
   async function abrirAdmin(){

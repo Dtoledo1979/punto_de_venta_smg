@@ -391,3 +391,70 @@ además de, no en reemplazo de, activar `--kiosk-printing` — con eso
 activado no debería haber diálogos que confirmar y el flujo es
 prácticamente instantáneo; sin él, sigue funcionando bien pero cada copia
 va a pedir confirmación manual, en el orden correcto.
+
+### Varias ubicaciones/cajas al mismo tiempo (07-09-2026)
+
+Auditoría de aislamiento entre eventos (Christchurch + Wellington
+funcionando a la vez). Con una sola caja de cada tipo (como hoy), nada
+cambia. En cuanto exista una segunda caja del mismo tipo:
+
+- Cada pantalla (`pos-productos.html`, `pos-tickets.html`,
+  `despacho.html`, `insumos.html`) pregunta **una sola vez por
+  dispositivo** en qué caja/ubicación está trabajando, y lo recuerda
+  (`localStorage`, no por sesión). Link **"📍 Cambiar ubicación"** en el
+  header para reasignar un dispositivo a otra ciudad.
+- El stock, insumos, menú y recetas ya estaban separados por caja
+  (`register_id`) desde el diseño original — no fue necesario migrar
+  nada de eso.
+- **"➕ Nueva ubicación"** en `insumos.html` (con PIN de administrador)
+  crea una caja nueva completa sin tocar la base de datos a mano.
+- La búsqueda de tickets en Productos ahora busca solo en el evento
+  activo por defecto, con casilla "Buscar en todos los eventos" para
+  historial; cada resultado muestra a qué evento pertenece.
+- El CSV exportado viene acotado al evento activo por defecto (mismo
+  criterio que el resumen en pantalla), con casilla "Todos los eventos"
+  para exportar todo el historial de esa caja.
+- Entrega y el panel de "Órdenes activas" **siguen mostrando pedidos por
+  caja, no por evento** — a propósito: un pedido sin entregar de un
+  evento ya cerrado no debe desaparecer solo.
+
+### Mejoras operacionales: pago, insumos, tickets, Test Mode (07-09-2026)
+
+**1. Confirmación de pago con tarjeta antes de imprimir.** Antes, tocar
+"💳 Tarjeta" cobraba y imprimía de inmediato, sin esperar a que el
+terminal EFTPOS aprobara. Ahora aparece un paso intermedio obligatorio:
+"Cobra $X en el terminal → toca Pago confirmado solo si dice APROBADO".
+El pedido, el descuento de stock y la impresión solo ocurren después de
+ese clic. Mismo resguardo para la parte tarjeta de un pago mixto.
+
+**2. Foto de consumo real de insumos.** `create_order` ahora guarda,
+junto con cada pedido, exactamente cuánto de cada insumo se descontó en
+ese momento (columna `ingredient_consumption`). Antes, anular un pedido
+volvía a consultar la receta ACTUAL — si la receta cambiaba después de
+la venta, anular devolvía la cantidad equivocada. Ahora siempre devuelve
+exactamente lo que se descontó ese día, sin importar cambios posteriores
+a la receta.
+
+**3. Editar insumos.** Botón "✏️ Editar" en cada insumo (nombre, unidad,
+tamaño de envase, etiqueta) sin tener que borrar y crear de nuevo — el
+`ingredient_id` nunca cambia, así que las recetas y el historial no se
+pierden. Resguardo: si el insumo ya tiene stock cargado, la unidad queda
+bloqueada (hay que reiniciar a 0, cambiar la unidad, y volver a cargar).
+
+**4. Numeración de tickets por evento.** Antes vivía en la caja completa
+(`registers.next_ticket`) — un evento nuevo seguía la numeración del
+anterior. Ahora cada combinación caja+evento tiene su propio contador
+(tabla `ticket_counters`): cada evento nuevo empieza en #1 automático.
+Insumos → "🔢 Reiniciar numeración" para forzar un número de inicio
+distinto si hace falta (con PIN de administrador).
+
+**5. Test Mode.** Toggle "🧪 Modo prueba" en el header de Productos y
+Tickets, con un banner rojo fijo mientras esté activo. Los pedidos de
+prueba: se pueden vender, imprimir (la boleta dice
+"***** PRUEBA — NO ES UNA VENTA REAL *****") y aparecen en Entrega y en
+el panel de "Órdenes activas" marcados con 🧪 (para poder probar el flujo
+completo) — pero **no descuentan stock real** y quedan excluidos del
+resumen de ventas, el CSV y las métricas del Dashboard. El estado se
+guarda por pestaña (`sessionStorage`), así que se apaga solo si cierras
+el navegador — pensado para no dejarlo prendido sin darte cuenta al
+día siguiente.
