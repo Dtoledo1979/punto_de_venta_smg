@@ -632,10 +632,13 @@
 
   let printQueue = [];
   let printingNow = false;
+  let printingSince = 0;
 
   function processPrintQueue(){
+    if (printingNow && Date.now() - printingSince > 10000) printingNow = false;
     if (printingNow || printQueue.length === 0) return;
     printingNow = true;
+    printingSince = Date.now();
     document.getElementById("receipt-area").innerHTML = printQueue.shift();
     let done = false;
     function finish(){
