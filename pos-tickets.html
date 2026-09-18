@@ -712,7 +712,7 @@
   }
 
   async function exportarCSV(){
-    const { data: orders } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id);
+    const { data: orders } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id).neq("status","anulado");
     const rows = [["Evento","Fecha","Ticket","Hora","Cliente","Tipo","Cantidad","PrecioUnitario","Subtotal","TotalTicket","MetodoPago","Efectivo","Tarjeta","Estado","Observacion"]];
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";

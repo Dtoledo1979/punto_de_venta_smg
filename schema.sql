@@ -624,6 +624,13 @@ begin
     v_total := v_total + coalesce((v_item->>'subtotal')::numeric, 0);
   end loop;
 
+  if jsonb_array_length(p_items) = 0 then
+    raise exception 'El pedido no tiene productos';
+  end if;
+  if p_payment_method <> 'cortesia' and v_total <= 0 then
+    raise exception 'El total del pedido debe ser mayor a cero';
+  end if;
+
   if p_payment_method <> 'cortesia' and abs((coalesce(p_cash,0) + coalesce(p_card,0)) - v_total) > 1 then
     raise exception 'El efectivo + tarjeta no coincide con el total';
   end if;
@@ -693,11 +700,57 @@ grant execute on function pos.create_order(uuid, text, uuid, jsonb, text, numeri
 
 create or replace function pos.void_order(p_register_id uuid, p_pin text, p_order_id uuid)
 returns boolean language plpgsql security definer set search_path = pos as $$
+declare
+  v_order pos.orders;
+  v_item jsonb;
+  v_sold_qty numeric;
+  v_stock_after numeric;
+  v_recipe_line record;
+  v_ingredient_after numeric;
 begin
   if not (pos.verify_register_pin(p_register_id, p_pin) or pos.verify_despacho_pin(p_register_id, p_pin)) then
     raise exception 'PIN incorrecto';
   end if;
+
+  select * into v_order from pos.orders where id = p_order_id and register_id = p_register_id;
+  if v_order is null then raise exception 'Pedido no encontrado'; end if;
+  if v_order.status = 'anulado' then return true; end if; -- ya estaba anulado: no repetir la reposición
+
   update pos.orders set status = 'anulado' where id = p_order_id and register_id = p_register_id;
+
+  -- Reponer el stock de productos e insumos que create_order() había
+  -- descontado al vender — antes esto no se hacía y anular un pedido
+  -- dejaba el inventario permanentemente más bajo de lo real.
+  for v_item in select * from jsonb_array_elements(v_order.items) loop
+    if v_item ? 'id' then
+      v_sold_qty := coalesce((v_item->>'qty')::numeric, 0);
+
+      update pos.menu_items
+        set stock_qty = stock_qty + v_sold_qty
+        where id = (v_item->>'id')::uuid and register_id = p_register_id
+          and track_stock = true and stock_qty is not null
+        returning stock_qty into v_stock_after;
+      if found then
+        insert into pos.stock_movements (menu_item_id, register_id, event_id, type, qty_change, qty_after, note, created_by)
+          values ((v_item->>'id')::uuid, p_register_id, v_order.event_id, 'ajuste', v_sold_qty, v_stock_after,
+                  'Repuesto por anular ticket #' || v_order.ticket_num, null);
+      end if;
+
+      for v_recipe_line in
+        select ri.ingredient_id, ri.qty_per_unit from pos.recipe_items ri where ri.menu_item_id = (v_item->>'id')::uuid
+      loop
+        update pos.ingredients
+          set stock_qty = coalesce(stock_qty,0) + (v_recipe_line.qty_per_unit * v_sold_qty)
+          where id = v_recipe_line.ingredient_id
+          returning stock_qty into v_ingredient_after;
+        insert into pos.stock_movements (ingredient_id, register_id, event_id, type, qty_change, qty_after, note, created_by)
+          values (v_recipe_line.ingredient_id, p_register_id, v_order.event_id, 'ajuste',
+                  v_recipe_line.qty_per_unit * v_sold_qty, v_ingredient_after,
+                  'Repuesto por anular ticket #' || v_order.ticket_num, null);
+      end loop;
+    end if;
+  end loop;
+
   return true;
 end;
 $$;
@@ -705,11 +758,59 @@ grant execute on function pos.void_order(uuid, text, uuid) to anon, authenticate
 
 create or replace function pos.reopen_order(p_register_id uuid, p_pin text, p_order_id uuid)
 returns boolean language plpgsql security definer set search_path = pos as $$
+declare
+  v_order pos.orders;
+  v_item jsonb;
+  v_sold_qty numeric;
+  v_stock_after numeric;
+  v_recipe_line record;
+  v_ingredient_after numeric;
 begin
   if not (pos.verify_register_pin(p_register_id, p_pin) or pos.verify_despacho_pin(p_register_id, p_pin)) then
     raise exception 'PIN incorrecto';
   end if;
+
+  select * into v_order from pos.orders where id = p_order_id and register_id = p_register_id;
+  if v_order is null then raise exception 'Pedido no encontrado'; end if;
+
   update pos.orders set status = 'pendiente_entrega', delivered_at = null where id = p_order_id and register_id = p_register_id;
+
+  -- Si el pedido que se reabre estaba ANULADO, hay que volver a descontar
+  -- el stock/insumos (void_order se los había devuelto) — si no, el
+  -- producto queda contado dos veces: una vez como repuesto y otra como
+  -- vendido en este pedido reabierto.
+  if v_order.status = 'anulado' then
+    for v_item in select * from jsonb_array_elements(v_order.items) loop
+      if v_item ? 'id' then
+        v_sold_qty := coalesce((v_item->>'qty')::numeric, 0);
+
+        update pos.menu_items
+          set stock_qty = greatest(0, stock_qty - v_sold_qty)
+          where id = (v_item->>'id')::uuid and register_id = p_register_id
+            and track_stock = true and stock_qty is not null
+          returning stock_qty into v_stock_after;
+        if found then
+          insert into pos.stock_movements (menu_item_id, register_id, event_id, type, qty_change, qty_after, note, created_by)
+            values ((v_item->>'id')::uuid, p_register_id, v_order.event_id, 'ajuste', -v_sold_qty, v_stock_after,
+                    'Descontado de nuevo al reabrir ticket #' || v_order.ticket_num, null);
+        end if;
+
+        for v_recipe_line in
+          select ri.ingredient_id, ri.qty_per_unit from pos.recipe_items ri where ri.menu_item_id = (v_item->>'id')::uuid
+        loop
+          update pos.ingredients
+            set stock_qty = greatest(0, coalesce(stock_qty,0) - (v_recipe_line.qty_per_unit * v_sold_qty))
+            where id = v_recipe_line.ingredient_id
+            returning stock_qty into v_ingredient_after;
+          insert into pos.stock_movements (ingredient_id, register_id, event_id, type, qty_change, qty_after, note, created_by)
+            values (v_recipe_line.ingredient_id, p_register_id, v_order.event_id, 'ajuste',
+                    -(v_recipe_line.qty_per_unit * v_sold_qty), v_ingredient_after,
+                    'Descontado de nuevo al reabrir ticket #' || v_order.ticket_num, null);
+        end loop;
+      end if;
+    end loop;
+  end if;
+
   return true;
 end;
 $$;
@@ -717,13 +818,17 @@ grant execute on function pos.reopen_order(uuid, text, uuid) to anon, authentica
 
 create or replace function pos.despacho_toggle_item(p_register_id uuid, p_despacho_pin text, p_order_id uuid, p_item_index int)
 returns boolean language plpgsql security definer set search_path = pos as $$
-declare v_items jsonb;
 begin
   if not pos.verify_despacho_pin(p_register_id, p_despacho_pin) then raise exception 'PIN incorrecto'; end if;
-  select items into v_items from pos.orders where id = p_order_id and register_id = p_register_id;
-  v_items := jsonb_set(v_items, array[p_item_index::text, 'delivered'],
-    to_jsonb(not coalesce((v_items->p_item_index->>'delivered')::boolean, false)));
-  update pos.orders set items = v_items where id = p_order_id and register_id = p_register_id;
+  -- Todo en un solo UPDATE (en vez de leer y luego escribir por separado):
+  -- así, si dos personas tocan la pantalla de Entrega al mismo tiempo,
+  -- Postgres serializa los cambios en vez de que uno pise el del otro.
+  update pos.orders
+    set items = jsonb_set(
+      items, array[p_item_index::text, 'delivered'],
+      to_jsonb(not coalesce((items->p_item_index->>'delivered')::boolean, false))
+    )
+    where id = p_order_id and register_id = p_register_id;
   return true;
 end;
 $$;

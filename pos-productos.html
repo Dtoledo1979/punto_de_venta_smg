@@ -418,7 +418,7 @@
       if (item.color) html += '<span class="color-bar" style="background:' + item.color + ';"></span>';
       html += '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
       if (item.track_stock && item.stock_qty !== null) {
-        const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : 1;
+        const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : (item.stock_qty > 0 ? 1 : 0);
         html += '<span class="stock-badge">' + item.stock_qty + ' en stock' + (pct <= 0.25 ? " ⚠️" : "") + '</span>';
       }
       const promo = activePromoFor(item.id);
@@ -632,7 +632,7 @@
         const low = [];
         trackedSold.forEach(id => {
           const m = menu.find(x => x.id === id);
-          if (m && m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) low.push(m.name + " (" + m.stock_qty + ")");
+          if (m && ((m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) || m.stock_qty === 0)) low.push(m.name + " (" + m.stock_qty + ")");
         });
         if (low.length) setTimeout(() => showToast("⚠️ Reponer stock: " + low.join(", ")), 1800);
       }
@@ -829,7 +829,7 @@
   }
 
   async function exportarCSV(){
-    const { data: orders } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id);
+    const { data: orders } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id).neq("status","anulado");
     const rows = [["Evento","Fecha","Ticket","Hora","Cliente","Producto","Cantidad","PrecioUnitario","Subtotal","TotalTicket","MetodoPago","Efectivo","Tarjeta","Estado","Observacion"]];
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";
