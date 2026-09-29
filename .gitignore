@@ -1,0 +1,3 @@
+
+# Archivos locales con credenciales de ambientes (nunca a git)
+.local/
