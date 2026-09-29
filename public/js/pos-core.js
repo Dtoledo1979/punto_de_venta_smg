@@ -54,6 +54,7 @@
     "create_order", "void_order", "reopen_order",
     "despacho_toggle_item", "despacho_confirm_all",
     "record_payment_attempt", "refund_order", "record_waste", "record_stocktake",
+    "open_register_session", "record_cash_movement", "close_register_session",
   ]);
   const rawRpc = sb.rpc.bind(sb);
   sb.rpc = function (fn, args, opts) {
@@ -193,7 +194,7 @@
     core.user = session.user;
 
     const { data: mems, error } = await sb.from("memberships")
-      .select("org_id, role, organizations(name, currency, timezone, status, language, locale)")
+      .select("org_id, role, organizations(name, currency, timezone, status, language, locale, tax_rate, tax_name, tax_number)")
       .eq("user_id", session.user.id).eq("status", "active");
     if (error) { showBlocked(core.t("Could not load your organisation: {msg}", { msg: core.errorText(error) })); return new Promise(() => {}); }
 

@@ -80,24 +80,24 @@
   // ---------------------------------------------------------------------
   function summarize(orders, refunds) {
     const C = toCents;
-    const s = { grossC: 0, cashC: 0, cardC: 0, refundC: 0, refundCashC: 0, refundCardC: 0, paidCount: 0, compCount: 0, compValueC: 0, refundCount: 0 };
+    const s = { grossC: 0, cashC: 0, cardC: 0, refundC: 0, refundCashC: 0, refundCardC: 0, paidCount: 0, compCount: 0, compValueC: 0, refundCount: 0, taxC: 0 };
     const byProduct = {};
     const prod = (name) => (byProduct[name] = byProduct[name] || { qty: 0, totalC: 0 });
     for (const o of orders || []) {
       if (o.payment_method === "complimentary") { s.compCount++; s.compValueC += C(o.total); continue; }
       s.paidCount++;
-      s.grossC += C(o.total); s.cashC += C(o.cash_amount); s.cardC += C(o.card_amount);
+      s.grossC += C(o.total); s.cashC += C(o.cash_amount); s.cardC += C(o.card_amount); s.taxC += C(o.tax_amount || 0);
       for (const it of o.items || []) { const p = prod(it.name); p.qty += Number(it.qty); p.totalC += C(it.subtotal); }
     }
     for (const r of refunds || []) {
       s.refundCount++;
-      s.refundC += C(r.amount);
+      s.refundC += C(r.amount); s.taxC -= C(r.tax_amount || 0);
       if (r.method === "cash") s.refundCashC += C(r.amount); else s.refundCardC += C(r.amount);
       for (const l of r.lines || []) { const p = prod(l.name); p.qty -= Number(l.qty); p.totalC -= C(l.amount); }
     }
     const netC = s.grossC - s.refundC;
     return {
-      gross: fromCents(s.grossC), refunds: fromCents(s.refundC), net: fromCents(netC),
+      gross: fromCents(s.grossC), refunds: fromCents(s.refundC), net: fromCents(netC), tax: fromCents(s.taxC),
       cash: fromCents(s.cashC - s.refundCashC), card: fromCents(s.cardC - s.refundCardC),
       refundsCash: fromCents(s.refundCashC), refundsCard: fromCents(s.refundCardC),
       paidCount: s.paidCount, refundCount: s.refundCount,

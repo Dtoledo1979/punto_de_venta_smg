@@ -829,6 +829,15 @@
       showToast(t("Supervisor PIN updated."));
     }
 
+    // GST: número que se imprime en las boletas (tasa por defecto 15%, NZ).
+    const taxNumber = prompt(t("{tax} number printed on receipts (leave blank to keep it):", { tax: posCore.org.tax_name || "GST" }), posCore.org.tax_number || "");
+    if (taxNumber !== null && taxNumber.trim() && taxNumber.trim() !== (posCore.org.tax_number || "")) {
+      const { error } = await sb.rpc("update_organization_tax", { p_org_id: posCore.orgId, p_tax_number: taxNumber.trim() });
+      if (error) { showError("Could not update the organisation", error); return; }
+      posCore.org.tax_number = taxNumber.trim();
+      showToast(t("{tax} number updated.", { tax: posCore.org.tax_name || "GST" }));
+    }
+
     // Idioma de la organización: el de las boletas y el que ven por defecto
     // quienes no eligieron uno en su dispositivo.
     const lang = (prompt(t("Organisation language for receipts and default screens (en / es):"), (posCore.org && posCore.org.language) || "en") || "").trim().toLowerCase();

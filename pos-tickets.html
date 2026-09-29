@@ -139,6 +139,8 @@
   </div>
 </div>
 
+<div id="session-bar"></div>
+
 <main>
   <div class="card">
     <h2 data-i18n>Ticket types</h2>
@@ -247,6 +249,7 @@
 <script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
 <script src="/js/pos-refunds.js"></script>
+<script src="/js/pos-sessions.js"></script>
 <script>
   const sb = posCore.sb;
   const REGISTER_TYPE = "ticket";
@@ -345,6 +348,7 @@
     await loadMenu();
     renderMenu();
     renderCart();
+    posSessions.mount(document.getElementById("session-bar"), { registerId: register.id, pin: myPin, operator: () => operatorName, print: enqueueSingle, toast: showToast });
   }
 
   async function updateNextTicketDisplay(){
@@ -742,6 +746,7 @@
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
     if (!activeEvent) { showToast(t("Start an event first.")); return; }
+    if (!testMode && !posSessions.isOpen()) { showToast(t("Open the register before selling (or turn on test mode).")); return; }
 
     cobrando = true;
     try {
@@ -772,7 +777,8 @@
       document.getElementById("void-num").textContent = ticketNum;
       document.getElementById("next-ticket").textContent = ticketNum + 1;
 
-      printReceipt(ticketNum, order.items, order.total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash, testMode);
+      printReceipt(ticketNum, order.items, order.total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash, testMode, order.tax_amount);
+      posSessions.refresh();
       showToast((testMode ? t("🧪 [TEST]") + " " : "") + t("Ticket #{n} issued.", { n: ticketNum }));
       if (!testMode && document.getElementById("summary").style.display !== "none") renderSummary();
       vaciarCarro();
@@ -782,12 +788,13 @@
   }
 
   // La boleta se imprime en el idioma de la ORGANIZACIÓN.
-  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash, isTest){
+  function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash, isTest, taxAmount){
     const rl = posCore.receiptLang();
     const r = (text, params) => posCore.esc(t(text, params, rl));
     const timeStr = posCore.fmtTime(now);
     const isComp = paymentMethod === "complimentary";
     let html = '<div class="receipt-copy"><h3>' + posCore.esc(posCore.org.name) + '</h3><h4>' + r("Ticket") + '</h4>';
+    if (posCore.org.tax_number) html += '<div class="line" style="justify-content:center;"><span>' + r("{tax} No. {n}", { tax: posCore.org.tax_name || "GST", n: posCore.org.tax_number }) + '</span></div>';
     if (isTest) html += '<div class="line" style="justify-content:center; font-weight:800; color:#A3271D;"><span>' + r("***** TEST — NOT A REAL SALE *****") + '</span></div>';
     if (activeEvent) html += '<div class="line" style="justify-content:center; font-weight:600;"><span>' + posCore.esc(activeEvent.name) + '</span></div>';
     html += '<div class="line"><b>' + r("Ticket #{n}", { n: ticketNum }) + '</b><span>' + timeStr + '</span></div>';
@@ -806,6 +813,7 @@
       html += '<div class="line total"><span class="iname">' + r("TOTAL DUE") + '</span><span class="iprice">' + posCore.money(0) + '</span></div>';
     } else {
       html += '<div class="line total"><span class="iname">' + r("TOTAL") + '</span><span class="iprice">' + posCore.money(total) + '</span></div>';
+      if (Number(taxAmount) > 0) html += '<div class="line"><span class="iname">' + r("Includes {tax}", { tax: posCore.org.tax_name || "GST" }) + '</span><span class="iprice">' + posCore.money(taxAmount) + '</span></div>';
       if (paymentMethod === "split") {
         html += '<div class="line"><span class="iname">' + r("Cash") + '</span><span class="iprice">' + posCore.money(cash) + '</span></div>';
         html += '<div class="line"><span class="iname">' + r("Card") + '</span><span class="iprice">' + posCore.money(card) + '</span></div>';
@@ -850,6 +858,7 @@
     if (error) { showError("Could not void", error); return; }
     document.getElementById("void-btn").style.display = "none";
     showToast(t("Ticket #{n} voided.", { n: lastTicketNum }));
+    posSessions.refresh();
     lastOrderId = null;
   }
 
@@ -891,6 +900,7 @@
         showToast(t("Refund of {amount} recorded ({method}).", { amount: posCore.money(refund.amount), method: posCore.label("payment", refund.method) }));
         printRefundSlip(o, refund);
         buscarTicket();
+        posSessions.refresh();
         if (document.getElementById("summary").style.display !== "none") renderSummary();
       },
     });
@@ -929,6 +939,7 @@
     if (error) { showError("Could not void", error); return; }
     showToast(t("Order voided."));
     buscarTicket();
+    posSessions.refresh();
   }
 
   function toggleSummary(){
@@ -945,7 +956,7 @@
     body.innerHTML = posCore.esc(t("Loading…"));
     const [{ data: orders, error: e1 }, { data: refunds, error: e2 }] = await Promise.all([
       sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","voided").eq("is_test", false),
-      sb.from("refunds").select("amount, method, lines, orders!inner(event_id)").eq("register_id", register.id).eq("is_test", false).eq("orders.event_id", activeEvent.id),
+      sb.from("refunds").select("amount, method, lines, tax_amount, orders!inner(event_id)").eq("register_id", register.id).eq("is_test", false).eq("orders.event_id", activeEvent.id),
     ]);
     if (e1 || e2) { body.innerHTML = "<p>" + posCore.esc(posCore.errorText(e1 || e2)) + "</p>"; return; }
     if (!orders || orders.length === 0) { body.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>" + posCore.esc(t("No sales in this event yet.")) + "</p>"; return; }
@@ -958,7 +969,8 @@
     if (s.refundCount) {
       html += '<p style="font-size:13px; color:var(--muted);">' + E(t("Gross {gross} − refunds {refunds} ({n})", { gross: M(s.gross), refunds: M(s.refunds), n: s.refundCount })) + '</p>';
     }
-    html += '<p style="font-size:13px; color:var(--muted);">' + E(t("{n} sales · average {amount}", { n: s.paidCount, amount: M(s.avgTicket) })) + '</p>';
+    html += '<p style="font-size:13px; color:var(--muted);">' + E(t("{n} sales · average {amount}", { n: s.paidCount, amount: M(s.avgTicket) })) +
+      ' · ' + E(t("{tax} included: {amount}", { tax: posCore.org.tax_name || "GST", amount: M(s.tax) })) + '</p>';
     html += '<table class="tbl"><tr><th>' + E(t(SUMMARY_ITEM_LABEL)) + '</th><th>' + E(t("Qty")) + '</th><th>' + E(t("Total")) + '</th></tr>';
     s.byProduct.forEach(p => {
       html += '<tr><td>' + E(p.name) + '</td><td>' + p.qty + '</td><td>' + M(p.total) + '</td></tr>';

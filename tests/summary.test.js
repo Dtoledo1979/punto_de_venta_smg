@@ -45,6 +45,14 @@ describe("resumen de ventas", () => {
     expect(u.sumMoney(s.byProduct.map((p) => p.total))).toBe(s.net); // productos suman el neto
   });
 
+  it("GST: suma el de las ventas y resta el de los reembolsos (cortesías sin GST)", () => {
+    const withTax = orders.map((o) => ({ ...o, tax_amount: o.payment_method === "complimentary" ? 0 : Math.round(o.total * 0.15 / 1.15 * 100) / 100 }));
+    // 4.50 → 0.59 ; 34.50 → 4.50
+    expect(u.summarize(withTax, []).tax).toBe(5.09);
+    const refunds = [{ amount: 11.5, method: "card", tax_amount: 1.5, lines: [{ name: "Piscola", qty: 1, amount: 11.5 }] }];
+    expect(u.summarize(withTax, refunds).tax).toBe(3.59);
+  });
+
   it("sin centavos perdidos con muchos montos pequeños", () => {
     const many = Array.from({ length: 1000 }, () => ({ payment_method: "cash", total: 0.1, cash_amount: 0.1, card_amount: 0, items: [{ name: "X", qty: 1, subtotal: 0.1 }] }));
     const s = u.summarize(many, []);

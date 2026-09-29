@@ -58,6 +58,8 @@
       "supervisor_pin.change": "Supervisor PIN changed", "member.add": "Member added", "member.update": "Member changed",
       "event.close": "Event closed", "event.reopen": "Event reopened", "ticket.reset_numbering": "Ticket numbering reset",
       "org.update": "Organisation changed",
+      "session.open": "Register opened", "session.close": "Register closed",
+      "cash.cash_in": "Cash in", "cash.cash_out": "Cash out",
     },
   };
   function label(kind, code, lang) {
@@ -126,6 +128,15 @@
     "stocktake.empty": "Count at least one item.",
     "stocktake.duplicate_item": "The same item was counted twice.",
     "stocktake.immutable": "A stocktake can't be modified.",
+    "session.not_open": "The register is closed. Open it before selling (or turn on test mode).",
+    "session.already_open": "This register is already open.",
+    "session.invalid_amount": "Enter a valid amount.",
+    "session.invalid_movement": "Invalid cash movement.",
+    "session.reason_required": "Write the reason.",
+    "session.pending_orders": "{n} orders are still waiting for delivery.",
+    "session.immutable": "A closed register session can't be modified.",
+    "order.session_closed": "That sale belongs to a register that's already closed — refund it instead of voiding.",
+    "org.invalid_tax_rate": "Invalid tax rate.",
   };
 
   // Recibe el error de supabase-js ({ message, details, code }) y devuelve

@@ -48,6 +48,10 @@ begin
     v_ev   := (pos.create_event(v_reg, '1234', 'Evento ' || v_slug, current_date)).id;
     v_item := (pos.add_menu_item(v_reg, '1234', 'Piscola', 10, 1)).id;
     perform pos.restock_item(v_reg, '1234', v_item, 'reset', 20);
+    -- Vender de verdad exige una sesión de caja abierta (fase 4).
+    if exists (select 1 from pg_proc where proname = 'open_register_session') then
+      perform pos.open_register_session(v_reg, '1234', 100, 'Tester');
+    end if;
 
     v_order := pos.create_order(v_reg, '1234', v_ev,
       jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 2)),
