@@ -701,13 +701,14 @@
 
     cobrando = true;
     try {
-      const total = cartTotal();
       const eftposResult = await sendToEftpos(card);
       if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
 
       const obs = document.getElementById("obs").value.trim();
       const customerName = document.getElementById("customer-name").value.trim();
-      const items = keys.map(id => ({ id, name: cart[id].name, qty: cart[id].qty, price: cart[id].price, subtotal: cart[id].price * cart[id].qty, delivered: true }));
+      // El navegador solo manda qué producto y cuánta cantidad — precio y
+      // subtotal los calcula siempre create_order() en el servidor.
+      const items = keys.map(id => ({ id, qty: cart[id].qty }));
 
       const { data: order, error } = await sb.rpc("create_order", {
         p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
@@ -724,7 +725,7 @@
       document.getElementById("void-num").textContent = ticketNum;
       document.getElementById("next-ticket").textContent = ticketNum + 1;
 
-      printReceipt(ticketNum, items, total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash, testMode);
+      printReceipt(ticketNum, order.items, order.total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash, testMode);
       showToast((testMode ? "🧪 [PRUEBA] " : "") + "Ticket #" + ticketNum + " emitido.");
       if (!testMode && document.getElementById("summary").style.display !== "none") renderSummary();
       vaciarCarro();
