@@ -639,6 +639,24 @@
     document.getElementById("cash-received").focus();
   }
 
+  // Aviso de stock insuficiente — no bloquea, solo avisa y pide
+  // confirmación. Si se confirma, el stock puede quedar en negativo a
+  // propósito (ver create_order), para poder reconciliar después.
+  function confirmStockOk(){
+    const warnings = [];
+    Object.keys(cart).forEach(id => {
+      const m = menu.find(x => x.id === id);
+      if (m && m.track_stock && m.stock_qty !== null && cart[id].qty > m.stock_qty) {
+        warnings.push("• " + m.name + ": quedan " + m.stock_qty + ", estás vendiendo " + cart[id].qty);
+      }
+    });
+    if (!warnings.length) return true;
+    return confirm(
+      "⚠️ Stock insuficiente:\n\n" + warnings.join("\n") +
+      "\n\n¿Vender igual? El stock va a quedar en negativo hasta que hagas el restock real."
+    );
+  }
+
   function onCashReceivedInput(){
     const total = cartTotal();
     const received = round2(Number(document.getElementById("cash-received").value) || 0);
@@ -652,26 +670,28 @@
       feedback.className = "cash-feedback ok";
       btn.textContent = "Cobrar";
       btn.style.display = "block";
-      btn.onclick = () => finalizarCobro(total, 0, "efectivo", received);
+      btn.onclick = () => { if (confirmStockOk()) finalizarCobro(total, 0, "efectivo", received); };
     } else {
       const remaining = round2(total - received);
       feedback.textContent = "Faltan $" + Math.round(remaining).toLocaleString("es-CL");
       feedback.className = "cash-feedback warn";
       btn.textContent = "Cobrar $" + Math.round(received).toLocaleString("es-CL") + " efectivo + $" + Math.round(remaining).toLocaleString("es-CL") + " tarjeta";
       btn.style.display = "block";
-      btn.onclick = () => showCardConfirm(received, remaining, "mixto", received);
+      btn.onclick = () => { if (confirmStockOk()) showCardConfirm(received, remaining, "mixto", received); };
     }
   }
 
   function pagarConTarjeta(){
     const total = cartTotal();
     if (total <= 0) return;
+    if (!confirmStockOk()) return;
     showCardConfirm(0, total, "tarjeta", 0);
   }
 
   async function pagarCortesia(){
     const total = cartTotal();
     if (total <= 0) return;
+    if (!confirmStockOk()) return;
     const pin = prompt("PIN de administrador para autorizar la cortesía:");
     if (pin === null) return;
     const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });

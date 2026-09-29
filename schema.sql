@@ -840,11 +840,21 @@ begin
   -- IMPORTANTE: solo toca stock_qty, nunca initial_stock (esa es la base
   -- del % restante — reiniciarla en cada venta es el bug que hacía que
   -- siempre marcara 100%).
+  --
+  -- Política de sobreventa (decisión del negocio): el stock SÍ puede
+  -- quedar negativo. No se recorta a 0 con greatest(), a propósito — así
+  -- el historial de movimientos siempre cuadra matemáticamente
+  -- (stock_después = stock_antes + cambio, siempre exacto), incluso
+  -- cuando se vendió más de lo que el sistema tenía cargado (ej. llegó
+  -- mercadería nueva que todavía no se cargó como restock). El aviso y
+  -- la confirmación de "¿vender igual?" se hacen en el navegador antes
+  -- de llegar hasta acá — este cálculo simplemente registra la realidad
+  -- tal cual ocurrió, para poder reconciliar después.
   for v_item in select * from jsonb_array_elements(v_resolved_items) loop
     v_sold_qty := (v_item->>'qty')::numeric;
 
     update pos.menu_items
-      set stock_qty = greatest(0, stock_qty - v_sold_qty)
+      set stock_qty = stock_qty - v_sold_qty
       where id = (v_item->>'id')::uuid
         and register_id = p_register_id
         and track_stock = true
@@ -860,7 +870,7 @@ begin
   -- Descontar insumos usando exactamente la foto de consumo calculada arriba.
   for v_item in select * from jsonb_array_elements(v_consumption) loop
     update pos.ingredients
-      set stock_qty = greatest(0, coalesce(stock_qty,0) - (v_item->>'qty')::numeric)
+      set stock_qty = coalesce(stock_qty,0) - (v_item->>'qty')::numeric
       where id = (v_item->>'ingredient_id')::uuid
       returning stock_qty into v_ingredient_after;
 
@@ -1002,7 +1012,7 @@ begin
         v_sold_qty := coalesce((v_item->>'qty')::numeric, 0);
 
         update pos.menu_items
-          set stock_qty = greatest(0, stock_qty - v_sold_qty)
+          set stock_qty = stock_qty - v_sold_qty
           where id = (v_item->>'id')::uuid and register_id = p_register_id
             and track_stock = true and stock_qty is not null
           returning stock_qty into v_stock_after;
@@ -1017,7 +1027,7 @@ begin
     if v_order.ingredient_consumption is not null then
       for v_item in select * from jsonb_array_elements(v_order.ingredient_consumption) loop
         update pos.ingredients
-          set stock_qty = greatest(0, coalesce(stock_qty,0) - (v_item->>'qty')::numeric)
+          set stock_qty = coalesce(stock_qty,0) - (v_item->>'qty')::numeric
           where id = (v_item->>'ingredient_id')::uuid
           returning stock_qty into v_ingredient_after;
         insert into pos.stock_movements (ingredient_id, register_id, event_id, type, qty_change, qty_after, note, created_by)

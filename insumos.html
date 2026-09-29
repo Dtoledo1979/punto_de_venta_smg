@@ -614,7 +614,7 @@
           '<button class="del-btn">✕</button>' +
         '</div>' +
         (hasStock ?
-          '<div class="prog-bar"><div class="prog-fill" style="width:' + Math.min(100,pct) + '%; background:' + barColor + ';"></div></div>' +
+          '<div class="prog-bar"><div class="prog-fill" style="width:' + Math.max(0, Math.min(100,pct)) + '%; background:' + barColor + ';"></div></div>' +
           '<div class="qty-line">' + formatQty(ing.stock_qty, ing.unit) + ' de ' + formatQty(ing.initial_stock, ing.unit) + ' (' + pct + '%)' + (pct <= 25 ? ' <span class="stock-alert">¡Reponer!</span>' : '') + '</div>' +
           (containerTxt ? '<div class="qty-sub">' + containerTxt + '</div>' : '')
           : '<div class="qty-sub">Sin stock cargado todavía — usa "Reiniciar a" para cargar el primero.</div>') +
