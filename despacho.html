@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Entrega</title>
+<title>Delivery</title>
 <script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
 <style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,19 +78,19 @@
 <header>
   <div class="id">
     <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-    <h1>Entrega</h1>
+    <h1 data-i18n>Delivery</h1>
   </div>
-  <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;">📍 Cambiar ubicación</a>
-  <a class="back" href="index.html">← Inicio</a>
+  <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;" data-i18n>📍 Change location</a>
+  <a class="back" href="index.html" data-i18n>← Home</a>
 </header>
-<div class="sub" id="event-label">Cargando…</div>
+<div class="sub" id="event-label" data-i18n>Loading…</div>
 
 <div class="search-card">
-  <button class="search-toggle" onclick="toggleSearch()">🔎 Buscar ticket (por cliente o número) — ver, reabrir o anular</button>
+  <button class="search-toggle" onclick="toggleSearch()" data-i18n>🔎 Find a ticket (by customer or number) — view, reopen or void</button>
   <div id="search-panel" style="display:none;">
     <div class="search-box">
-      <input type="text" id="search-input" placeholder="Nombre del cliente o N° de ticket" onkeydown="if(event.key==='Enter') buscarTicket()">
-      <button onclick="buscarTicket()">Buscar</button>
+      <input type="text" id="search-input" placeholder="Customer name or ticket #" data-i18n-ph onkeydown="if(event.key==='Enter') buscarTicket()">
+      <button onclick="buscarTicket()" data-i18n>Search</button>
     </div>
     <div id="search-results" class="search-results"></div>
   </div>
@@ -98,39 +98,43 @@
 
 <main>
   <div id="board" class="grid"></div>
-  <div id="empty-msg" class="empty" style="display:none;">No hay pedidos pendientes de entrega.</div>
+  <div id="empty-msg" class="empty" style="display:none;" data-i18n>No orders waiting for delivery.</div>
 
-  <div class="delivered-title">Entregados recientemente</div>
+  <div class="delivered-title" data-i18n>Recently delivered</div>
   <div id="delivered-list" class="delivered-list"></div>
 </main>
 
 <div id="register-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); align-items:center; justify-content:center; z-index:10001; padding:16px;">
   <div class="modal">
-    <h3>¿En qué caja/ubicación estás?</h3>
-    <p>Este dispositivo va a recordar tu elección — no se vuelve a preguntar salvo que la cambies.</p>
+    <h3 data-i18n>Which register / location are you at?</h3>
+    <p data-i18n>This device will remember your choice — you won't be asked again unless you change it.</p>
     <div id="register-picker-list"></div>
   </div>
 </div>
 <div id="pin-overlay">
   <div class="modal">
-    <h3>Ingresa el PIN</h3>
-    <p>Tu nombre y el PIN de Entrega para abrir esta pantalla.</p>
-    <input type="text" id="operator-name-input" placeholder="Tu nombre" style="margin-bottom:8px;" autofocus>
+    <h3 data-i18n>Enter PIN</h3>
+    <p data-i18n>Your name and the Delivery PIN to open this screen.</p>
+    <input type="text" id="operator-name-input" placeholder="Your name" data-i18n-ph style="margin-bottom:8px;" autofocus>
     <input type="password" id="pin-input" inputmode="numeric" maxlength="8">
     <div class="row">
-      <button class="cancel" onclick="location.href='index.html'">Cancelar</button>
-      <button class="ok" onclick="checkPin()">Entrar</button>
+      <button class="cancel" onclick="location.href='index.html'" data-i18n>Cancel</button>
+      <button class="ok" onclick="checkPin()" data-i18n>Enter</button>
     </div>
-    <p style="margin:14px 0 0; cursor:pointer; text-decoration:underline;" onclick="cambiarPinEntrega()">⚙️ Cambiar PIN de Entrega (admin)</p>
+    <p style="margin:14px 0 0; cursor:pointer; text-decoration:underline;" onclick="cambiarPinEntrega()" data-i18n>⚙️ Change Delivery PIN (admin)</p>
   </div>
 </div>
+
 <div id="toast"></div>
 
 <script src="/vendor/supabase.js"></script>
 <script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
 <script>
   const sb = posCore.sb;
+  const REGISTER_TYPE = "product";
 
   // Umbrales del timer (segundos) — ajusta si tu operación es más rápida/lenta.
   const WARN_AFTER = 120;   // amarillo
@@ -143,11 +147,12 @@
   let tickInterval = null;
 
   function showToast(msg){
-    const t = document.getElementById("toast");
-    t.textContent = msg; t.style.display = "block";
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.style.display = "block";
     clearTimeout(showToast._t);
-    showToast._t = setTimeout(() => t.style.display = "none", 2200);
+    showToast._t = setTimeout(() => el.style.display = "none", 2200);
   }
+  function showError(prefix, error){ showToast(t(prefix) + ": " + posCore.errorText(error)); }
 
   async function resolveRegister(type){
     const { data: registers, error } = await sb.from("registers").select("id,name,type,active,created_at,location_id,locations(name)").eq("org_id", posCore.orgId).eq("type", type).eq("active", true).order("created_at");
@@ -176,16 +181,18 @@
   }
 
   function cambiarUbicacion(){
-    localStorage.removeItem("pos_register_producto");
+    localStorage.removeItem("pos_register_" + REGISTER_TYPE);
     location.reload();
   }
 
   async function init(){
-    register = await resolveRegister("producto");
-    if (!register){ showToast("Tu organización todavía no tiene una caja de tipo Producto."); return; }
+    register = await resolveRegister(REGISTER_TYPE);
+    if (!register){ showToast(t("Your organisation doesn't have a product register yet.")); return; }
 
     const { data: evs } = await sb.from("events").select("name").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
-    const ev = (evs && evs.length) ? (evs.length === 1 ? "Evento activo: " + evs[0].name : "Eventos activos: " + evs.map(e=>e.name).join(", ")) : "Sin evento activo.";
+    const ev = (evs && evs.length)
+      ? (evs.length === 1 ? t("Active event: {name}", { name: evs[0].name }) : t("Active events: {names}", { names: evs.map(e=>e.name).join(", ") }))
+      : t("No active event.");
     document.getElementById("event-label").textContent = ev;
 
     const savedPin = sessionStorage.getItem("pos_despacho_pin_" + register.id);
@@ -203,9 +210,10 @@
   function myDespachoPin(){ return sessionStorage.getItem("pos_despacho_pin_" + register.id) || ""; }
 
   async function checkPin(){
+    if (!register) return;
     const name = document.getElementById("operator-name-input").value.trim();
     const val = document.getElementById("pin-input").value;
-    if (!name) { showToast("Escribe tu nombre."); return; }
+    if (!name) { showToast(t("Type your name.")); return; }
     const { data: ok } = await sb.rpc("verify_despacho_pin", { p_register_id: register.id, p_pin: val });
     if (ok){
       operatorName = name;
@@ -213,20 +221,22 @@
       sessionStorage.setItem("pos_despacho_operator_" + register.id, name);
       document.getElementById("pin-overlay").style.display = "none";
       afterUnlock();
-    } else showToast("PIN incorrecto.");
+    } else showToast(posCore.errorText({ message: "pin.incorrect" }));
   }
 
+  // PIN de Entrega: lo cambia una cuenta owner/admin (verificado en la base).
   async function cambiarPinEntrega(){
-    if (!posCore.isAdmin()) { showToast("Solo una cuenta owner o admin puede cambiar el PIN de Entrega."); return; }
-    const nuevoPin = prompt("Nuevo PIN de Entrega (4 a 8 dígitos):");
+    if (!register) return;
+    if (!posCore.isAdmin()) { showToast(t("Only an owner or admin account can change the Delivery PIN.")); return; }
+    const nuevoPin = prompt(t("New Delivery PIN (4 to 8 digits):"));
     if (!nuevoPin) return;
     const { error } = await sb.rpc("update_register", { p_register_id: register.id, p_name: null, p_pin: null, p_despacho_pin: nuevoPin });
-    if (error) { showToast("No se pudo cambiar el PIN: " + error.message); return; }
-    showToast("PIN de Entrega actualizado.");
+    if (error) { showError("Could not change the PIN", error); return; }
+    showToast(t("Delivery PIN updated."));
   }
 
   async function afterUnlock(){
-    document.getElementById("event-label").textContent += " · Recibe: " + operatorName;
+    document.getElementById("event-label").textContent += " · " + t("Receiving: {name}", { name: operatorName });
     await loadPending();
     await loadDeliveredRecent();
     render();
@@ -235,15 +245,19 @@
   }
 
   async function loadPending(){
-    const { data } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id).eq("status","pendiente_entrega").order("paid_at");
+    const { data } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id).eq("status","pending_delivery").order("paid_at");
     pendingOrders = data || [];
   }
 
   async function loadDeliveredRecent(){
-    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","entregado").order("delivered_at",{ ascending:false }).limit(6);
+    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","delivered").order("delivered_at",{ ascending:false }).limit(6);
     deliveredRecent = data || [];
   }
 
+  // Realtime: al (re)conectar se recarga todo — así un corte de red no hace
+  // perder pedidos que llegaron mientras tanto. Además, una recarga de
+  // respaldo cada 30 s por si el canal queda caído sin avisar. La lista se
+  // reemplaza completa en cada render, así que nada se duplica.
   async function refreshAll(){ await loadPending(); await loadDeliveredRecent(); render(); }
 
   function subscribeRealtime(){
@@ -283,31 +297,31 @@
         return '<div class="order">' +
           eventTag +
           '<div class="row1"><span class="tnum">' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? ' · ' + posCore.esc(o.customer_name) : '') + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
-          '<div class="progress">' + doneCount + ' de ' + o.items.length + ' entregados — toca un producto para marcarlo</div>' +
+          '<div class="progress">' + posCore.esc(t("{done} of {total} delivered — tap a product to mark it", { done: doneCount, total: o.items.length })) + '</div>' +
           '<div class="items">' + itemsHtml + '</div>' +
           (o.obs ? '<div class="obs">' + posCore.esc(o.obs) + '</div>' : '') +
-          '<div class="meta"><span>' + new Date(o.paid_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) + '</span><span>' + posCore.esc(o.payment_method) + '</span></div>' +
-          '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + (allDone ? "✔ Cerrar pedido" : "Marcar todo como entregado") + '</button>' +
+          '<div class="meta"><span>' + posCore.fmtTime(o.paid_at) + '</span><span>' + posCore.esc(posCore.label("payment", o.payment_method)) + '</span></div>' +
+          '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + posCore.esc(allDone ? t("✔ Close order") : t("Mark all as delivered")) + '</button>' +
           '</div>';
       }).join("");
     }
 
     document.getElementById("delivered-list").innerHTML = deliveredRecent.map(o => {
       const secs = Math.round((new Date(o.delivered_at) - new Date(o.paid_at))/1000);
-      return '<div>#' + o.ticket_num + ' — entregado en ' + fmt(secs) + '</div>';
-    }).join("") || '<div style="color:#4A5563;">Aún no hay entregas registradas.</div>';
+      return '<div>' + posCore.esc(t("#{n} — delivered in {time}", { n: o.ticket_num, time: fmt(secs) })) + '</div>';
+    }).join("") || '<div style="color:#4A5563;">' + posCore.esc(t("No deliveries recorded yet.")) + '</div>';
   }
 
   async function toggleItem(orderId, idx){
     const { error } = await sb.rpc("despacho_toggle_item", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_item_index: idx });
-    if (error) showToast("No se pudo marcar: " + error.message);
+    if (error) showError("Could not mark it", error);
     await refreshAll();
   }
 
   async function confirmarEntrega(id){
     const { error } = await sb.rpc("despacho_confirm_all", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: id, p_delivered_by: operatorName || null });
-    if (error) { showToast("No se pudo cerrar el pedido: " + error.message); return; }
-    showToast("Pedido entregado.");
+    if (error) { showError("Could not close the order", error); return; }
+    showToast(t("Order delivered."));
     await refreshAll();
   }
 
@@ -324,35 +338,34 @@
     let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).order("paid_at", { ascending:false }).limit(20);
     query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
     const { data, error } = await query;
-    if (error || !data || data.length === 0) { results.innerHTML = "<p style='color:#7C8996; font-size:13px;'>Sin resultados.</p>"; return; }
+    if (error || !data || data.length === 0) { results.innerHTML = "<p style='color:#7C8996; font-size:13px;'>" + posCore.esc(t("No results.")) + "</p>"; return; }
     results.innerHTML = data.map(renderSearchRow).join("");
   }
 
   function renderSearchRow(o){
-    const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
     const itemsTxt = posCore.esc(o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", "));
-    const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+    const timeTxt = posCore.fmtDayTime(o.paid_at);
     const evTxt = o.events ? posCore.esc(o.events.name) : "";
     return '<div class="search-row">' +
-      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
+      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || t("(no name)")) +
+        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + posCore.esc(posCore.label("status", o.status)) + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
-        (o.status !== "pendiente_entrega" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
-        (o.status !== "anulado" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
+        (o.status !== "pending_delivery" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">' + posCore.esc(t("Reopen")) + '</button>' : '') +
+        (o.status !== "voided" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">' + posCore.esc(t("Void")) + '</button>' : '') +
       '</div></div>';
   }
 
   async function reabrirPedido(id){
     const { error } = await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
-    if (error) { showToast("No se pudo reabrir: " + error.message); return; }
-    showToast("Pedido reabierto.");
+    if (error) { showError("Could not reopen", error); return; }
+    showToast(t("Order reopened."));
     buscarTicket();
   }
 
   async function anularPedidoBuscado(id){
     const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
-    if (error) { showToast("No se pudo anular: " + error.message); return; }
-    showToast("Pedido anulado.");
+    if (error) { showError("Could not void", error); return; }
+    showToast(t("Order voided."));
     buscarTicket();
   }
 

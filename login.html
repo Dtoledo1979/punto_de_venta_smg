@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iniciar sesión — POS</title>
+<title>Sign in — POS</title>
 <script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", publicPage: true };
 // supabase-js limpia el #... del link del email apenas lo procesa: se guarda antes.
 window.POS_INITIAL_HASH = location.hash;</script>
@@ -21,6 +21,7 @@ window.POS_INITIAL_HASH = location.hash;</script>
   .card{background:var(--surface); border-radius:var(--r-card); padding:28px 24px; width:100%; max-width:380px;}
   .brand{display:flex; align-items:center; gap:9px; margin-bottom:18px;}
   .brand path{fill:var(--accent);}
+  .lang{margin-left:auto;} .lang select{font-size:13px; padding:3px 6px; border-radius:6px; border:1px solid var(--border);}
   .brand span{font-family:'Sora',sans-serif; font-weight:800; font-size:15px; letter-spacing:.5px;}
   h1{font-family:'Sora',sans-serif; font-size:20px; margin:0 0 6px;}
   p.sub{color:var(--muted); font-size:13.5px; margin:0 0 18px;}
@@ -42,36 +43,37 @@ window.POS_INITIAL_HASH = location.hash;</script>
   <div class="brand">
     <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
     <span>POS</span>
+    <div class="lang" id="lang-slot"></div>
   </div>
 
   <form id="form-login" class="active" novalidate>
-    <h1>Iniciar sesión</h1>
-    <p class="sub">Entra con la cuenta de tu negocio. En un dispositivo compartido, basta con hacerlo una vez: después cada caja se abre con su PIN.</p>
-    <label for="email">Email</label>
+    <h1 data-i18n>Sign in</h1>
+    <p class="sub" data-i18n>Use your business account. On a shared device you only need to do this once: after that each register opens with its PIN.</p>
+    <label for="email" data-i18n>Email</label>
     <input id="email" type="email" autocomplete="username" required>
-    <label for="password">Contraseña</label>
+    <label for="password" data-i18n>Password</label>
     <input id="password" type="password" autocomplete="current-password" required>
-    <button type="submit" id="btn-login">Entrar</button>
-    <button type="button" class="link" id="go-forgot">¿Olvidaste tu contraseña?</button>
+    <button type="submit" id="btn-login" data-i18n>Sign in</button>
+    <button type="button" class="link" id="go-forgot" data-i18n>Forgot your password?</button>
   </form>
 
   <form id="form-forgot" novalidate>
-    <h1>Recuperar contraseña</h1>
-    <p class="sub">Te enviamos un link por email para crear una contraseña nueva.</p>
-    <label for="forgot-email">Email</label>
+    <h1 data-i18n>Reset password</h1>
+    <p class="sub" data-i18n>We'll email you a link to create a new password.</p>
+    <label for="forgot-email" data-i18n>Email</label>
     <input id="forgot-email" type="email" autocomplete="username" required>
-    <button type="submit" id="btn-forgot">Enviar link</button>
-    <button type="button" class="link" id="go-login">← Volver</button>
+    <button type="submit" id="btn-forgot" data-i18n>Send link</button>
+    <button type="button" class="link" id="go-login" data-i18n>← Back</button>
   </form>
 
   <form id="form-reset" novalidate>
-    <h1>Contraseña nueva</h1>
-    <p class="sub">Mínimo 10 caracteres, con mayúsculas, minúsculas y números.</p>
-    <label for="new-password">Contraseña nueva</label>
+    <h1 data-i18n>New password</h1>
+    <p class="sub" data-i18n>At least 10 characters, with upper-case, lower-case letters and numbers.</p>
+    <label for="new-password" data-i18n>New password</label>
     <input id="new-password" type="password" autocomplete="new-password" required>
-    <label for="new-password-2">Repítela</label>
+    <label for="new-password-2" data-i18n>Repeat it</label>
     <input id="new-password-2" type="password" autocomplete="new-password" required>
-    <button type="submit" id="btn-reset">Guardar contraseña</button>
+    <button type="submit" id="btn-reset" data-i18n>Save password</button>
   </form>
 
   <div id="msg" class="msg" role="status"></div>
@@ -79,10 +81,19 @@ window.POS_INITIAL_HASH = location.hash;</script>
 
 <script src="/vendor/supabase.js"></script>
 <script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
 <script>
   const sb = posCore.sb;
   const $ = (id) => document.getElementById(id);
+
+  // Selector de idioma (antes de iniciar sesión se recuerda por dispositivo).
+  $("lang-slot").innerHTML = posCore.langSelect();
+  $("lang-slot").querySelector("select").addEventListener("change", (e) => {
+    try { localStorage.setItem("pos_lang", e.target.value); } catch (_) { /* sin storage */ }
+    location.reload();
+  });
 
   // Solo se permite volver a una ruta de ESTE sitio (evita usar el login
   // como redirección abierta hacia otro dominio: ?next=//sitio-malo.com).
@@ -104,13 +115,13 @@ window.POS_INITIAL_HASH = location.hash;</script>
 
   function friendlyAuthError(error) {
     const code = error && (error.code || "");
-    if (code === "invalid_credentials") return "Email o contraseña incorrectos.";
-    if (code === "email_not_confirmed") return "Tu email todavía no está confirmado. Revisa tu correo.";
-    if (code === "weak_password") return "La contraseña es muy débil: mínimo 10 caracteres, con mayúsculas, minúsculas y números.";
-    if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") return "Demasiados intentos. Espera unos minutos y vuelve a intentar.";
-    if (code === "same_password") return "La contraseña nueva tiene que ser distinta de la anterior.";
-    if (error && /fetch|network/i.test(error.message || "")) return "Sin conexión con el servidor. Revisa tu internet.";
-    return (error && error.message) || "No se pudo completar la operación.";
+    if (code === "invalid_credentials") return t("Incorrect email or password.");
+    if (code === "email_not_confirmed") return t("Your email isn't confirmed yet. Check your inbox.");
+    if (code === "weak_password") return t("That password is too weak: at least 10 characters, with upper-case, lower-case letters and numbers.");
+    if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") return t("Too many attempts. Wait a few minutes and try again.");
+    if (code === "same_password") return t("The new password must be different from the old one.");
+    if (error && /fetch|network/i.test(error.message || "")) return t("No connection to the server. Check your internet.");
+    return (error && error.message) || t("Something went wrong.");
   }
 
   $("go-forgot").onclick = () => { $("forgot-email").value = $("email").value; show("form-forgot"); };
@@ -119,7 +130,7 @@ window.POS_INITIAL_HASH = location.hash;</script>
   $("form-login").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = $("email").value.trim(), password = $("password").value;
-    if (!email || !password) { setMsg("Escribe tu email y contraseña."); return; }
+    if (!email || !password) { setMsg(t("Type your email and password.")); return; }
     busy($("btn-login"), true);
     const { error } = await sb.auth.signInWithPassword({ email, password });
     busy($("btn-login"), false);
@@ -130,24 +141,24 @@ window.POS_INITIAL_HASH = location.hash;</script>
   $("form-forgot").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = $("forgot-email").value.trim();
-    if (!email) { setMsg("Escribe tu email."); return; }
+    if (!email) { setMsg(t("Type your email.")); return; }
     busy($("btn-forgot"), true);
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/login.html" });
     busy($("btn-forgot"), false);
     // Mismo mensaje exista o no la cuenta (no revelar qué emails están registrados).
     if (error && error.code !== "user_not_found") { setMsg(friendlyAuthError(error)); return; }
-    setMsg("Si ese email tiene una cuenta, te llegará un link en unos minutos.", "ok");
+    setMsg(t("If that email has an account, a link will arrive in a few minutes."), "ok");
   });
 
   $("form-reset").addEventListener("submit", async (e) => {
     e.preventDefault();
     const p1 = $("new-password").value, p2 = $("new-password-2").value;
-    if (p1 !== p2) { setMsg("Las contraseñas no coinciden."); return; }
+    if (p1 !== p2) { setMsg(t("The passwords don't match.")); return; }
     busy($("btn-reset"), true);
     const { error } = await sb.auth.updateUser({ password: p1 });
     busy($("btn-reset"), false);
     if (error) { setMsg(friendlyAuthError(error)); return; }
-    setMsg("Contraseña actualizada. Entrando…", "ok");
+    setMsg(t("Password updated. Signing you in…"), "ok");
     setTimeout(() => location.replace("/index.html"), 900);
   });
 
@@ -165,13 +176,13 @@ window.POS_INITIAL_HASH = location.hash;</script>
     if (linkError) {
       show("form-forgot");
       setMsg(linkError === "otp_expired"
-        ? "El link expiró o ya se usó. Pide uno nuevo."
-        : "El link no es válido (" + linkError + "). Pide uno nuevo.");
+        ? t("The link has expired or was already used. Request a new one.")
+        : t("The link isn't valid ({code}). Request a new one.", { code: linkError }));
       return;
     }
     if (isRecovery) {
       if (data.session) show("form-reset");
-      else { show("form-forgot"); setMsg("El link expiró o ya se usó. Pide uno nuevo."); }
+      else { show("form-forgot"); setMsg(t("The link has expired or was already used. Request a new one.")); }
       return;
     }
     // Ya hay sesión: no mostrar el login.

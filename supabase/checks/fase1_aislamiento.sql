@@ -44,14 +44,14 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
 
     v_loc  := (pos.create_location(v_org, 'Local ' || v_slug)).id;
-    v_reg  := (pos.create_register(v_loc, 'Barra ' || v_slug, 'producto', '1234', '5678')).id;
+    v_reg  := (pos.create_register(v_loc, 'Barra ' || v_slug, 'product', '1234', '5678')).id;
     v_ev   := (pos.create_event(v_reg, '1234', 'Evento ' || v_slug, current_date)).id;
     v_item := (pos.add_menu_item(v_reg, '1234', 'Piscola', 10, 1)).id;
     perform pos.restock_item(v_reg, '1234', v_item, 'reset', 20);
 
     v_order := pos.create_order(v_reg, '1234', v_ev,
       jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 2)),
-      'efectivo', 20, 0, 'Cliente ' || v_slug, null, 'Operador', null, false, gen_random_uuid());
+      'cash', 20, 0, 'Cliente ' || v_slug, null, 'Operador', null, false, gen_random_uuid());
     if v_order.id is null then raise exception 'FALLA: no se pudo crear el pedido de prueba de %', v_slug; end if;
     if v_order.total <> 20 then raise exception 'FALLA: total calculado % (esperado 20)', v_order.total; end if;
   end loop;
@@ -164,11 +164,11 @@ begin
     format('select pos.restock_item(%L, ''1234'', %L, ''reset'', 0)', b.reg_b, b.item_b),
     format('select pos.close_event(%L, ''1234'', %L)', b.reg_b, b.ev_b),
     format('select pos.despacho_confirm_all(%L, ''5678'', %L, ''x'')', b.reg_b, b.order_b),
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 10, 0, null, null, null)',
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''cash'', 10, 0, null, null, null)',
            b.reg_b, b.ev_b, jsonb_build_array(jsonb_build_object('id', b.item_b, 'qty', 1))),
     format('select pos.update_register(%L, ''Hack'')', b.reg_b),
     format('select pos.create_location(%L, ''Hack'')', b.org_b),
-    format('select pos.create_register(%L, ''Hack'', ''producto'', ''1111'', ''2222'')', b.loc_b),
+    format('select pos.create_register(%L, ''Hack'', ''product'', ''1111'', ''2222'')', b.loc_b),
     format('select pos.set_supervisor_pin(%L, ''0000'')', b.org_b),
     format('select pos.add_member(%L, ''owner-a@test.local'', ''owner'')', b.org_b)
   ];
@@ -266,10 +266,10 @@ begin
   select id into v_ev from pos.events where org_id = (select org_a from t_ids);
   select id into v_item from pos.menu_items where register_id = v_reg_a;
   v_o := pos.create_order(v_reg_a, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
-                          'cortesia', 0, 0, null, null, null, '9999');
+                          'complimentary', 0, 0, null, null, null, '9999');
   if v_o.id is not null then raise exception 'FALLA: cortesía con PIN de supervisor incorrecto'; end if;
   v_o := pos.create_order(v_reg_a, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
-                          'cortesia', 0, 0, null, null, null, '4321');
+                          'complimentary', 0, 0, null, null, null, '4321');
   if v_o.id is null then raise exception 'FALLA: cortesía con PIN de supervisor correcto rechazada'; end if;
   raise notice 'OK 8: cortesía exige PIN de supervisor';
 end $$;
@@ -285,18 +285,18 @@ begin
   select id into v_reg from pos.registers where org_id = (select org_a from t_ids);
   select id into v_ev from pos.events where org_id = (select org_a from t_ids);
   select id, stock_qty into v_item, v_stock_before from pos.menu_items where register_id = v_reg and name = 'Piscola';
-  select count(*) into v_movs_before from pos.stock_movements where menu_item_id = v_item and type = 'venta';
+  select count(*) into v_movs_before from pos.stock_movements where menu_item_id = v_item and type = 'sale';
   v_o1 := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
-                           'efectivo', 10, 0, 'Reintento', null, null, null, false, v_tx);
+                           'cash', 10, 0, 'Reintento', null, null, null, false, v_tx);
   v_o2 := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
-                           'efectivo', 10, 0, 'Reintento', null, null, null, false, v_tx);
+                           'cash', 10, 0, 'Reintento', null, null, null, false, v_tx);
   if v_o1.id is null or v_o1.id <> v_o2.id then raise exception 'FALLA: el reintento creó un segundo pedido'; end if;
   if (select count(*) from pos.orders where client_transaction_id = v_tx) <> 1 then raise exception 'FALLA: hay más de un pedido con el mismo intento'; end if;
   if (select stock_qty from pos.menu_items where id = v_item) <> v_stock_before - 1 then
     raise exception 'FALLA: el reintento descontó stock dos veces';
   end if;
   -- (no se filtra por created_at: dentro de una transacción now() es siempre el mismo)
-  select count(*) - v_movs_before into v_movs from pos.stock_movements where menu_item_id = v_item and type = 'venta';
+  select count(*) - v_movs_before into v_movs from pos.stock_movements where menu_item_id = v_item and type = 'sale';
   if v_movs <> 1 then raise exception 'FALLA: % movimientos de venta para un solo cobro', v_movs; end if;
   raise notice 'OK 8b: idempotencia (un pedido, un descuento)';
 end $$;
@@ -336,23 +336,23 @@ begin
   v_item := (pos.add_menu_item(v_reg, '1234', 'Café', 4.50, 2)).id;
   v_items := jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 3));
 
-  v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'efectivo', 13.50, 0, null, null, null);
+  v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'cash', 13.50, 0, null, null, null);
   if v_o.total <> 13.50 then raise exception 'FALLA: total con centavos % (esperado 13.50)', v_o.total; end if;
-  v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'mixto', 10.00, 3.50, null, null, null);
+  v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'split', 10.00, 3.50, null, null, null);
   if v_o.id is null then raise exception 'FALLA: pago mixto exacto rechazado'; end if;
 
   foreach v_sql in array array[
     -- 1 centavo de diferencia (antes se aceptaba hasta $1)
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 13.49, 0, null, null, null)', v_reg, v_ev, v_items),
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 14.00, 0, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''cash'', 13.49, 0, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''cash'', 14.00, 0, null, null, null)', v_reg, v_ev, v_items),
     -- método incoherente con los montos
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 10.00, 3.50, null, null, null)', v_reg, v_ev, v_items),
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''tarjeta'', 13.50, 0, null, null, null)', v_reg, v_ev, v_items),
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''mixto'', 13.50, 0, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''cash'', 10.00, 3.50, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''card'', 13.50, 0, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''split'', 13.50, 0, null, null, null)', v_reg, v_ev, v_items),
     -- montos negativos
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''mixto'', 15.00, -1.50, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''split'', 15.00, -1.50, null, null, null)', v_reg, v_ev, v_items),
     -- cantidad fraccionaria
-    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 6.75, 0, null, null, null)', v_reg, v_ev,
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''cash'', 6.75, 0, null, null, null)', v_reg, v_ev,
            jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1.5)))
   ] loop
     begin
@@ -362,6 +362,16 @@ begin
       if sqlerrm like 'FALLA:%' then raise; end if;
     end;
   end loop;
+  -- Los errores llegan como código estable + detalle JSON (el texto lo pone el frontend).
+  declare v_msg text; v_detail text;
+  begin
+    perform pos.create_order(v_reg, '1234', v_ev, v_items, 'cash', 13.49, 0, null, null, null);
+  exception when raise_exception then
+    get stacked diagnostics v_msg = message_text, v_detail = pg_exception_detail;
+    if v_msg <> 'payment.total_mismatch' or (v_detail::jsonb->>'total')::numeric <> 13.50 or (v_detail::jsonb->>'paid')::numeric <> 13.49 then
+      raise exception 'FALLA: error mal formado: % / %', v_msg, v_detail;
+    end if;
+  end;
   raise notice 'OK 9b: dinero exacto al centavo y coherente con el método';
 end $$;
 reset role;

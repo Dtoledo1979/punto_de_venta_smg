@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Punto de venta</title>
+<title>Point of sale</title>
 <script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
 <style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -68,27 +68,29 @@
 </div>
 
 <div class="hero">
-  <h1>Operación de eventos</h1>
-  <p>Elige el evento en el que vas a trabajar. Adentro vas a encontrar ventas, entrega, inventario y reportes de ese evento.</p>
+  <h1 data-i18n>Event operations</h1>
+  <p data-i18n>Choose the event you'll be working on. Inside you'll find sales, delivery, inventory and reports for that event.</p>
 </div>
 
 <main>
-  <div class="step-title"><span class="num">1</span> Elige el evento</div>
+  <div class="step-title"><span class="num">1</span> <span data-i18n>Choose the event</span></div>
   <div id="event-area"></div>
 
   <div class="enter-row">
-    <button class="btn btn-primary" id="enter-btn" disabled onclick="enterEvent()">Entrar al evento →</button>
+    <button class="btn btn-primary" id="enter-btn" disabled onclick="enterEvent()" data-i18n>Enter event →</button>
   </div>
 
-  <div class="quick-title">Acceso directo (sin pasar por el dashboard)</div>
+  <div class="quick-title" data-i18n>Shortcuts (skip the dashboard)</div>
   <div class="quick-row">
-    <a class="quick-link" href="despacho.html"><span>Pantalla de <b>Entrega</b></span><span class="go">→</span></a>
-    <a class="quick-link" href="insumos.html"><span><b>Insumos, stock y recetas</b></span><span class="go">→</span></a>
+    <a class="quick-link" href="despacho.html"><span data-i18n><b>Delivery</b> screen</span><span class="go">→</span></a>
+    <a class="quick-link" href="insumos.html"><span data-i18n><b>Inventory, stock and recipes</b></span><span class="go">→</span></a>
   </div>
 </main>
 
 <script src="/vendor/supabase.js"></script>
 <script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
 <script>
   const sb = posCore.sb;
@@ -104,7 +106,14 @@
       openEvents = data || [];
 
       if (openEvents.length === 0) {
-        area.innerHTML = '<div class="no-events">Sin eventos activos todavía — entra a "Insumos, stock y recetas" o abre una caja de Productos/Tickets y usa "Iniciar nuevo evento" para crear el primero.</div>';
+        // Estado vacío: sin cajas todavía (organización nueva) o sin eventos.
+        const { count } = await sb.from("registers").select("id", { count: "exact", head: true }).eq("org_id", posCore.orgId);
+        const msg = !count
+          ? (posCore.isAdmin()
+              ? t("Welcome! Start by creating your first location and register in \"Inventory, stock and recipes\" → New location.")
+              : t("Your organisation isn't set up yet. Ask an owner or admin to create the first register."))
+          : t("No active events yet — open a Products or Tickets register and use \"Start new event\" to create the first one.");
+        area.innerHTML = '<div class="no-events">' + posCore.esc(msg) + '</div>';
         selectedId = null;
         updateEnterBtn();
         return;
@@ -116,7 +125,7 @@
       renderEvents();
       updateEnterBtn();
     } catch (e) {
-      area.innerHTML = '<div class="no-events">No se pudieron cargar los eventos: ' + posCore.esc(e.message || "sin conexión") + '. Revisa tu internet y recarga la página.</div>';
+      area.innerHTML = '<div class="no-events">' + posCore.esc(t("Could not load the events: {msg}. Check your internet and reload the page.", { msg: posCore.errorText(e) })) + '</div>';
     }
   }
 
@@ -126,8 +135,8 @@
       '<button class="event-card ' + (e.id === selectedId ? "selected" : "") + '" onclick="selectEvent(\'' + e.id + '\')">' +
         '<span class="check">✓</span>' +
         '<div class="ename">' + posCore.esc(e.name) + '</div>' +
-        (e.event_date ? '<div class="edate">' + posCore.esc(e.event_date) + '</div>' : '') +
-        '<div class="live"><span class="dot"></span> EN CURSO</div>' +
+        (e.event_date ? '<div class="edate">' + posCore.esc(posCore.fmtDate(e.event_date + "T12:00:00")) + '</div>' : '') +
+        '<div class="live"><span class="dot"></span> ' + posCore.esc(t("LIVE")) + '</div>' +
       '</button>'
     ).join("") + '</div>';
   }

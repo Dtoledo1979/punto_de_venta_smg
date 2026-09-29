@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>POS Productos</title>
+<title>Product sales</title>
 <script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
 <style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -142,127 +142,127 @@
 <header>
   <div class="id">
     <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-    <h1 id="register-name">POS Productos</h1>
+    <h1 id="register-name" data-i18n>Product sales</h1>
   </div>
-  <a class="back" id="test-mode-toggle" onclick="toggleTestMode()" style="cursor:pointer;">🧪 Modo prueba: OFF</a>
-  <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;">📍 Cambiar ubicación</a>
-  <a class="back" href="insumos.html">⚙️ Insumos</a>
-  <a class="back" href="index.html">← Inicio</a>
+  <a class="back" id="test-mode-toggle" onclick="toggleTestMode()" style="cursor:pointer;">🧪 Test mode: OFF</a>
+  <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;" data-i18n>📍 Change location</a>
+  <a class="back" href="insumos.html" data-i18n>⚙️ Inventory</a>
+  <a class="back" href="index.html" data-i18n>← Home</a>
 </header>
 
-<div id="test-mode-banner" style="display:none; background:#E4483A; color:#fff; text-align:center; font-weight:800; font-size:13px; padding:8px; letter-spacing:.5px;">
-  ⚠️ MODO PRUEBA — LO QUE VENDAS ACÁ NO ES REAL, NO TOCA EL STOCK NI LOS REPORTES ⚠️
+<div id="test-mode-banner" style="display:none; background:#E4483A; color:#fff; text-align:center; font-weight:800; font-size:13px; padding:8px; letter-spacing:.5px;" data-i18n>
+  ⚠️ TEST MODE — SALES HERE ARE NOT REAL AND DON'T AFFECT STOCK OR REPORTS ⚠️
 </div>
 
 <div class="event-strip">
-  <span id="event-label">Cargando evento…</span>
+  <span id="event-label" data-i18n>Loading event…</span>
   <span>
-    <a onclick="toggleEventPicker()">Cambiar evento</a> ·
-    <a onclick="toggleEventForm()">Iniciar nuevo evento</a>
+    <a onclick="toggleEventPicker()" data-i18n>Change event</a> ·
+    <a onclick="toggleEventForm()" data-i18n>Start new event</a>
   </span>
 </div>
 <div id="event-picker" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
-  <p style="margin:0 0 10px; font-size:13px; color:var(--muted);">Elige el evento en el que vas a trabajar:</p>
+  <p style="margin:0 0 10px; font-size:13px; color:var(--muted);" data-i18n>Choose the event you'll be working on:</p>
   <div id="event-picker-list"></div>
 </div>
 <div id="event-form" class="card wide-card" style="display:none; margin-top:12px; margin-bottom:0;">
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
-    <input type="text" id="event-name" placeholder="Nombre del evento" style="flex:2; min-width:160px; padding:9px; border:1px solid var(--border); border-radius:8px;">
+    <input type="text" id="event-name" placeholder="Event name" data-i18n-ph style="flex:2; min-width:160px; padding:9px; border:1px solid var(--border); border-radius:8px;">
     <input type="date" id="event-date" style="padding:9px; border:1px solid var(--border); border-radius:8px;">
-    <button class="btn btn-primary btn-small" onclick="crearEvento()">Iniciar evento</button>
+    <button class="btn btn-primary btn-small" onclick="crearEvento()" data-i18n>Start event</button>
   </div>
 </div>
 
 <main>
   <div class="card">
-    <h2>Menú</h2>
+    <h2 data-i18n>Menu</h2>
     <div class="menu-grid" id="menu-grid"></div>
   </div>
 
   <div class="card">
-    <h2>Pedido actual</h2>
-    <div id="cart-list"><p style="color:#9AA7B2; font-size:13px;">Toca un ítem del menú para agregarlo.</p></div>
-    <div class="total-row"><span>Total</span><span id="total">$0</span></div>
-    <input type="text" id="customer-name" class="customer-input" placeholder="Nombre del cliente (obligatorio)">
-    <textarea id="obs" placeholder="Observación (ej. sin hielo, sin granadina)"></textarea>
+    <h2 data-i18n>Current order</h2>
+    <div id="cart-list"></div>
+    <div class="total-row"><span data-i18n>Total</span><span id="total">$0.00</span></div>
+    <input type="text" id="customer-name" class="customer-input" placeholder="Customer name (required)" data-i18n-ph>
+    <textarea id="obs" placeholder="Note (e.g. no ice)" data-i18n-ph></textarea>
 
     <div class="pay-buttons">
-      <button class="btn btn-primary" style="margin:0;" onclick="pagarConTarjeta()">💳 Tarjeta</button>
-      <button class="btn btn-secondary" style="margin:0;" onclick="mostrarEfectivo()">💵 Efectivo</button>
-      <button class="btn btn-secondary" style="margin:0;" onclick="pagarCortesia()">🎁 Cortesía</button>
+      <button class="btn btn-primary" style="margin:0;" onclick="pagarConTarjeta()" data-i18n>💳 Card</button>
+      <button class="btn btn-secondary" style="margin:0;" onclick="mostrarEfectivo()" data-i18n>💵 Cash</button>
+      <button class="btn btn-secondary" style="margin:0;" onclick="pagarCortesia()" data-i18n>🎁 Comp</button>
     </div>
 
     <div id="cash-panel" class="cash-panel" style="display:none;">
-      <label>¿Cuánto te dio el cliente?</label>
-      <input type="number" id="cash-received" min="0" step="1" placeholder="$" oninput="onCashReceivedInput()">
+      <label data-i18n>How much did the customer give you?</label>
+      <input type="number" id="cash-received" min="0" step="0.01" inputmode="decimal" placeholder="$" oninput="onCashReceivedInput()">
       <div id="cash-feedback" class="cash-feedback"></div>
       <button class="btn btn-primary" id="cash-confirm-btn" style="display:none;"></button>
     </div>
 
     <div id="card-confirm-panel" class="cash-panel" style="display:none; background:#FFF8E8; border-color:#F0D9A0;">
-      <label style="text-align:center; font-weight:700; color:#8A5800;">💳 Cobra este monto en el terminal EFTPOS</label>
-      <div id="card-confirm-amount" style="font-family:'Sora',sans-serif; font-weight:800; font-size:32px; text-align:center; margin:6px 0;">$0</div>
-      <p style="font-size:12px; color:var(--muted); text-align:center; margin:0 0 10px;">Solo continúa después de que el terminal muestre <b>APROBADO</b>.</p>
+      <label style="text-align:center; font-weight:700; color:#8A5800;" data-i18n>💳 Charge this amount on the EFTPOS terminal</label>
+      <div id="card-confirm-amount" style="font-family:'Sora',sans-serif; font-weight:800; font-size:32px; text-align:center; margin:6px 0;">$0.00</div>
+      <p style="font-size:12px; color:var(--muted); text-align:center; margin:0 0 10px;" data-i18n>Only continue once the terminal shows <b>APPROVED</b>.</p>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-secondary" style="margin:0;" onclick="cancelarConfirmacionTarjeta()">Cancelar</button>
-        <button class="btn btn-primary" id="card-confirm-btn" style="margin:0;" onclick="confirmarPagoTarjeta()">✓ Pago confirmado</button>
+        <button class="btn btn-secondary" style="margin:0;" onclick="cancelarConfirmacionTarjeta()" data-i18n>Cancel</button>
+        <button class="btn btn-primary" id="card-confirm-btn" style="margin:0;" onclick="confirmarPagoTarjeta()" data-i18n>✓ Payment approved</button>
       </div>
     </div>
 
-    <button class="btn btn-secondary" onclick="vaciarCarro()">Vaciar pedido</button>
-    <button class="btn btn-danger" id="void-btn" style="display:none;" onclick="anularUltimo()">↩️ Anular último ticket (#<span id="void-num"></span>)</button>
-    <div class="ticket-note">Próximo N° de ticket: <b id="next-ticket">—</b></div>
+    <button class="btn btn-secondary" onclick="vaciarCarro()" data-i18n>Clear order</button>
+    <button class="btn btn-danger" id="void-btn" style="display:none;" onclick="anularUltimo()"><span data-i18n>↩️ Void last ticket</span> (#<span id="void-num"></span>)</button>
+    <div class="ticket-note"><span data-i18n>Next ticket #:</span> <b id="next-ticket">—</b></div>
   </div>
 </main>
 
 <div class="card wide-card" style="margin-bottom:16px;">
-  <h2>🧾 Órdenes activas</h2>
-  <p style="font-size:12px; color:var(--muted); margin:-8px 0 12px;">Solo lectura — confirmar la entrega se hace desde la pantalla de Entrega. Toca una orden para ver qué falta.</p>
-  <div id="orders-panel"><p style="color:#9AA7B2; font-size:13px;">Sin órdenes pendientes.</p></div>
+  <h2 data-i18n>🧾 Active orders</h2>
+  <p style="font-size:12px; color:var(--muted); margin:-8px 0 12px;" data-i18n>Read only — delivery is confirmed on the Delivery screen. Tap an order to see what's missing.</p>
+  <div id="orders-panel"></div>
 </div>
 
 <div class="card wide-card" style="margin-bottom:16px;">
-  <button class="toggle" onclick="toggleSearch()">🔎 Buscar ticket (por cliente o número)</button>
+  <button class="toggle" onclick="toggleSearch()" data-i18n>🔎 Find a ticket (by customer or number)</button>
   <div id="search-panel" style="display:none; margin-top:10px;">
     <div class="search-box">
-      <input type="text" id="search-input" placeholder="Nombre del cliente o N° de ticket" onkeydown="if(event.key==='Enter') buscarTicket()">
-      <button class="btn btn-primary btn-small" onclick="buscarTicket()">Buscar</button>
+      <input type="text" id="search-input" placeholder="Customer name or ticket #" data-i18n-ph onkeydown="if(event.key==='Enter') buscarTicket()">
+      <button class="btn btn-primary btn-small" onclick="buscarTicket()" data-i18n>Search</button>
     </div>
     <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; margin-top:8px;">
-      <input type="checkbox" id="search-all-events"> Buscar en todos los eventos (no solo el actual)
+      <input type="checkbox" id="search-all-events"> <span data-i18n>Search all events (not just the current one)</span>
     </label>
     <div id="search-results"></div>
   </div>
 </div>
 
 <div class="card wide-card" style="margin-bottom:24px;">
-  <button class="toggle" onclick="toggleSummary()">📊 Ver resumen de ventas</button>
-  <button class="btn btn-secondary btn-small" style="float:right;" onclick="exportarCSV()">⬇️ Exportar CSV</button>
+  <button class="toggle" onclick="toggleSummary()" data-i18n>📊 Sales summary</button>
+  <button class="btn btn-secondary btn-small" style="float:right;" onclick="exportarCSV()" data-i18n>⬇️ Export CSV</button>
   <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; float:right; margin:0 10px 0 0;">
-    <input type="checkbox" id="csv-all-events"> Todos los eventos
+    <input type="checkbox" id="csv-all-events"> <span data-i18n>All events</span>
   </label>
   <div id="summary" style="display:none;">
-    <h2>Resumen del evento activo</h2>
-    <div id="summary-body">Cargando…</div>
+    <h2 data-i18n>Active event summary</h2>
+    <div id="summary-body"></div>
   </div>
 </div>
 
 <div id="register-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(10,13,18,.6); align-items:center; justify-content:center; z-index:10001; padding:16px;">
   <div class="modal">
-    <h3>¿En qué caja/ubicación estás?</h3>
-    <p>Este dispositivo va a recordar tu elección — no se vuelve a preguntar salvo que la cambies.</p>
+    <h3 data-i18n>Which register / location are you at?</h3>
+    <p data-i18n>This device will remember your choice — you won't be asked again unless you change it.</p>
     <div id="register-picker-list"></div>
   </div>
 </div>
 <div id="pin-overlay">
   <div class="modal">
-    <h3 id="pin-title">Ingresa el PIN</h3>
-    <p id="pin-sub">Tu nombre y el PIN de esta caja para comenzar a vender.</p>
-    <input type="text" id="operator-name-input" placeholder="Tu nombre" style="margin-bottom:8px;" autofocus>
+    <h3 id="pin-title" data-i18n>Enter PIN</h3>
+    <p id="pin-sub" data-i18n>Your name and this register's PIN to start selling.</p>
+    <input type="text" id="operator-name-input" placeholder="Your name" data-i18n-ph style="margin-bottom:8px;" autofocus>
     <input type="password" id="pin-input" inputmode="numeric" maxlength="8">
     <div class="row">
-      <button class="btn btn-secondary" onclick="location.href='index.html'">Cancelar</button>
-      <button class="btn btn-primary" onclick="checkPin()">Entrar</button>
+      <button class="btn btn-secondary" onclick="location.href='index.html'" data-i18n>Cancel</button>
+      <button class="btn btn-primary" onclick="checkPin()" data-i18n>Enter</button>
     </div>
   </div>
 </div>
@@ -272,9 +272,12 @@
 
 <script src="/vendor/supabase.js"></script>
 <script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
 <script>
   const sb = posCore.sb;
+  const REGISTER_TYPE = "product";
 
   // Cambia esto a true una vez tengas la integración EFTPOS con BNZ/Verifone lista.
   const EFTPOS_ENABLED = false;
@@ -297,11 +300,12 @@
   let lastOrderId = null, lastTicketNum = null;
 
   function showToast(msg){
-    const t = document.getElementById("toast");
-    t.textContent = msg; t.style.display = "block";
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.style.display = "block";
     clearTimeout(showToast._t);
-    showToast._t = setTimeout(() => t.style.display = "none", 2600);
+    showToast._t = setTimeout(() => el.style.display = "none", 2600);
   }
+  function showError(prefix, error){ showToast(t(prefix) + ": " + posCore.errorText(error)); }
 
   async function resolveRegister(type){
     const { data: registers, error } = await sb.from("registers").select("id,name,type,active,created_at,location_id,locations(name)").eq("org_id", posCore.orgId).eq("type", type).eq("active", true).order("created_at");
@@ -330,14 +334,17 @@
   }
 
   function cambiarUbicacion(){
-    localStorage.removeItem("pos_register_producto");
+    localStorage.removeItem("pos_register_" + REGISTER_TYPE);
     location.reload();
   }
 
   async function init() {
-    register = await resolveRegister("producto");
+    applyTestModeUI();
+    renderCart();
+    renderOrdersPanel();
+    register = await resolveRegister(REGISTER_TYPE);
     if (!register) {
-      showToast("Tu organización todavía no tiene una caja de tipo Producto. Un administrador puede crearla en Insumos → Administración.");
+      showToast(t("Your organisation doesn't have a product register yet. An admin can create one in Inventory → New location."));
       return;
     }
     document.getElementById("register-name").textContent = register.name;
@@ -357,9 +364,10 @@
   function myPin(){ return sessionStorage.getItem("pos_pin_" + register.id) || ""; }
 
   async function checkPin() {
+    if (!register) return;
     const name = document.getElementById("operator-name-input").value.trim();
     const val = document.getElementById("pin-input").value;
-    if (!name) { showToast("Escribe tu nombre."); return; }
+    if (!name) { showToast(t("Type your name.")); return; }
     const { data: ok } = await sb.rpc("verify_register_pin", { p_register_id: register.id, p_pin: val });
     if (ok) {
       operatorName = name;
@@ -368,7 +376,7 @@
       document.getElementById("pin-overlay").style.display = "none";
       afterUnlock();
     } else {
-      showToast("PIN incorrecto.");
+      showToast(posCore.errorText({ message: "pin.incorrect" }));
     }
   }
 
@@ -419,10 +427,10 @@
   }
 
   function updateEventLabel(){
-    const extra = openEvents.length > 1 ? " (" + openEvents.length + " eventos abiertos)" : "";
+    const extra = openEvents.length > 1 ? " " + t("({n} open events)", { n: openEvents.length }) : "";
     document.getElementById("event-label").textContent = activeEvent
-      ? ("Evento activo: " + activeEvent.name + extra)
-      : (openEvents.length > 1 ? "Elige un evento para empezar a vender." + extra : "Sin evento activo — crea uno para empezar a vender.");
+      ? t("Active event: {name}", { name: activeEvent.name }) + extra
+      : (openEvents.length > 1 ? t("Choose an event to start selling.") + extra : t("No active event — start one to begin selling."));
   }
 
   function toggleEventForm(){
@@ -437,25 +445,27 @@
     if (willShow) renderEventPicker();
   }
 
+  function eventTitle(e){ return e.name + (e.event_date ? " — " + posCore.fmtDate(e.event_date + "T12:00:00") : ""); }
+
   function renderEventPicker(){
     const list = document.getElementById("event-picker-list");
     let html = "";
     if (openEvents.length === 0) {
-      html += "<p style='font-size:13px; color:var(--muted);'>No hay eventos abiertos — crea uno con \"Iniciar nuevo evento\".</p>";
+      html += "<p style='font-size:13px; color:var(--muted);'>" + posCore.esc(t("No open events — create one with \"Start new event\".")) + "</p>";
     } else {
       html += openEvents.map(e =>
-        '<div class="event-pick-row"><span>' + posCore.esc(e.name + (e.event_date ? " — " + e.event_date : "")) + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
+        '<div class="event-pick-row"><span>' + posCore.esc(eventTitle(e)) + (activeEvent && activeEvent.id === e.id ? " " + posCore.esc(t("✓ (working here)")) : "") + '</span>' +
         '<span class="actions">' +
-          '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">Trabajar aquí</button>' +
-          '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">Cerrar evento</button>' +
+          '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">' + posCore.esc(t("Work here")) + '</button>' +
+          '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">' + posCore.esc(t("Close event")) + '</button>' +
         '</span></div>'
       ).join("");
     }
     if (closedEvents.length) {
-      html += '<p style="font-size:12px; color:var(--muted); margin:14px 0 4px;">Cerrados recientemente — ¿cerraste alguno por error?</p>';
+      html += '<p style="font-size:12px; color:var(--muted); margin:14px 0 4px;">' + posCore.esc(t("Recently closed — closed one by mistake?")) + '</p>';
       html += closedEvents.map(e =>
-        '<div class="event-pick-row"><span style="color:var(--muted);">' + posCore.esc(e.name + (e.event_date ? " — " + e.event_date : "")) + '</span>' +
-        '<span class="actions"><button class="btn btn-secondary" onclick="reabrirEvento(\'' + e.id + '\')">Reabrir</button></span></div>'
+        '<div class="event-pick-row"><span style="color:var(--muted);">' + posCore.esc(eventTitle(e)) + '</span>' +
+        '<span class="actions"><button class="btn btn-secondary" onclick="reabrirEvento(\'' + e.id + '\')">' + posCore.esc(t("Reopen")) + '</button></span></div>'
       ).join("");
     }
     list.innerHTML = html;
@@ -471,22 +481,22 @@
     updateEventLabel();
     updateNextTicketDisplay();
     document.getElementById("event-picker").style.display = "none";
-    showToast("Trabajando en: " + ev.name);
+    showToast(t("Working on: {name}", { name: ev.name }));
   }
 
   async function cerrarEvento(id){
-    if (!confirm("¿Cerrar este evento? Dejará de aparecer para seguir vendiendo ahí.")) return;
+    if (!confirm(t("Close this event? You won't be able to keep selling in it."))) return;
     const { error } = await sb.rpc("close_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
-    if (error) { showToast("No se pudo cerrar el evento: " + error.message); return; }
-    showToast("Evento cerrado.");
+    if (error) { showError("Could not close the event", error); return; }
+    showToast(t("Event closed."));
     await loadActiveEvent();
     renderEventPicker();
   }
 
   async function reabrirEvento(id){
     const { error } = await sb.rpc("reopen_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
-    if (error) { showToast("No se pudo reabrir el evento: " + error.message); return; }
-    showToast("Evento reabierto.");
+    if (error) { showError("Could not reopen the event", error); return; }
+    showToast(t("Event reopened."));
     await loadActiveEvent();
     renderEventPicker();
   }
@@ -494,16 +504,16 @@
   async function crearEvento(){
     const name = document.getElementById("event-name").value.trim();
     const date = document.getElementById("event-date").value || null;
-    if (!name) { showToast("Escribe el nombre del evento."); return; }
+    if (!name) { showToast(t("Type the event name.")); return; }
     const { data, error } = await sb.rpc("create_event", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_event_date: date });
-    if (error) { showToast("No se pudo crear el evento: " + error.message); return; }
+    if (error) { showError("Could not create the event", error); return; }
     openEvents.push(data);
     activeEvent = data;
     sessionStorage.setItem("pos_event_" + register.id, data.id);
     updateEventLabel();
     updateNextTicketDisplay();
     toggleEventForm();
-    showToast("Evento iniciado.");
+    showToast(t("Event started."));
   }
 
   async function loadMenu(){
@@ -516,6 +526,10 @@
   function renderMenu(){
     const grid = document.getElementById("menu-grid");
     grid.innerHTML = "";
+    if (!menu.length) {
+      grid.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">' + posCore.esc(t("No products yet — add them in Inventory.")) + '</p>';
+      return;
+    }
     menu.forEach(item => {
       const b = document.createElement("button");
       b.className = "item-btn";
@@ -524,7 +538,7 @@
       html += '<span class="price">' + posCore.money(item.price) + "</span>";
       if (item.track_stock && item.stock_qty !== null) {
         const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : (item.stock_qty > 0 ? 1 : 0);
-        html += '<div><span class="badge ' + (pct <= 0.25 ? "badge-warning" : "badge-success") + '">' + (pct <= 0.25 ? "⚠️ " : "") + item.stock_qty + ' en stock</span></div>';
+        html += '<div><span class="badge ' + (pct <= 0.25 ? "badge-warning" : "badge-success") + '">' + (pct <= 0.25 ? "⚠️ " : "") + posCore.esc(t("{n} in stock", { n: item.stock_qty })) + '</span></div>';
       }
       const promo = activePromoFor(item.id);
       if (promo) html += '<div><span class="badge badge-success">🏷️ ' + promo.bundle_qty + ' x ' + posCore.money(promo.bundle_price) + '</span></div>';
@@ -535,7 +549,7 @@
   }
 
   async function loadOrdersPanel(){
-    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","pendiente_entrega").order("paid_at");
+    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","pending_delivery").order("paid_at");
     pendingOrders = data || [];
     renderOrdersPanel();
   }
@@ -544,14 +558,14 @@
     sb.channel("orders-sala-venta")
       .on("postgres_changes", { event:"*", schema:"pos", table:"orders", filter:"register_id=eq." + register.id },
         () => loadOrdersPanel())
-      .subscribe();
+      .subscribe((status) => { if (status === "SUBSCRIBED") loadOrdersPanel(); });
   }
 
   let openOrderIds = new Set();
 
   function renderOrdersPanel(){
     const box = document.getElementById("orders-panel");
-    if (!pendingOrders.length) { box.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">Sin órdenes pendientes.</p>'; return; }
+    if (!pendingOrders.length) { box.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">' + posCore.esc(t("No pending orders.")) + '</p>'; return; }
     box.innerHTML = '<div class="orders-grid">' + pendingOrders.map(o => {
       const mins = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/60000));
       const cls = mins >= 5 ? "danger" : mins >= 2 ? "warn" : "";
@@ -573,7 +587,7 @@
     if (!cart[item.id]) cart[item.id] = { name: item.name, price: Number(item.price), qty: 0 };
     cart[item.id].qty += 1;
     if (item.track_stock && item.stock_qty !== null && cart[item.id].qty > item.stock_qty) {
-      showToast("⚠️ Solo quedan " + item.stock_qty + " unidades de " + item.name + " en stock.");
+      showToast(t("⚠️ Only {n} of {name} left in stock.", { n: item.stock_qty, name: item.name }));
     }
     renderCart();
   }
@@ -598,7 +612,7 @@
     const list = document.getElementById("cart-list");
     const keys = Object.keys(cart);
     if (keys.length === 0) {
-      list.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">Toca un ítem del menú para agregarlo.</p>';
+      list.innerHTML = '<p style="color:#9AA7B2; font-size:13px;">' + posCore.esc(t("Tap a menu item to add it.")) + '</p>';
     } else {
       list.innerHTML = keys.map(id => {
         const l = cart[id];
@@ -681,13 +695,13 @@
     Object.keys(cart).forEach(id => {
       const m = menu.find(x => x.id === id);
       if (m && m.track_stock && m.stock_qty !== null && cart[id].qty > m.stock_qty) {
-        warnings.push("• " + m.name + ": quedan " + m.stock_qty + ", estás vendiendo " + cart[id].qty);
+        warnings.push("• " + t("{name}: {left} left, you're selling {qty}", { name: m.name, left: m.stock_qty, qty: cart[id].qty }));
       }
     });
     if (!warnings.length) return true;
     return confirm(
-      "⚠️ Stock insuficiente:\n\n" + warnings.join("\n") +
-      "\n\n¿Vender igual? El stock va a quedar en negativo hasta que hagas el restock real (por ejemplo, si te llegó mercadería nueva que todavía no cargaste)."
+      t("⚠️ Not enough stock:") + "\n\n" + warnings.join("\n") + "\n\n" +
+      t("Sell anyway? Stock will go negative until you record the real restock (e.g. new stock arrived that isn't loaded yet).")
     );
   }
 
@@ -700,18 +714,18 @@
 
     if (received >= total) {
       const change = round2(received - total);
-      feedback.textContent = change > 0 ? ("Vuelto: " + posCore.money(change)) : "Pago exacto — sin vuelto.";
+      feedback.textContent = change > 0 ? t("Change: {amount}", { amount: posCore.money(change) }) : t("Exact amount — no change.");
       feedback.className = "cash-feedback ok";
-      btn.textContent = "Cobrar";
+      btn.textContent = t("Charge");
       btn.style.display = "block";
-      btn.onclick = () => { if (confirmStockOk()) finalizarCobro(total, 0, "efectivo", received); };
+      btn.onclick = () => { if (confirmStockOk()) finalizarCobro(total, 0, "cash", received); };
     } else {
       const remaining = round2(total - received);
-      feedback.textContent = "Faltan " + posCore.money(remaining);
+      feedback.textContent = t("{amount} still to pay", { amount: posCore.money(remaining) });
       feedback.className = "cash-feedback warn";
-      btn.textContent = "Cobrar " + posCore.money(received) + " efectivo + " + posCore.money(remaining) + " tarjeta";
+      btn.textContent = t("Charge {cash} cash + {card} card", { cash: posCore.money(received), card: posCore.money(remaining) });
       btn.style.display = "block";
-      btn.onclick = () => { if (confirmStockOk()) showCardConfirm(received, remaining, "mixto", received); };
+      btn.onclick = () => { if (confirmStockOk()) showCardConfirm(received, remaining, "split", received); };
     }
   }
 
@@ -719,18 +733,18 @@
     const total = cartTotal();
     if (total <= 0) return;
     if (!confirmStockOk()) return;
-    showCardConfirm(0, total, "tarjeta", 0);
+    showCardConfirm(0, total, "card", 0);
   }
 
   async function pagarCortesia(){
     const total = cartTotal();
     if (total <= 0) return;
     if (!confirmStockOk()) return;
-    const pin = prompt("PIN de supervisor para autorizar la cortesía:");
+    const pin = prompt(t("Supervisor PIN to authorise the complimentary sale:"));
     if (pin === null) return;
     const { data: ok } = await sb.rpc("verify_supervisor_pin", { p_register_id: register.id, p_pin: pin });
-    if (!ok) { showToast("PIN de supervisor incorrecto."); return; }
-    finalizarCobro(0, 0, "cortesia", 0, pin);
+    if (!ok) { showToast(t("Incorrect supervisor PIN.")); return; }
+    finalizarCobro(0, 0, "complimentary", 0, pin);
   }
 
   let cobrando = false;
@@ -749,20 +763,19 @@
   }
 
   function applyTestModeUI(){
-    document.getElementById("test-mode-toggle").textContent = "🧪 Modo prueba: " + (testMode ? "ON" : "OFF");
+    document.getElementById("test-mode-toggle").textContent = testMode ? t("🧪 Test mode: ON") : t("🧪 Test mode: OFF");
     document.getElementById("test-mode-banner").style.display = testMode ? "block" : "none";
   }
-  applyTestModeUI();
 
   async function finalizarCobro(cash, card, paymentMethod, receivedCash, supervisorPin){
     if (cobrando) return;
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
-    if (!activeEvent) { showToast("Primero inicia un evento."); return; }
+    if (!activeEvent) { showToast(t("Start an event first.")); return; }
 
     const customerName = document.getElementById("customer-name").value.trim();
     if (!customerName) {
-      showToast("Escribe el nombre del cliente antes de cobrar.");
+      showToast(t("Type the customer's name before charging."));
       document.getElementById("customer-name").focus();
       return;
     }
@@ -770,7 +783,7 @@
     cobrando = true;
     try {
       const eftposResult = await sendToEftpos(card);
-      if (!eftposResult.ok) { showToast("El terminal de pago no confirmó el cobro."); return; }
+      if (!eftposResult.ok) { showToast(t("The payment terminal didn't confirm the payment.")); return; }
 
       const obs = document.getElementById("obs").value.trim();
       // El navegador solo manda qué producto y cuánta cantidad — el precio,
@@ -789,7 +802,7 @@
       // No limpiamos currentTransactionId acá: si esto fue un error de red
       // (no una venta rechazada de verdad), el mismo id se reutiliza en el
       // próximo intento en vez de generar uno nuevo.
-      if (error || !order) { showToast("No se pudo registrar el pedido: " + (error ? error.message : "")); return; }
+      if (error || !order) { showError("Could not record the order", error); return; }
 
       currentTransactionId = null; // venta confirmada — la próxima usa un id nuevo
 
@@ -800,10 +813,9 @@
       document.getElementById("next-ticket").textContent = ticketNum + 1;
 
       // Imprime con order.items/order.total — lo que el servidor calculó y
-      // efectivamente guardó — nunca con el carrito local, que podría haber
-      // quedado desincronizado (precio viejo en caché, etc.).
+      // efectivamente guardó — nunca con el carrito local.
       printReceipt(ticketNum, order.items, order.total, obs, new Date(order.paid_at), cash, card, paymentMethod, customerName, receivedCash, testMode);
-      showToast((testMode ? "🧪 [PRUEBA] " : "") + "Pedido #" + ticketNum + " enviado a Entrega.");
+      showToast((testMode ? t("🧪 [TEST]") + " " : "") + t("Order #{n} sent to delivery.", { n: ticketNum }));
 
       if (testMode) { vaciarCarro(); return; }
 
@@ -818,7 +830,7 @@
           const m = menu.find(x => x.id === id);
           if (m && ((m.initial_stock > 0 && (m.stock_qty / m.initial_stock) <= 0.25) || m.stock_qty === 0)) low.push(m.name + " (" + m.stock_qty + ")");
         });
-        if (low.length) setTimeout(() => showToast("⚠️ Reponer stock: " + low.join(", ")), 1800);
+        if (low.length) setTimeout(() => showToast(t("⚠️ Restock: {items}", { items: low.join(", ") })), 1800);
       }
 
       if (document.getElementById("summary").style.display !== "none") renderSummary();
@@ -829,39 +841,43 @@
     }
   }
 
+  // La boleta se imprime en el idioma de la ORGANIZACIÓN (lo recibe el
+  // cliente), no en el del cajero.
   function printReceipt(ticketNum, items, total, obs, now, cash, card, paymentMethod, customerName, receivedCash, isTest){
-    const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
-    const isCortesia = paymentMethod === "cortesia";
-    function buildCopy(label){
-      let html = '<div class="receipt-copy"><h3>' + posCore.esc(posCore.org.name) + '</h3><h4>' + label + '</h4>';
-      if (isTest) html += '<div class="line" style="justify-content:center; font-weight:800; color:#A3271D;"><span>***** PRUEBA — NO ES UNA VENTA REAL *****</span></div>';
+    const rl = posCore.receiptLang();
+    const r = (text, params) => posCore.esc(t(text, params, rl));
+    const timeStr = posCore.fmtTime(now);
+    const isComp = paymentMethod === "complimentary";
+    function buildCopy(copyLabel){
+      let html = '<div class="receipt-copy"><h3>' + posCore.esc(posCore.org.name) + '</h3><h4>' + r(copyLabel) + '</h4>';
+      if (isTest) html += '<div class="line" style="justify-content:center; font-weight:800; color:#A3271D;"><span>' + r("***** TEST — NOT A REAL SALE *****") + '</span></div>';
       if (activeEvent) html += '<div class="line" style="justify-content:center; font-weight:600;"><span>' + posCore.esc(activeEvent.name) + '</span></div>';
-      html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
-      if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + posCore.esc(customerName) + '</span></div>';
-      if (operatorName) html += '<div class="line"><span class="iname">Atendió</span><span class="iprice">' + posCore.esc(operatorName) + '</span></div>';
+      html += '<div class="line"><b>' + r("Ticket #{n}", { n: ticketNum }) + '</b><span>' + timeStr + '</span></div>';
+      if (customerName) html += '<div class="line"><span class="iname">' + r("Customer") + '</span><span class="iprice">' + posCore.esc(customerName) + '</span></div>';
+      if (operatorName) html += '<div class="line"><span class="iname">' + r("Served by") + '</span><span class="iprice">' + posCore.esc(operatorName) + '</span></div>';
       html += '<hr>';
       items.forEach(l => {
         const promoTag = activePromoFor(l.id) ? " 🏷️" : "";
-        if (isCortesia) {
+        if (isComp) {
           html += '<div class="line"><span class="iname">' + l.qty + 'x ' + posCore.esc(l.name) + promoTag + '</span><span class="iprice"><s>' + posCore.money(l.subtotal) + '</s> ' + posCore.money(0) + '</span></div>';
         } else {
           html += '<div class="line"><span class="iname">' + l.qty + 'x ' + posCore.esc(l.name) + promoTag + '</span><span class="iprice">' + posCore.money(l.subtotal) + '</span></div>';
         }
       });
-      if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + posCore.esc(obs) + '</div>';
+      if (obs) html += '<hr><div class="obs"><b>' + r("NOTE:") + '</b> ' + posCore.esc(obs) + '</div>';
       html += '<hr>';
-      if (isCortesia) {
-        html += '<div class="line"><b>🎁 CORTESÍA — 100% DCTO.</b></div>';
-        html += '<div class="line"><span class="iname">Valor referencial</span><span class="iprice">' + posCore.money(total) + '</span></div>';
-        html += '<div class="line total"><span class="iname">TOTAL A PAGAR</span><span class="iprice">' + posCore.money(0) + '</span></div>';
+      if (isComp) {
+        html += '<div class="line"><b>' + r("🎁 COMPLIMENTARY — 100% OFF") + '</b></div>';
+        html += '<div class="line"><span class="iname">' + r("Reference value") + '</span><span class="iprice">' + posCore.money(total) + '</span></div>';
+        html += '<div class="line total"><span class="iname">' + r("TOTAL DUE") + '</span><span class="iprice">' + posCore.money(0) + '</span></div>';
       } else {
-        html += '<div class="line total"><span class="iname">TOTAL</span><span class="iprice">' + posCore.money(total) + '</span></div>';
-        if (paymentMethod === "mixto") {
-          html += '<div class="line"><span class="iname">Efectivo</span><span class="iprice">' + posCore.money(cash) + '</span></div>';
-          html += '<div class="line"><span class="iname">Tarjeta</span><span class="iprice">' + posCore.money(card) + '</span></div>';
-        } else if (paymentMethod === "efectivo" && receivedCash > total) {
-          html += '<div class="line"><span class="iname">Recibido</span><span class="iprice">' + posCore.money(receivedCash) + '</span></div>';
-          html += '<div class="line"><span class="iname">Vuelto</span><span class="iprice">' + posCore.money(posUtils.sumMoney([receivedCash, -total])) + '</span></div>';
+        html += '<div class="line total"><span class="iname">' + r("TOTAL") + '</span><span class="iprice">' + posCore.money(total) + '</span></div>';
+        if (paymentMethod === "split") {
+          html += '<div class="line"><span class="iname">' + r("Cash") + '</span><span class="iprice">' + posCore.money(cash) + '</span></div>';
+          html += '<div class="line"><span class="iname">' + r("Card") + '</span><span class="iprice">' + posCore.money(card) + '</span></div>';
+        } else if (paymentMethod === "cash" && receivedCash > total) {
+          html += '<div class="line"><span class="iname">' + r("Received") + '</span><span class="iprice">' + posCore.money(receivedCash) + '</span></div>';
+          html += '<div class="line"><span class="iname">' + r("Change") + '</span><span class="iprice">' + posCore.money(posUtils.sumMoney([receivedCash, -total])) + '</span></div>';
         }
       }
       html += '</div>';
@@ -869,10 +885,8 @@
     }
 
     // Se encola en vez de imprimir directo: si el pedido anterior todavía
-    // no termina sus dos copias (por ejemplo, porque el cajero todavía no
-    // confirma el diálogo de impresión de Windows), este pedido espera su
-    // turno en vez de mezclarse con el anterior.
-    printQueue.push({ copyBarra: buildCopy("COPIA BARRA"), copyCliente: buildCopy("COPIA CLIENTE") });
+    // no termina sus dos copias, este pedido espera su turno.
+    printQueue.push({ copyBarra: buildCopy("BAR COPY"), copyCliente: buildCopy("CUSTOMER COPY") });
     processPrintQueue();
   }
 
@@ -881,9 +895,7 @@
   let printingSince = 0;
 
   function processPrintQueue(){
-    // Si quedó "pegada" hace más de 10s (por ejemplo, la pestaña estuvo en
-    // segundo plano y el navegador retrasó el temporizador de seguridad),
-    // se destraba sola en vez de dejar de imprimir para siempre.
+    // Si quedó "pegada" hace más de 10s, se destraba sola.
     if (printingNow && Date.now() - printingSince > 10000) printingNow = false;
     if (printingNow || printQueue.length === 0) return;
     printingNow = true;
@@ -902,9 +914,7 @@
       }
       window.addEventListener("afterprint", finish);
       window.print();
-      // Red de seguridad: en algunos navegadores/config "afterprint" no
-      // dispara de forma confiable. Si no llega en unos segundos, seguimos
-      // igual — así nunca se queda pegado esperando la segunda copia.
+      // Red de seguridad: si "afterprint" no dispara, seguimos igual.
       setTimeout(finish, 4000);
     }
 
@@ -921,9 +931,9 @@
   async function anularUltimo(){
     if (!lastOrderId) return;
     const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: lastOrderId });
-    if (error) { showToast("No se pudo anular: " + error.message); return; }
+    if (error) { showError("Could not void", error); return; }
     document.getElementById("void-btn").style.display = "none";
-    showToast("Ticket #" + lastTicketNum + " anulado.");
+    showToast(t("Ticket #{n} voided.", { n: lastTicketNum }));
     lastOrderId = null;
   }
 
@@ -943,37 +953,36 @@
     query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
     const { data, error } = await query;
     if (error || !data || data.length === 0) {
-      results.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>Sin resultados" + (allEvents ? "" : " en este evento — prueba \"Buscar en todos los eventos\"") + ".</p>";
+      results.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>" + posCore.esc(allEvents ? t("No results.") : t("No results in this event — try \"Search all events\".")) + "</p>";
       return;
     }
     results.innerHTML = data.map(renderSearchRow).join("");
   }
 
   function renderSearchRow(o){
-    const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
     const itemsTxt = posCore.esc(o.items.map(it => it.qty + "x " + it.name).join(", "));
-    const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+    const timeTxt = posCore.fmtDayTime(o.paid_at);
     const evTxt = o.events ? posCore.esc(o.events.name) : "";
     return '<div class="search-row">' +
-      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
+      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || t("(no name)")) +
+        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + posCore.esc(posCore.label("status", o.status)) + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
-        (o.status !== "pendiente_entrega" ? '<button class="btn btn-secondary" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
-        (o.status !== "anulado" ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
+        (o.status !== "pending_delivery" ? '<button class="btn btn-secondary" onclick="reabrirPedido(\'' + o.id + '\')">' + posCore.esc(t("Reopen")) + '</button>' : '') +
+        (o.status !== "voided" ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">' + posCore.esc(t("Void")) + '</button>' : '') +
       '</div></div>';
   }
 
   async function reabrirPedido(id){
     const { error } = await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: id });
-    if (error) { showToast("No se pudo reabrir: " + error.message); return; }
-    showToast("Pedido reabierto — vuelve a aparecer en Entrega.");
+    if (error) { showError("Could not reopen", error); return; }
+    showToast(t("Order reopened — it's back on the Delivery screen."));
     buscarTicket();
   }
 
   async function anularPedidoBuscado(id){
     const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: id });
-    if (error) { showToast("No se pudo anular: " + error.message); return; }
-    showToast("Pedido anulado.");
+    if (error) { showError("Could not void", error); return; }
+    showToast(t("Order voided."));
     buscarTicket();
   }
 
@@ -985,13 +994,14 @@
   }
 
   async function renderSummary(){
-    if (!activeEvent) { document.getElementById("summary-body").innerHTML = "<p>No hay evento activo.</p>"; return; }
-    const { data: orders } = await sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","anulado").eq("is_test", false);
     const body = document.getElementById("summary-body");
-    if (!orders || orders.length === 0) { body.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>Aún no hay ventas en este evento.</p>"; return; }
+    if (!activeEvent) { body.innerHTML = "<p>" + posCore.esc(t("No active event.")) + "</p>"; return; }
+    body.innerHTML = posCore.esc(t("Loading…"));
+    const { data: orders } = await sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","voided").eq("is_test", false);
+    if (!orders || orders.length === 0) { body.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>" + posCore.esc(t("No sales in this event yet.")) + "</p>"; return; }
 
-    const paid = orders.filter(o => o.payment_method !== "cortesia");
-    const courtesy = orders.filter(o => o.payment_method === "cortesia");
+    const paid = orders.filter(o => o.payment_method !== "complimentary");
+    const courtesy = orders.filter(o => o.payment_method === "complimentary");
     // Sumas en centavos enteros: sin errores de punto flotante.
     const C = posUtils.toCents;
     let totalC = 0, cashC = 0, cardC = 0;
@@ -1007,20 +1017,19 @@
     });
     const total = posUtils.fromCents(totalC), cash = posUtils.fromCents(cashC), card = posUtils.fromCents(cardC);
 
-    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">Total vendido: ' + posCore.money(total) + '</p>';
-    html += '<p style="font-size:13px; color:var(--muted);">Efectivo: ' + posCore.money(cash) + ' &nbsp;|&nbsp; Tarjeta: ' + posCore.money(card) + '</p>';
-    html += '<table class="tbl"><tr><th>Producto</th><th>Cant.</th><th>Total</th></tr>';
+    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">' + posCore.esc(t("Total sold: {amount}", { amount: posCore.money(total) })) + '</p>';
+    html += '<p style="font-size:13px; color:var(--muted);">' + posCore.esc(t("Cash: {cash} | Card: {card}", { cash: posCore.money(cash), card: posCore.money(card) })) + '</p>';
+    html += '<table class="tbl"><tr><th>' + posCore.esc(t("Product")) + '</th><th>' + posCore.esc(t("Qty")) + '</th><th>' + posCore.esc(t("Total")) + '</th></tr>';
     Object.keys(byProduct).sort((a,b) => byProduct[b].totalC - byProduct[a].totalC).forEach(name => {
       html += '<tr><td>' + posCore.esc(name) + '</td><td>' + byProduct[name].qty + '</td><td>' + posCore.money(posUtils.fromCents(byProduct[name].totalC)) + '</td></tr>';
     });
     html += '</table>';
     if (courtesy.length){
-      html += '<p style="font-weight:600; margin-top:14px;">🎁 Cortesías entregadas (' + courtesy.length + ')</p>';
-      html += '<table class="tbl"><tr><th>Cliente</th><th>Ticket</th><th>Hora</th><th>Productos</th></tr>';
+      html += '<p style="font-weight:600; margin-top:14px;">' + posCore.esc(t("🎁 Complimentary sales ({n})", { n: courtesy.length })) + '</p>';
+      html += '<table class="tbl"><tr><th>' + posCore.esc(t("Customer")) + '</th><th>' + posCore.esc(t("Ticket")) + '</th><th>' + posCore.esc(t("Time")) + '</th><th>' + posCore.esc(t("Products")) + '</th></tr>';
       courtesy.forEach(o => {
         const itemsTxt = posCore.esc(o.items.map(it => it.qty + "x " + it.name).join(", "));
-        const horaTxt = new Date(o.paid_at).toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
-        html += '<tr><td>' + posCore.esc(o.customer_name || "(sin nombre)") + '</td><td>#' + o.ticket_num + '</td><td>' + horaTxt + '</td><td>' + itemsTxt + '</td></tr>';
+        html += '<tr><td>' + posCore.esc(o.customer_name || t("(no name)")) + '</td><td>#' + o.ticket_num + '</td><td>' + posCore.fmtTime(o.paid_at) + '</td><td>' + itemsTxt + '</td></tr>';
       });
       html += '</table>';
     }
@@ -1029,17 +1038,19 @@
 
   function csvField(val){ return posUtils.csvField(val); }
 
+  // CSV con encabezados y códigos FIJOS en inglés (no dependen del idioma
+  // de la pantalla): así un contador puede importarlo siempre igual.
   async function exportarCSV(){
     const allEvents = document.getElementById("csv-all-events").checked;
-    let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).neq("status","anulado").eq("is_test", false);
+    let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).neq("status","voided").eq("is_test", false);
     if (!allEvents && activeEvent) query = query.eq("event_id", activeEvent.id);
-    const { data: orders } = await query;
-    const rows = [["Evento","Fecha","Ticket","Hora","Cliente","Producto","Cantidad","PrecioUnitario","Subtotal","TotalTicket","MetodoPago","Efectivo","Tarjeta","Estado","Observacion"]];
+    const { data: orders, error } = await query;
+    if (error) { showError("Could not export", error); return; }
+    const rows = [["Event","Date","Ticket","Time","Customer","Product","Quantity","UnitPrice","Subtotal","TicketTotal","PaymentMethod","Cash","Card","Status","Note"]];
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";
-      const paidDate = new Date(o.paid_at);
-      const fecha = paidDate.toLocaleDateString("es-CL");
-      const hora = paidDate.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+      const fecha = posCore.fmtDate(o.paid_at);
+      const hora = posCore.fmtTimeSec(o.paid_at);
       o.items.forEach(it => {
         const m2 = v => Number(v || 0).toFixed(2); // montos siempre con 2 decimales
         rows.push([evName, fecha, o.ticket_num, hora, o.customer_name||"", it.name, it.qty, m2(it.price), m2(it.subtotal), m2(o.total), o.payment_method, m2(o.cash_amount), m2(o.card_amount), o.status, o.obs||""]);
@@ -1048,8 +1059,8 @@
     const csv = rows.map(r => r.map(csvField).join(",")).join("\n");
     const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const suffix = (!allEvents && activeEvent) ? "_" + activeEvent.name.replace(/[^a-zA-Z0-9]+/g,"_") : "_todos_los_eventos";
-    const a = document.createElement("a"); a.href = url; a.download = "ventas_productos" + suffix + ".csv";
+    const suffix = (!allEvents && activeEvent) ? "_" + activeEvent.name.replace(/[^a-zA-Z0-9]+/g,"_") : "_all_events";
+    const a = document.createElement("a"); a.href = url; a.download = "sales_products" + suffix + ".csv";
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 

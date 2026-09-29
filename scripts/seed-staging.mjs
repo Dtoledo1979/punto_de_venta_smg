@@ -19,11 +19,11 @@ const PROD_REF = "umbkpzhgocryhcbbczhr";
 const ORG = { name: "South Media Group", slug: "south-media" };
 const LOCATIONS = [
   { name: "Christchurch", registers: [
-    { name: "Barra Principal", type: "producto" },
+    { name: "Barra Principal", type: "product" },
     { name: "Boletería", type: "ticket" },
   ] },
   { name: "Wellington", registers: [
-    { name: "Barra Wellington", type: "producto" },
+    { name: "Barra Wellington", type: "product" },
   ] },
 ];
 
