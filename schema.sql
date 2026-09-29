@@ -860,6 +860,13 @@ begin
 
   update pos.orders set status = 'anulado' where id = p_order_id and register_id = p_register_id;
 
+  -- Los pedidos de PRUEBA (is_test) nunca descontaron stock real al
+  -- crearse (ver create_order), así que anularlos tampoco puede reponer
+  -- stock real — si no, se le suma stock a un producto que nunca perdió
+  -- nada. Este chequeo es justamente lo que faltaba antes: create_order
+  -- ya distinguía is_test, pero void_order no lo hacía.
+  if not coalesce(v_order.is_test, false) then
+
   -- Reponer el stock de productos e insumos que create_order() había
   -- descontado al vender — antes esto no se hacía y anular un pedido
   -- dejaba el inventario permanentemente más bajo de lo real.
@@ -897,6 +904,8 @@ begin
     end loop;
   end if;
 
+  end if; -- not is_test
+
   return true;
 end;
 $$;
@@ -924,7 +933,9 @@ begin
   -- el stock/insumos (void_order se los había devuelto) — usando la misma
   -- foto de consumo original, no la receta actual — si no, el producto
   -- queda contado dos veces: una vez como repuesto y otra como vendido.
-  if v_order.status = 'anulado' then
+  -- Los pedidos de PRUEBA nunca tocaron stock real, así que reabrirlos
+  -- tampoco debe hacerlo.
+  if v_order.status = 'anulado' and not coalesce(v_order.is_test, false) then
     for v_item in select * from jsonb_array_elements(v_order.items) loop
       if v_item ? 'id' then
         v_sold_qty := coalesce((v_item->>'qty')::numeric, 0);
