@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Iniciar sesión — POS</title>
-<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", publicPage: true };</script>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", publicPage: true };
+// supabase-js limpia el #... del link del email apenas lo procesa: se guarda antes.
+window.POS_INITIAL_HASH = location.hash;</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -150,14 +152,30 @@
   });
 
   // Link del email de recuperación: Supabase abre esta página con una
-  // sesión temporal y dispara PASSWORD_RECOVERY.
+  // sesión temporal (#...type=recovery) y dispara PASSWORD_RECOVERY.
+  const initialHash = new URLSearchParams((window.POS_INITIAL_HASH || "").replace(/^#/, ""));
+  const isRecovery = initialHash.get("type") === "recovery";
+  const linkError = initialHash.get("error_code");
+
   sb.auth.onAuthStateChange((event) => {
     if (event === "PASSWORD_RECOVERY") show("form-reset");
   });
 
-  // Si ya hay sesión (y no es una recuperación), no mostrar el login.
   sb.auth.getSession().then(({ data }) => {
-    if (data.session && !/type=recovery/.test(location.hash)) location.replace(safeNext());
+    if (linkError) {
+      show("form-forgot");
+      setMsg(linkError === "otp_expired"
+        ? "El link expiró o ya se usó. Pide uno nuevo."
+        : "El link no es válido (" + linkError + "). Pide uno nuevo.");
+      return;
+    }
+    if (isRecovery) {
+      if (data.session) show("form-reset");
+      else { show("form-forgot"); setMsg("El link expiró o ya se usó. Pide uno nuevo."); }
+      return;
+    }
+    // Ya hay sesión: no mostrar el login.
+    if (data.session) location.replace(safeNext());
   });
 </script>
 </body>
