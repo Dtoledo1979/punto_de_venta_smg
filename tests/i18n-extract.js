@@ -45,6 +45,9 @@ export function spanishLeftovers(src, file) {
   const lines = noComments.split("\n");
   const spanish = /[áéíóúñ¿¡]|\b(?:el|la|los|las|del|para|con|por|una|caja|pedido|evento|cobrar|entrega|insumo)\b/i;
   lines.forEach((line, i) => {
+    // Texto marcado explícitamente como español (ej. el nombre del idioma
+    // en su propio idioma dentro de un selector): es intencional.
+    if (/\slang="es"/.test(line)) return;
     // Literales de JS en la línea
     for (const m of line.matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g)) {
       const s = m[2];

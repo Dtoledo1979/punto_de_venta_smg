@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set up your business</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", noOrgPage: true }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0E1116; --surface:#FFFFFF; --ink:#12161C; --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333; --border:#E2E6EA; --r-md:10px; }
+  *{box-sizing:border-box;}
+  body{margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:'Inter',Arial,sans-serif; padding:24px 16px;}
+  .top{display:flex; align-items:center; justify-content:space-between; gap:10px; max-width:560px; margin:0 auto 14px; color:#C9D3DC;}
+  .card{background:var(--surface); border-radius:16px; padding:24px; max-width:560px; margin:0 auto;}
+  h1{font-family:'Sora',sans-serif; font-size:21px; margin:0 0 6px;}
+  h2{font-family:'Sora',sans-serif; font-size:15px; margin:20px 0 4px;}
+  p.sub{color:var(--muted); font-size:13.5px; margin:0 0 8px;}
+  label{display:block; font-size:13px; font-weight:600; margin:12px 0 5px;}
+  small{display:block; color:var(--muted); font-size:12px; margin-top:4px; font-weight:400;}
+  input, select{width:100%; font-size:16px; padding:11px; border:1px solid var(--border); border-radius:var(--r-md); font-family:inherit;}
+  .row{display:flex; gap:10px;} .row > div{flex:1;}
+  button.primary{width:100%; margin-top:22px; min-height:50px; font-size:16px; font-weight:700; border:0; border-radius:var(--r-md); background:var(--accent); color:var(--accent-ink); cursor:pointer;}
+  button.primary:disabled{opacity:.6; cursor:wait;}
+  .msg{margin-top:14px; font-size:13.5px; padding:10px 12px; border-radius:var(--r-md); display:none;}
+  .msg.error{display:block; background:#FDECEA; color:#A3271D;}
+  .top a{color:#C9D3DC; cursor:pointer; text-decoration:underline; font-size:13px;}
+  .top select{width:auto; font-size:13px; padding:3px 6px;}
+</style>
+</head>
+<body>
+<div class="top"><span id="who"></span><span><span id="lang-slot"></span> <a id="logout" data-i18n>Sign out</a></span></div>
+<div class="card">
+  <h1 data-i18n>Set up your business</h1>
+  <p class="sub" data-i18n>A few details and you can start selling. You can change all of this later. Your free trial lasts 14 days.</p>
+  <form id="f" novalidate>
+    <h2 data-i18n>Business</h2>
+    <label for="name" data-i18n>Business name</label>
+    <input id="name" required>
+    <label for="slug"><span data-i18n>Short name (for your account)</span> <small data-i18n>Lowercase letters, numbers and dashes.</small></label>
+    <input id="slug" required pattern="[a-z0-9-]{3,40}">
+    <div class="row">
+      <div><label for="currency" data-i18n>Currency</label>
+        <select id="currency"><option value="NZD">NZD</option><option value="AUD">AUD</option><option value="USD">USD</option></select></div>
+      <div><label for="language" data-i18n>Receipt language</label>
+        <select id="language"><option value="en">English</option><option value="es" lang="es">Español</option></select></div>
+    </div>
+    <div class="row">
+      <div><label for="tax-rate"><span data-i18n>GST rate (%)</span> <small data-i18n>Prices include it.</small></label>
+        <input id="tax-rate" type="number" step="0.01" min="0" max="99" value="15"></div>
+      <div><label for="tax-number"><span data-i18n>GST number</span> <small data-i18n>Optional — printed on receipts.</small></label>
+        <input id="tax-number"></div>
+    </div>
+    <label for="sup-pin"><span data-i18n>Supervisor PIN</span> <small data-i18n>4 to 8 digits. Authorises complimentary sales and refunds.</small></label>
+    <input id="sup-pin" type="password" inputmode="numeric" maxlength="8" required>
+
+    <h2 data-i18n>First location and register</h2>
+    <label for="location" data-i18n>Location name</label>
+    <input id="location" placeholder="e.g. Main cart" data-i18n-ph required>
+    <div class="row">
+      <div><label for="register" data-i18n>Register name</label>
+        <input id="register" placeholder="e.g. Front counter" data-i18n-ph required></div>
+      <div><label for="type" data-i18n>Register type</label>
+        <select id="type"><option value="product" data-i18n>Products (with Delivery)</option><option value="ticket" data-i18n>Tickets (delivered when charged)</option></select></div>
+    </div>
+    <div class="row">
+      <div><label for="reg-pin"><span data-i18n>Register PIN</span> <small data-i18n>4 to 8 digits, to sell.</small></label>
+        <input id="reg-pin" type="password" inputmode="numeric" maxlength="8" required></div>
+      <div><label for="del-pin"><span data-i18n>Delivery PIN</span> <small data-i18n>4 to 8 digits.</small></label>
+        <input id="del-pin" type="password" inputmode="numeric" maxlength="8" required></div>
+    </div>
+    <button class="primary" id="go" type="submit" data-i18n>Create my business</button>
+    <div id="msg" class="msg" role="status"></div>
+  </form>
+</div>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
+<script src="/js/pos-core.js"></script>
+<script>
+  const sb = posCore.sb;
+  const $ = (id) => document.getElementById(id);
+  const PIN = /^[0-9]{4,8}$/;
+
+  function setMsg(text){ const m = $("msg"); m.textContent = text; m.className = "msg" + (text ? " error" : ""); }
+  const slugify = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  let slugTouched = false;
+  $("name").addEventListener("input", () => { if (!slugTouched) $("slug").value = slugify($("name").value); });
+  $("slug").addEventListener("input", () => { slugTouched = true; });
+
+  $("f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = (id) => $(id).value.trim();
+    if (!v("name") || !v("location") || !v("register")) { setMsg(t("Fill in the business, location and register names.")); return; }
+    if (!/^[a-z0-9-]{3,40}$/.test(v("slug"))) { setMsg(t("The short name must be 3 to 40 lowercase letters, numbers or dashes.")); return; }
+    if (!PIN.test(v("sup-pin")) || !PIN.test(v("reg-pin")) || !PIN.test(v("del-pin"))) { setMsg(t("Each PIN must be 4 to 8 digits.")); return; }
+    const rate = Number(v("tax-rate"));
+    if (!Number.isFinite(rate) || rate < 0 || rate >= 100) { setMsg(t("Enter a valid GST rate.")); return; }
+    $("go").disabled = true; setMsg("");
+
+    const { data: org, error: e1 } = await sb.rpc("create_organization", {
+      p_name: v("name"), p_slug: v("slug"), p_supervisor_pin: v("sup-pin"), p_language: $("language").value,
+      p_locale: "en-NZ", p_currency: $("currency").value, p_tax_rate: Math.round(rate * 100) / 10000, p_tax_number: v("tax-number") || null,
+    });
+    if (e1) { $("go").disabled = false; setMsg(posCore.errorText(e1)); return; }
+    const { data: loc, error: e2 } = await sb.rpc("create_location", { p_org_id: org.id, p_name: v("location") });
+    if (e2) { $("go").disabled = false; setMsg(posCore.errorText(e2)); return; }
+    const { error: e3 } = await sb.rpc("create_register", { p_location_id: loc.id, p_name: v("register"), p_type: $("type").value, p_pin: v("reg-pin"), p_despacho_pin: v("del-pin") });
+    if (e3) { $("go").disabled = false; setMsg(posCore.errorText(e3)); return; }
+    try { localStorage.setItem("pos_org_id", org.id); } catch (_) { /* sin storage */ }
+    location.replace("/insumos.html#welcome");
+  });
+
+  posCore.ready.then(() => {
+    $("who").textContent = posCore.user.email;
+    $("lang-slot").innerHTML = posCore.langSelect();
+    $("lang-slot").querySelector("select").addEventListener("change", (e) => posCore.setLang(e.target.value));
+    $("logout").onclick = () => posCore.logout();
+    $("name").focus();
+  });
+</script>
+</body>
+</html>

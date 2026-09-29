@@ -114,6 +114,7 @@
     <button class="tab-btn" data-tab="productos" onclick="switchTab('productos')"><span data-i18n>📋 Products</span></button>
     <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')"><span data-i18n>🧪 Ingredients</span></button>
     <button class="tab-btn" data-tab="stocktake" onclick="switchTab('stocktake'); renderStocktake();"><span data-i18n>📋 Stocktake</span></button>
+    <button class="tab-btn" data-tab="team" id="team-tab-btn" style="display:none;" onclick="switchTab('team'); loadTeam();"><span data-i18n>👥 Team</span></button>
     <button class="tab-btn" data-tab="audit" id="audit-tab-btn" style="display:none;" onclick="switchTab('audit'); loadAudit();"><span data-i18n>🛡️ Audit log</span></button>
   </div>
 
@@ -163,6 +164,23 @@
     <p class="sub" data-i18n>Count what's physically there. The system records what it expected, what you counted and the difference for each item, then sets the stock to your count.</p>
     <div id="stocktake-form"></div>
     <div id="stocktake-history" style="margin-top:14px;"></div>
+  </div>
+  </div>
+
+  <div id="tab-team" class="tab-panel" style="display:none;">
+  <div class="card">
+    <h2 data-i18n>👥 Team</h2>
+    <p class="sub" data-i18n>Who can sign in to your business and what they can do. Staff sell and deliver; managers also see the audit log; admins manage registers, PINs and the team.</p>
+    <div id="team-list"></div>
+    <div class="add-form">
+      <input type="email" id="new-member-email" placeholder="Email of an existing account" data-i18n-ph>
+      <select id="new-member-role" style="padding:8px; border:1px solid var(--border); border-radius:7px;">
+        <option value="staff" data-i18n>Staff</option><option value="manager" data-i18n>Manager</option><option value="admin" data-i18n>Admin</option>
+      </select>
+      <button class="btn btn-primary" onclick="addMember()" data-i18n>Add to team</button>
+    </div>
+    <p class="qty-sub" style="margin-top:8px;" data-i18n>The person needs an account first (they can create one from the sign-in screen).</p>
+    <div id="plan-box" class="qty-sub" style="margin-top:14px;"></div>
   </div>
   </div>
 
@@ -298,6 +316,12 @@
 
   async function afterUnlock() {
     if (["owner","admin","manager"].includes(posCore.role)) document.getElementById("audit-tab-btn").style.display = "";
+    if (posCore.isAdmin()) document.getElementById("team-tab-btn").style.display = "";
+    if (location.hash === "#welcome") {
+      showToast(t("Your business is ready! Add your products below, then open the register to start selling."));
+      switchTab("productos");
+      history.replaceState(null, "", location.pathname);
+    }
     await loadMenu();
     await loadIngredients();
     renderAll();
@@ -988,6 +1012,47 @@
     if (!data.length) { box.innerHTML = "<p class='qty-sub'>" + E(t("No entries yet.")) + "</p>"; return; }
     box.innerHTML = '<table class="tbl"><tr><th>' + E(t("Date")) + '</th><th>' + E(t("Action")) + '</th><th>' + E(t("Details")) + '</th><th>' + E(t("Who")) + '</th></tr>' +
       data.map(a => '<tr><td>' + posCore.fmtDayTime(a.created_at) + '</td><td>' + E(posCore.label("audit", a.action)) + '</td><td>' + E(auditSummary(a)) + '</td><td>' + E(a.operator_name || "—") + '</td></tr>').join("") + '</table>';
+  }
+
+  // ---------------------------------------------------------------------
+  // Equipo (owner/admin; la base lo verifica)
+  // ---------------------------------------------------------------------
+  async function loadTeam(){
+    const box = document.getElementById("team-list");
+    box.textContent = t("Loading…");
+    const { data, error } = await sb.rpc("list_members", { p_org_id: posCore.orgId });
+    if (error) { box.textContent = posCore.errorText(error); return; }
+    const me = posCore.user.id;
+    box.innerHTML = '<table class="tbl"><tr><th>' + E(t("Email")) + '</th><th>' + E(t("Role")) + '</th><th>' + E(t("Status")) + '</th><th></th></tr>' +
+      data.map(m => '<tr><td>' + E(m.email) + (m.user_id === me ? ' <span class="qty-sub">(' + E(t("you")) + ')</span>' : '') + '</td>' +
+        '<td><select data-user="' + m.user_id + '" class="member-role" style="padding:5px; border:1px solid var(--border); border-radius:6px;"' + (m.user_id === me ? " disabled" : "") + '>' +
+          ["owner","admin","manager","staff"].map(r => '<option value="' + r + '"' + (m.role === r ? " selected" : "") + '>' + E(posCore.label("role", r)) + '</option>').join("") + '</select></td>' +
+        '<td>' + E(m.status === "active" ? t("Active") : t("Disabled")) + '</td>' +
+        '<td>' + (m.user_id === me ? '' : '<button class="reset-btn member-toggle" data-user="' + m.user_id + '" data-status="' + (m.status === "active" ? "disabled" : "active") + '">' +
+          E(m.status === "active" ? t("Disable") : t("Enable")) + '</button>') + '</td></tr>').join("") + '</table>';
+    box.querySelectorAll(".member-role").forEach(sel => sel.onchange = () => setMember(sel.dataset.user, sel.value, null));
+    box.querySelectorAll(".member-toggle").forEach(btn => btn.onclick = () => setMember(btn.dataset.user, null, btn.dataset.status));
+
+    const { data: ent } = await sb.rpc("org_entitlements", { p_org_id: posCore.orgId });
+    if (ent) document.getElementById("plan-box").textContent = t("Plan: {plan} ({status}) · locations {l}/{lm} · registers {r}/{rm}", {
+      plan: ent.plan, status: ent.status, l: ent.usage.locations, lm: ent.limits.locations, r: ent.usage.registers, rm: ent.limits.registers });
+  }
+
+  async function setMember(userId, role, status){
+    const { error } = await sb.rpc("set_member_role", { p_org_id: posCore.orgId, p_user_id: userId, p_role: role, p_status: status });
+    if (error) showError("Could not update the member", error);
+    else showToast(t("Team updated."));
+    loadTeam();
+  }
+
+  async function addMember(){
+    const email = document.getElementById("new-member-email").value.trim();
+    if (!email) { showToast(t("Type your email.")); return; }
+    const { error } = await sb.rpc("add_member", { p_org_id: posCore.orgId, p_email: email, p_role: document.getElementById("new-member-role").value });
+    if (error) { showError("Could not add the member", error); return; }
+    document.getElementById("new-member-email").value = "";
+    showToast(t("{email} added to the team.", { email }));
+    loadTeam();
   }
 
   posCore.ready.then(init);

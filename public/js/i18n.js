@@ -47,6 +47,7 @@
     role: { owner: "Owner", admin: "Admin", manager: "Manager", staff: "Staff" },
     reason: { wrong_item: "Wrong item", quality: "Quality issue", changed_mind: "Customer changed their mind", overcharged: "Overcharged", other: "Other" },
     payment_status: { approved: "Approved", declined: "Declined", cancelled: "Cancelled", voided: "Voided" },
+    limit: { locations: "locations", registers: "registers" },
     station: { bar: "Bar", kitchen: "Kitchen", coffee: "Coffee", collection: "Collection", none: "No preparation" },
     waste_reason: { spillage: "Spillage", breakage: "Breakage", expired: "Expired", staff: "Staff consumption", prep_error: "Preparation error", other: "Other" },
     audit: {
@@ -139,6 +140,12 @@
     "order.session_closed": "That sale belongs to a register that's already closed — refund it instead of voiding.",
     "org.invalid_tax_rate": "Invalid tax rate.",
     "station.invalid": "Invalid station.",
+    "subscription.limit_reached": "You've reached your plan's limit ({plan}: {limit} {what}).",
+    "subscription.inactive": "Your subscription isn't active, so the register can't open for real sales. Test mode still works.",
+    "org.too_many": "You already own the maximum number of businesses.",
+    "org.invalid_currency": "Invalid currency.",
+    "org.invalid_slug": "The short name must be 3 to 40 lowercase letters, numbers or dashes.",
+    "org.slug_taken": "That short name is already taken — try another.",
   };
 
   // Recibe el error de supabase-js ({ message, details, code }) y devuelve

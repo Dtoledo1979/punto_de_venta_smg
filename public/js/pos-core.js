@@ -104,7 +104,7 @@
     fmtDayTime(d) { return dtf({ day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(d)); },
     errorText(error) {
       return posI18n.errorText(error, (k, v) =>
-        ["paid", "total", "amount"].includes(k) ? core.money(v) : k === "method" ? core.label("payment", v) : v);
+        ["paid", "total", "amount"].includes(k) ? core.money(v) : k === "method" ? core.label("payment", v) : k === "what" ? core.label("limit", v) : v);
     },
     setLang(lang) {
       storage.set(LANG_KEY, lang);
@@ -122,6 +122,7 @@
     },
   };
   window.posCore = core;
+  core.langSelect = () => langSelect();
 
   const style = document.createElement("style");
   style.textContent = "html.pos-auth-pending body{visibility:hidden}" +
@@ -179,6 +180,27 @@
     }
   }
 
+  // Aviso de suscripción: días de prueba, prueba vencida o pago pendiente.
+  // (Informativo: la base de datos es la que impide abrir caja sin
+  // suscripción vigente.)
+  async function showSubscriptionBanner() {
+    const { data: e } = await sb.rpc("org_entitlements", { p_org_id: core.orgId });
+    if (!e) return;
+    core.entitlements = e;
+    let text = null, bad = false;
+    if (!e.can_operate) { text = core.t("Your subscription isn't active (trial ended or cancelled). You can look around and use test mode, but registers can't open for real sales."); bad = true; }
+    else if (e.status === "past_due") { text = core.t("Payment is overdue — please update your billing to avoid interruption."); bad = true; }
+    else if (e.status === "trialing" && e.trial_ends_at) {
+      const days = Math.max(0, Math.ceil((new Date(e.trial_ends_at) - Date.now()) / 86400000));
+      text = core.t("Free trial: {n} days left.", { n: days });
+    }
+    if (!text) return;
+    const div = document.createElement("div");
+    div.style.cssText = "text-align:center;font:600 13px Inter,Arial,sans-serif;padding:7px 12px;" + (bad ? "background:#FDECEA;color:#A3271D" : "background:#EEF8DA;color:#3A5200");
+    div.textContent = text;
+    document.body.insertBefore(div, document.body.firstChild);
+  }
+
   function showBlocked(message) {
     whenDomReady(() => {
       document.documentElement.classList.remove("pos-auth-pending");
@@ -201,8 +223,22 @@
 
     // La RLS ya oculta las organizaciones suspendidas (organizations viene null).
     core.memberships = (mems || []).filter((m) => m.organizations);
+
+    // Página de alta (onboarding): funciona con o sin organización.
+    if (env.noOrgPage) {
+      posI18n.setLang(storage.get(LANG_KEY) || "en");
+      await new Promise((resolve) => whenDomReady(resolve));
+      posI18n.translateDom();
+      document.documentElement.classList.remove("pos-auth-pending");
+      return core;
+    }
     if (!core.memberships.length) {
-      showBlocked(core.t("Your account ({email}) doesn't belong to any active organisation. Ask an administrator for access.", { email: session.user.email }));
+      if ((mems || []).length) {
+        showBlocked(core.t("Your organisation is suspended. Contact support to reactivate it."));
+        return new Promise(() => {});
+      }
+      // Cuenta nueva sin negocio: al alta guiada.
+      location.replace("/onboarding.html");
       return new Promise(() => {});
     }
 
@@ -221,6 +257,7 @@
     posI18n.translateDom();
     renderUserBar();
     document.documentElement.classList.remove("pos-auth-pending");
+    showSubscriptionBanner();
 
     // Sesión cerrada en otra pestaña o refresh token vencido → al login.
     sb.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") goToLogin(); });

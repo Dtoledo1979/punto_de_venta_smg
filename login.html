@@ -55,6 +55,20 @@ window.POS_INITIAL_HASH = location.hash;</script>
     <input id="password" type="password" autocomplete="current-password" required>
     <button type="submit" id="btn-login" data-i18n>Sign in</button>
     <button type="button" class="link" id="go-forgot" data-i18n>Forgot your password?</button>
+    <button type="button" class="link" id="go-signup" style="margin-left:14px;" data-i18n>Create an account</button>
+  </form>
+
+  <form id="form-signup" novalidate>
+    <h1 data-i18n>Create an account</h1>
+    <p class="sub" data-i18n>Start your 14-day free trial. We'll email you a link to confirm your address.</p>
+    <label for="su-email" data-i18n>Email</label>
+    <input id="su-email" type="email" autocomplete="username" required>
+    <label for="su-password" data-i18n>Password</label>
+    <input id="su-password" type="password" autocomplete="new-password" required>
+    <label for="su-password-2" data-i18n>Repeat it</label>
+    <input id="su-password-2" type="password" autocomplete="new-password" required>
+    <button type="submit" id="btn-signup" data-i18n>Create account</button>
+    <button type="button" class="link" id="go-login-2" data-i18n>← Back</button>
   </form>
 
   <form id="form-forgot" novalidate>
@@ -126,6 +140,25 @@ window.POS_INITIAL_HASH = location.hash;</script>
 
   $("go-forgot").onclick = () => { $("forgot-email").value = $("email").value; show("form-forgot"); };
   $("go-login").onclick = () => show("form-login");
+  $("go-signup").onclick = () => { $("su-email").value = $("email").value; show("form-signup"); };
+  $("go-login-2").onclick = () => show("form-login");
+
+  $("form-signup").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("su-email").value.trim(), p1 = $("su-password").value, p2 = $("su-password-2").value;
+    if (!email || !p1) { setMsg(t("Type your email and password.")); return; }
+    if (p1 !== p2) { setMsg(t("The passwords don't match.")); return; }
+    busy($("btn-signup"), true);
+    const { data, error } = await sb.auth.signUp({ email, password: p1, options: { emailRedirectTo: location.origin + "/onboarding.html" } });
+    busy($("btn-signup"), false);
+    if (error) {
+      setMsg(error.code === "signup_disabled" ? t("New accounts are by invitation for now. Contact us to get started.") : friendlyAuthError(error));
+      return;
+    }
+    // Con confirmación de email activada no hay sesión todavía.
+    if (data.session) { location.replace("/onboarding.html"); return; }
+    setMsg(t("Check your email to confirm your account, then sign in."), "ok");
+  });
 
   $("form-login").addEventListener("submit", async (e) => {
     e.preventDefault();
