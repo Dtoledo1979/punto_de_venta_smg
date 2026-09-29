@@ -568,7 +568,7 @@ begin
   end if;
 
   update pos.menu_items set track_stock = true, stock_qty = v_new_stock, initial_stock = v_new_initial
-    where id = p_item_id returning * into v_item;
+    where id = p_item_id and register_id = p_register_id returning * into v_item;
 
   insert into pos.stock_movements (menu_item_id, register_id, type, qty_change, qty_after, note, created_by)
     values (p_item_id, p_register_id, v_type, p_qty, v_new_stock, p_note, p_by);
@@ -648,7 +648,7 @@ begin
   end if;
 
   update pos.ingredients set stock_qty = v_new_stock, initial_stock = v_new_initial
-    where id = p_ingredient_id returning * into v_row;
+    where id = p_ingredient_id and register_id = p_register_id returning * into v_row;
 
   insert into pos.stock_movements (ingredient_id, register_id, type, qty_change, qty_after, created_by)
     values (p_ingredient_id, p_register_id, v_type, p_qty, v_new_stock, p_by);
@@ -664,9 +664,32 @@ grant execute on function pos.restock_ingredient(uuid, text, uuid, text, numeric
 -- ---------------------------------------------------------------------
 create or replace function pos.set_recipe(p_register_id uuid, p_pin text, p_menu_item_id uuid, p_recipe jsonb)
 returns boolean language plpgsql security definer set search_path = pos as $$
-declare v_line jsonb;
+declare
+  v_line jsonb;
+  v_menu_item pos.menu_items;
+  v_qty numeric;
 begin
   if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+
+  -- Integridad entre cajas (auditoría P1): antes esta función no validaba
+  -- en absoluto que el producto fuera de esta caja, ni que los insumos de
+  -- la receta también lo fueran — alguien con el PIN de una caja podía
+  -- reemplazar la receta de un producto de OTRA caja, con insumos de una
+  -- tercera. Ahora se valida todo antes de tocar nada.
+  select * into v_menu_item from pos.menu_items where id = p_menu_item_id and register_id = p_register_id;
+  if v_menu_item is null then raise exception 'Producto no encontrado en esta caja'; end if;
+
+  for v_line in select * from jsonb_array_elements(p_recipe) loop
+    if not exists (select 1 from pos.ingredients where id = (v_line->>'ingredient_id')::uuid and register_id = p_register_id) then
+      raise exception 'Un insumo de la receta no pertenece a esta caja';
+    end if;
+    v_qty := (v_line->>'qty_per_unit')::numeric;
+    if v_qty is null or v_qty <= 0 then
+      raise exception 'Cantidad de receta inválida para un insumo';
+    end if;
+  end loop;
+
+  -- Recién ahora, con todo validado, se reemplaza la receta completa.
   delete from pos.recipe_items where menu_item_id = p_menu_item_id;
   for v_line in select * from jsonb_array_elements(p_recipe) loop
     insert into pos.recipe_items (menu_item_id, ingredient_id, qty_per_unit)
@@ -687,6 +710,13 @@ create or replace function pos.upsert_promotion(
 declare v_row pos.promotions;
 begin
   if not pos.verify_register_pin(p_register_id, p_pin) then raise exception 'PIN incorrecto'; end if;
+
+  -- Integridad entre cajas: el producto de la promoción tiene que ser de
+  -- esta misma caja — antes no se validaba al crear una promoción nueva.
+  if not exists (select 1 from pos.menu_items where id = p_menu_item_id and register_id = p_register_id) then
+    raise exception 'Producto no encontrado en esta caja';
+  end if;
+
   if p_promotion_id is null then
     insert into pos.promotions (register_id, menu_item_id, name, bundle_qty, bundle_price, active, starts_at, ends_at)
       values (p_register_id, p_menu_item_id, p_name, p_bundle_qty, p_bundle_price, p_active, p_starts_at, p_ends_at)
@@ -697,6 +727,7 @@ begin
       active = p_active, starts_at = p_starts_at, ends_at = p_ends_at
     where id = p_promotion_id and register_id = p_register_id
     returning * into v_row;
+    if v_row is null then raise exception 'Promoción no encontrada en esta caja'; end if;
   end if;
   return v_row;
 end;
