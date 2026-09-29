@@ -42,17 +42,19 @@
     movement: {
       opening_stock: "Opening stock", purchase: "Restock", sale: "Sale", adjustment: "Adjustment",
       void_return: "Returned (void)", reopen_sale: "Deducted (reopen)", refund_return: "Returned (refund)",
+      waste: "Waste", stocktake: "Stocktake",
     },
     role: { owner: "Owner", admin: "Admin", manager: "Manager", staff: "Staff" },
     reason: { wrong_item: "Wrong item", quality: "Quality issue", changed_mind: "Customer changed their mind", overcharged: "Overcharged", other: "Other" },
     payment_status: { approved: "Approved", declined: "Declined", cancelled: "Cancelled", voided: "Voided" },
+    waste_reason: { spillage: "Spillage", breakage: "Breakage", expired: "Expired", staff: "Staff consumption", prep_error: "Preparation error", other: "Other" },
     audit: {
       "order.void": "Order voided", "order.reopen": "Order reopened", "order.complimentary": "Complimentary sale",
       "order.refund": "Refund", "payment.declined": "Card declined", "payment.cancelled": "Card payment cancelled",
       "menu.add": "Product added", "menu.update": "Product changed", "menu.remove": "Product removed",
       "recipe.change": "Recipe changed", "promotion.insert": "Promotion created", "promotion.update": "Promotion changed",
       "promotion.delete": "Promotion removed", "stock.opening_stock": "Opening stock", "stock.purchase": "Restock",
-      "stock.adjustment": "Stock adjustment", "register.create": "Register created", "register.update": "Register changed",
+      "stock.adjustment": "Stock adjustment", "stock.waste": "Waste", "stock.stocktake": "Stocktake", "register.create": "Register created", "register.update": "Register changed",
       "supervisor_pin.change": "Supervisor PIN changed", "member.add": "Member added", "member.update": "Member changed",
       "event.close": "Event closed", "event.reopen": "Event reopened", "ticket.reset_numbering": "Ticket numbering reset",
       "org.update": "Organisation changed",
@@ -117,6 +119,13 @@
     "refund.zero": "The refund amount must be greater than zero.",
     "refund.exceeds_method": "You can refund at most {amount} by {method}.",
     "audit.immutable": "The audit log can't be modified.",
+    "stock.invalid_target": "Choose one product or ingredient.",
+    "stock.invalid_qty": "Invalid quantity.",
+    "stock.invalid_reason": "Choose a reason.",
+    "stock.not_tracked": "Stock tracking isn't on for that item.",
+    "stocktake.empty": "Count at least one item.",
+    "stocktake.duplicate_item": "The same item was counted twice.",
+    "stocktake.immutable": "A stocktake can't be modified.",
   };
 
   // Recibe el error de supabase-js ({ message, details, code }) y devuelve

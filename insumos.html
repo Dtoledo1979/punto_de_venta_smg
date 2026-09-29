@@ -113,6 +113,7 @@
     <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')"><span data-i18n>Overview</span></button>
     <button class="tab-btn" data-tab="productos" onclick="switchTab('productos')"><span data-i18n>📋 Products</span></button>
     <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')"><span data-i18n>🧪 Ingredients</span></button>
+    <button class="tab-btn" data-tab="stocktake" onclick="switchTab('stocktake'); renderStocktake();"><span data-i18n>📋 Stocktake</span></button>
     <button class="tab-btn" data-tab="audit" id="audit-tab-btn" style="display:none;" onclick="switchTab('audit'); loadAudit();"><span data-i18n>🛡️ Audit log</span></button>
   </div>
 
@@ -156,6 +157,15 @@
     </div>
   </div>
   </div>
+  <div id="tab-stocktake" class="tab-panel" style="display:none;">
+  <div class="card">
+    <h2 data-i18n>📋 Stocktake</h2>
+    <p class="sub" data-i18n>Count what's physically there. The system records what it expected, what you counted and the difference for each item, then sets the stock to your count.</p>
+    <div id="stocktake-form"></div>
+    <div id="stocktake-history" style="margin-top:14px;"></div>
+  </div>
+  </div>
+
   <div id="tab-audit" class="tab-panel" style="display:none;">
   <div class="card">
     <h2 data-i18n>🛡️ Audit log</h2>
@@ -396,9 +406,11 @@
           '<a class="toggle" onclick="toggleHistorial(this,\'' + item.id + '\')">' + E(t("Stock history")) + '</a>' +
           '<a class="toggle" onclick="toggleReceta(this,\'' + item.id + '\')">' + E(t("🍹 Recipe")) + '</a>' +
           '<a class="toggle" onclick="togglePromo(this,\'' + item.id + '\')">' + E(t("🏷️ Promotion")) + (promotions.some(p=>p.menu_item_id===item.id) ? " ✓" : "") + '</a>' +
+          (item.track_stock ? '<a class="toggle" onclick="toggleWaste(this,\'product\',\'' + item.id + '\')">' + E(t("🗑️ Waste")) + '</a>' : '') +
         '</div>' +
         '<div class="recipe-box" style="display:none;"></div>' +
-        '<div class="promo-box" style="display:none;"></div>';
+        '<div class="promo-box" style="display:none;"></div>' +
+        '<div class="waste-box" style="display:none;"></div>';
 
       const [nameInput, priceInput] = wrap.querySelectorAll(".item-row input");
       nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
@@ -520,8 +532,9 @@
     if (error || !data || data.length === 0) { box.innerHTML = "<p class='qty-sub'>" + E(t("No movements recorded.")) + "</p>"; return; }
     box.innerHTML = '<table class="tbl"><tr><th>' + E(t("Date")) + '</th><th>' + E(t("Type")) + '</th><th>' + E(t("Change")) + '</th><th>' + E(t("Left")) + '</th><th>' + E(t("Who")) + '</th></tr>' +
       data.map(m => {
-        const change = (m.qty_change > 0 ? "+" : "") + m.qty_change;
-        return '<tr><td>' + posCore.fmtDayTime(m.created_at) + '</td><td>' + E(posCore.label("movement", m.type)) + '</td><td>' + change + '</td><td>' + m.qty_after + '</td><td>' + E(m.created_by||"—") + '</td></tr>';
+        const extra = m.type === "waste" && m.reason ? " (" + posCore.label("waste_reason", m.reason) + ")"
+          : m.type === "stocktake" && m.expected_qty !== null ? " (" + t("expected {expected}", { expected: Number(m.expected_qty) }) + ")" : "";
+        return '<tr><td>' + posCore.fmtDayTime(m.created_at) + '</td><td>' + E(posCore.label("movement", m.type) + extra) + '</td><td>' + (Number(m.qty_change) > 0 ? "+" : "") + Number(m.qty_change) + '</td><td>' + Number(m.qty_after) + '</td><td>' + E(m.created_by||"—") + '</td></tr>';
       }).join("") + '</table>';
   }
 
@@ -676,14 +689,17 @@
           '<input type="number" class="reset-input" placeholder="' + E(t("reset to")) + '">' +
           '<button class="reset-btn">' + E(t("Reset")) + '</button>' +
           '<input type="number" class="add-input" placeholder="' + E(t("add +")) + '">' +
+          (ing.container_size ? '<select class="add-unit"><option value="base">' + E(ing.unit) + '</option><option value="pack">' + E(ing.container_label || t("packs")) + ' (' + E(formatQty(ing.container_size, ing.unit)) + ')</option></select>' : '') +
           '<button class="add-btn">' + E(t("Add")) + '</button>' +
         '</div>' +
         '<div class="stock-history" style="display:none;"></div>' +
         '<div class="links-row" style="border-top:none; padding-top:4px;">' +
           '<a class="toggle" onclick="toggleHistorial(this,\'' + ing.id + '\')">' + E(t("History")) + '</a>' +
           '<a class="toggle" onclick="toggleEditIngredient(this,\'' + ing.id + '\')">' + E(t("✏️ Edit")) + '</a>' +
+          (hasStock ? '<a class="toggle" onclick="toggleWaste(this,\'ingredient\',\'' + ing.id + '\')">' + E(t("🗑️ Waste")) + '</a>' : '') +
         '</div>' +
-        '<div class="edit-ing-box" style="display:none;"></div>';
+        '<div class="edit-ing-box" style="display:none;"></div>' +
+        '<div class="waste-box" style="display:none;"></div>';
 
       wrap.querySelector(".del-btn").onclick = async () => {
         if (!confirm(t("Remove this ingredient?"))) return;
@@ -701,8 +717,11 @@
         await loadIngredients(); renderAll();
       };
       wrap.querySelector(".add-btn").onclick = async () => {
-        const qty = readQty(wrap.querySelector(".add-input"), "add", ing.unit);
+        let qty = readQty(wrap.querySelector(".add-input"), "add", ing.unit);
         if (qty === null) return;
+        // Reposición por envase: "2 botellas" de 700 ml = 1400 ml (se guarda en la unidad base).
+        const unitSel = wrap.querySelector(".add-unit");
+        if (unitSel && unitSel.value === "pack") qty = Math.round(qty * Number(ing.container_size) * 1000) / 1000;
         const { error } = await sb.rpc("restock_ingredient", { p_register_id: register.id, p_pin: myPin(), p_ingredient_id: ing.id, p_mode: "add", p_qty: qty, p_by: operatorName || null });
         if (error) { showError("Could not add stock", error); return; }
         showToast(t("{name}: stock added.", { name: ing.name }));
@@ -819,6 +838,103 @@
       if (error) { showError("Could not update the organisation", error); return; }
       showToast(t("Organisation language updated."));
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Merma: baja stock con motivo. Nunca es una venta.
+  // ---------------------------------------------------------------------
+  const WASTE_REASONS = ["spillage", "breakage", "expired", "staff", "prep_error", "other"];
+
+  function toggleWaste(linkEl, kind, id){
+    const box = linkEl.closest(".item-card").querySelector(".waste-box");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    const target = kind === "product" ? menu.find(m => m.id === id) : ingredients.find(i => i.id === id);
+    if (!target) return;
+    box.style.display = "block";
+    const unit = kind === "product" ? t("units") : target.unit;
+    box.innerHTML =
+      '<div class="stock-row" style="border-top:none; padding-top:0; flex-wrap:wrap;">' +
+        '<input type="number" class="waste-qty" min="0" step="any" placeholder="' + E(t("quantity")) + '" style="width:100px;"> <span class="qty-sub">' + E(unit) + '</span>' +
+        '<select class="waste-reason" style="padding:6px; border:1px solid var(--border); border-radius:6px;">' +
+          WASTE_REASONS.map(r => '<option value="' + r + '">' + E(posCore.label("waste_reason", r)) + '</option>').join("") + '</select>' +
+        '<input type="text" class="waste-note" placeholder="' + E(t("Note (optional)")) + '" style="flex:1; min-width:120px; padding:6px; border:1px solid var(--border); border-radius:6px;">' +
+        '<button class="reset-btn waste-save">' + E(t("Record waste")) + '</button>' +
+      '</div>' +
+      '<div class="qty-sub" style="margin-top:4px;">' + E(t("Waste reduces stock but is never a sale.")) + '</div>';
+    box.querySelector(".waste-save").onclick = async () => {
+      const qty = readQty(box.querySelector(".waste-qty"), "add", unit);
+      if (qty === null) return;
+      const { error } = await sb.rpc("record_waste", {
+        p_register_id: register.id, p_pin: myPin(),
+        p_menu_item_id: kind === "product" ? id : null, p_ingredient_id: kind === "ingredient" ? id : null,
+        p_qty: qty, p_reason: box.querySelector(".waste-reason").value,
+        p_note: box.querySelector(".waste-note").value.trim() || null, p_by: operatorName || null
+      });
+      if (error) { showError("Could not record the waste", error); return; }
+      showToast(t("Waste recorded: {qty} {unit} of {name}.", { qty, unit, name: target.name }));
+      if (kind === "product") await loadMenu(); else await loadIngredients();
+      renderAll();
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Toma de inventario
+  // ---------------------------------------------------------------------
+  function stocktakeItems(){
+    return [
+      ...menu.filter(m => m.track_stock).map(m => ({ kind: "menu_item", id: m.id, name: m.name, unit: t("units"), expected: Number(m.stock_qty || 0) })),
+      ...ingredients.filter(i => i.stock_qty != null).map(i => ({ kind: "ingredient", id: i.id, name: i.name, unit: i.unit, expected: Number(i.stock_qty) })),
+    ];
+  }
+
+  let stocktakeTx = null; // un id por toma: un doble toque no la registra dos veces
+
+  async function renderStocktake(){
+    const form = document.getElementById("stocktake-form");
+    const items = stocktakeItems();
+    if (!items.length) { form.innerHTML = "<p class='qty-sub'>" + E(t("No products or ingredients with stock tracking yet.")) + "</p>"; }
+    else {
+      stocktakeTx = crypto.randomUUID();
+      form.innerHTML = '<table class="tbl"><tr><th>' + E(t("Item")) + '</th><th>' + E(t("Expected")) + '</th><th>' + E(t("Counted")) + '</th><th>' + E(t("Difference")) + '</th></tr>' +
+        items.map((x, i) => '<tr><td>' + E(x.name) + '</td><td>' + E(x.expected + " " + x.unit) + '</td>' +
+          '<td><input type="number" min="0" step="any" class="st-count" data-i="' + i + '" style="width:90px; padding:6px; border:1px solid var(--border); border-radius:6px;"></td>' +
+          '<td class="st-var" data-i="' + i + '">—</td></tr>').join("") + '</table>' +
+        '<div class="qty-sub" style="margin:8px 0;">' + E(t("Leave blank what you didn't count — only counted items are saved.")) + '</div>' +
+        '<div class="stock-row" style="border-top:none;"><input type="text" id="st-note" placeholder="' + E(t("Note (optional)")) + '" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px;">' +
+        '<button class="add-btn" id="st-save">' + E(t("Save stocktake")) + '</button></div>';
+      form.oninput = (e) => {
+        if (!e.target.classList.contains("st-count")) return;
+        const i = Number(e.target.dataset.i), x = items[i], cell = form.querySelector('.st-var[data-i="' + i + '"]');
+        if (e.target.value === "") { cell.textContent = "—"; cell.style.color = ""; return; }
+        const v = Math.round((Number(e.target.value) - x.expected) * 1000) / 1000;
+        cell.textContent = (v > 0 ? "+" : "") + v;
+        cell.style.color = v === 0 ? "var(--ok)" : "var(--danger)";
+      };
+      document.getElementById("st-save").onclick = async () => {
+        const counts = [];
+        for (const inp of form.querySelectorAll(".st-count")) {
+          if (inp.value === "") continue;
+          const n = Number(inp.value);
+          if (!Number.isFinite(n) || n < 0) { showToast(t("Enter a valid quantity (0 or more).")); return; }
+          const x = items[Number(inp.dataset.i)];
+          counts.push(x.kind === "menu_item" ? { menu_item_id: x.id, counted: n } : { ingredient_id: x.id, counted: n });
+        }
+        if (!counts.length) { showToast(t("Count at least one item.")); return; }
+        const { data, error } = await sb.rpc("record_stocktake", {
+          p_register_id: register.id, p_pin: myPin(), p_counts: counts,
+          p_note: document.getElementById("st-note").value.trim() || null, p_by: operatorName || null, p_client_transaction_id: stocktakeTx
+        });
+        if (error) { showError("Could not save the stocktake", error); return; }
+        showToast(t("Stocktake saved: {n} items counted, {v} with a difference.", { n: data.items_counted, v: data.items_with_variance }));
+        await loadMenu(); await loadIngredients(); renderAll(); renderStocktake();
+      };
+    }
+    const { data: past } = await sb.from("stocktakes").select("created_at, items_counted, items_with_variance, operator_name, lines, note").eq("register_id", register.id).order("created_at", { ascending:false }).limit(5);
+    const hist = document.getElementById("stocktake-history");
+    hist.innerHTML = (past && past.length) ? '<h2 style="font-size:14px;">' + E(t("Recent stocktakes")) + '</h2>' + past.map(p =>
+      '<div class="qty-sub" style="padding:6px 0; border-bottom:1px solid var(--border);"><b>' + posCore.fmtDayTime(p.created_at) + '</b> · ' +
+      E(t("{n} items counted, {v} with a difference", { n: p.items_counted, v: p.items_with_variance })) + (p.operator_name ? ' · ' + E(p.operator_name) : '') +
+      (p.items_with_variance ? '<br>' + p.lines.filter(l => Number(l.variance) !== 0).map(l => E(l.name + ": " + (l.variance > 0 ? "+" : "") + Number(l.variance) + (l.unit ? " " + l.unit : ""))).join(" · ") : '') + '</div>').join("") : "";
   }
 
   // ---------------------------------------------------------------------

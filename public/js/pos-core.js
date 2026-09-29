@@ -53,7 +53,7 @@
     "set_recipe", "upsert_promotion", "delete_promotion",
     "create_order", "void_order", "reopen_order",
     "despacho_toggle_item", "despacho_confirm_all",
-    "record_payment_attempt", "refund_order",
+    "record_payment_attempt", "refund_order", "record_waste", "record_stocktake",
   ]);
   const rawRpc = sb.rpc.bind(sb);
   sb.rpc = function (fn, args, opts) {
