@@ -889,11 +889,23 @@ begin
     raise exception 'PIN incorrecto';
   end if;
 
-  select * into v_order from pos.orders where id = p_order_id and register_id = p_register_id;
-  if v_order is null then raise exception 'Pedido no encontrado'; end if;
-  if v_order.status = 'anulado' then return true; end if; -- ya estaba anulado: no repetir la reposición
+  -- Transición atómica: este UPDATE solo tiene efecto si el pedido NO
+  -- estaba ya anulado (todo en una sola sentencia, sin un select previo
+  -- por separado). Si dos dispositivos anulan el mismo pedido casi al
+  -- mismo tiempo, Postgres serializa el acceso a esa fila — la segunda
+  -- petición ve que ya no cumple la condición y su UPDATE no afecta
+  -- ninguna fila. Solo la petición cuyo UPDATE sí tuvo efecto continúa y
+  -- repone stock; la otra simplemente no hace nada más (idempotente).
+  update pos.orders
+    set status = 'anulado'
+    where id = p_order_id and register_id = p_register_id and status <> 'anulado'
+    returning * into v_order;
 
-  update pos.orders set status = 'anulado' where id = p_order_id and register_id = p_register_id;
+  if not found then
+    select * into v_order from pos.orders where id = p_order_id and register_id = p_register_id;
+    if v_order is null then raise exception 'Pedido no encontrado'; end if;
+    return true; -- ya estaba anulado (por esta misma llamada o por otra que ganó la carrera)
+  end if;
 
   -- Los pedidos de PRUEBA (is_test) nunca descontaron stock real al
   -- crearse (ver create_order), así que anularlos tampoco puede reponer
@@ -959,18 +971,32 @@ begin
     raise exception 'PIN incorrecto';
   end if;
 
-  select * into v_order from pos.orders where id = p_order_id and register_id = p_register_id;
-  if v_order is null then raise exception 'Pedido no encontrado'; end if;
+  -- Transición atómica igual que en void_order: este UPDATE solo tiene
+  -- efecto si el pedido estaba ANULADO. Si dos dispositivos reabren el
+  -- mismo pedido casi al mismo tiempo, solo uno consigue transicionarlo —
+  -- ese es el único que vuelve a descontar stock; el otro no hace nada
+  -- más (protege contra un doble descuento).
+  update pos.orders
+    set status = 'pendiente_entrega', delivered_at = null
+    where id = p_order_id and register_id = p_register_id and status = 'anulado'
+    returning * into v_order;
 
-  update pos.orders set status = 'pendiente_entrega', delivered_at = null where id = p_order_id and register_id = p_register_id;
+  if not found then
+    -- No estaba anulado (ej. estaba "entregado" y se reabre solo para
+    -- corregir algo) — no hay stock que reponer, solo cambia el estado.
+    update pos.orders
+      set status = 'pendiente_entrega', delivered_at = null
+      where id = p_order_id and register_id = p_register_id
+      returning * into v_order;
+    if v_order is null then raise exception 'Pedido no encontrado'; end if;
+    return true;
+  end if;
 
-  -- Si el pedido que se reabre estaba ANULADO, hay que volver a descontar
-  -- el stock/insumos (void_order se los había devuelto) — usando la misma
-  -- foto de consumo original, no la receta actual — si no, el producto
-  -- queda contado dos veces: una vez como repuesto y otra como vendido.
-  -- Los pedidos de PRUEBA nunca tocaron stock real, así que reabrirlos
-  -- tampoco debe hacerlo.
-  if v_order.status = 'anulado' and not coalesce(v_order.is_test, false) then
+  -- A partir de acá, esta llamada ganó la transición anulado→reabierto,
+  -- así que es la única responsable de volver a descontar. Los pedidos de
+  -- PRUEBA nunca tocaron stock real, así que reabrirlos tampoco debe
+  -- hacerlo.
+  if not coalesce(v_order.is_test, false) then
     for v_item in select * from jsonb_array_elements(v_order.items) loop
       if v_item ? 'id' then
         v_sold_qty := coalesce((v_item->>'qty')::numeric, 0);
