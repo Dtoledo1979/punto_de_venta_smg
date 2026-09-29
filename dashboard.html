@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — South Media Group</title>
+<title>Dashboard</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -57,7 +59,7 @@
 <div class="app-nav">
   <div class="brand">
     <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-    SOUTH MEDIA GROUP
+    <span id="org-word"></span>
   </div>
   <div class="links"><a href="index.html">Cambiar evento</a></div>
 </div>
@@ -87,32 +89,33 @@
   </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/pos-core.js"></script>
 <script>
-  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+  const sb = posCore.sb;
 
   const eventId = sessionStorage.getItem("pos_selected_event_id");
-  if (!eventId) location.href = "index.html";
 
   async function load(){
-    const { data: ev } = await sb.from("events").select("*").eq("id", eventId).maybeSingle();
+    document.getElementById("org-word").textContent = posCore.org.name.toUpperCase();
+    if (!eventId) { location.href = "index.html"; return; }
+    const { data: ev } = await sb.from("events").select("*").eq("org_id", posCore.orgId).eq("id", eventId).maybeSingle();
     if (!ev) { location.href = "index.html"; return; }
     document.getElementById("event-name").textContent = ev.name;
     document.getElementById("event-date").textContent = ev.event_date ? ("EN CURSO · " + ev.event_date) : "EN CURSO";
 
-    const { data: orders } = await sb.from("orders").select("total,status,payment_method").eq("event_id", eventId).neq("status","anulado").eq("is_test", false);
+    const { data: orders } = await sb.from("orders").select("total,status,payment_method").eq("org_id", posCore.orgId).eq("event_id", eventId).neq("status","anulado").eq("is_test", false);
     const list = orders || [];
-    const ventas = list.filter(o => o.payment_method !== "cortesia").reduce((s,o) => s + Number(o.total), 0);
+    const ventas = posUtils.sumMoney(list.filter(o => o.payment_method !== "cortesia").map(o => o.total));
     const pendientes = list.filter(o => o.status === "pendiente_entrega").length;
 
-    const { data: menuItems } = await sb.from("menu_items").select("stock_qty,initial_stock,track_stock").eq("active", true).eq("track_stock", true);
-    const { data: ingredients } = await sb.from("ingredients").select("stock_qty,initial_stock").eq("active", true).not("stock_qty","is",null);
+    const { data: menuItems } = await sb.from("menu_items").select("stock_qty,initial_stock,track_stock").eq("org_id", posCore.orgId).eq("active", true).eq("track_stock", true);
+    const { data: ingredients } = await sb.from("ingredients").select("stock_qty,initial_stock").eq("org_id", posCore.orgId).eq("active", true).not("stock_qty","is",null);
     const lowStock = [...(menuItems||[]), ...(ingredients||[])].filter(i => i.initial_stock > 0 && (i.stock_qty / i.initial_stock) <= 0.25).length;
 
     const cards = document.querySelectorAll("#metrics .metric-card .value");
-    cards[0].textContent = "$" + Math.round(ventas).toLocaleString("es-CL");
+    cards[0].textContent = posCore.money(ventas);
     cards[0].classList.remove("loading-txt");
     cards[1].textContent = list.length;
     cards[1].classList.remove("loading-txt");
@@ -122,7 +125,7 @@
     cards[3].classList.remove("loading-txt");
     if (lowStock > 0) cards[3].closest(".metric-card").classList.add("warn");
   }
-  load();
+  posCore.ready.then(load);
 </script>
 </body>
 </html>

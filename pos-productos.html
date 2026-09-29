@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>POS Productos — South Media Group</title>
+<title>POS Productos</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -268,11 +270,11 @@
 <div id="toast"></div>
 <div id="receipt-area"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/pos-core.js"></script>
 <script>
-  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+  const sb = posCore.sb;
 
   // Cambia esto a true una vez tengas la integración EFTPOS con BNZ/Verifone lista.
   const EFTPOS_ENABLED = false;
@@ -302,7 +304,7 @@
   }
 
   async function resolveRegister(type){
-    const { data: registers, error } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type", type).eq("active", true).order("created_at");
+    const { data: registers, error } = await sb.from("registers").select("id,name,type,active,created_at,location_id,locations(name)").eq("org_id", posCore.orgId).eq("type", type).eq("active", true).order("created_at");
     if (error || !registers || registers.length === 0) return null;
     if (registers.length === 1) return registers[0];
 
@@ -314,7 +316,7 @@
       const overlay = document.getElementById("register-picker-overlay");
       const list = document.getElementById("register-picker-list");
       list.innerHTML = registers.map(r =>
-        '<button class="btn btn-secondary" style="display:block; width:100%; margin-bottom:8px;" data-id="' + r.id + '">' + r.name + '</button>'
+        '<button class="btn btn-secondary" style="display:block; width:100%; margin-bottom:8px;" data-id="' + r.id + '">' + posCore.esc((r.locations ? r.locations.name + " — " : "") + r.name) + '</button>'
       ).join("");
       overlay.style.display = "flex";
       list.querySelectorAll("button").forEach(btn => {
@@ -335,7 +337,7 @@
   async function init() {
     register = await resolveRegister("producto");
     if (!register) {
-      showToast("No hay una caja de tipo Producto configurada en Supabase.");
+      showToast("Tu organización todavía no tiene una caja de tipo Producto. Un administrador puede crearla en Insumos → Administración.");
       return;
     }
     document.getElementById("register-name").textContent = register.name;
@@ -392,9 +394,9 @@
   let closedEvents = [];     // eventos cerrados recientemente (por si hace falta reabrir)
 
   async function loadActiveEvent() {
-    const { data } = await sb.from("events").select("*").eq("active", true).order("created_at");
+    const { data } = await sb.from("events").select("*").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
     openEvents = data || [];
-    const { data: closedData } = await sb.from("events").select("*").eq("active", false).order("created_at", { ascending:false }).limit(10);
+    const { data: closedData } = await sb.from("events").select("*").eq("org_id", posCore.orgId).eq("active", false).order("created_at", { ascending:false }).limit(10);
     closedEvents = closedData || [];
 
     const globalId = sessionStorage.getItem("pos_selected_event_id");
@@ -442,7 +444,7 @@
       html += "<p style='font-size:13px; color:var(--muted);'>No hay eventos abiertos — crea uno con \"Iniciar nuevo evento\".</p>";
     } else {
       html += openEvents.map(e =>
-        '<div class="event-pick-row"><span>' + e.name + (e.event_date ? " — " + e.event_date : "") + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
+        '<div class="event-pick-row"><span>' + posCore.esc(e.name + (e.event_date ? " — " + e.event_date : "")) + (activeEvent && activeEvent.id === e.id ? " ✓ (trabajando aquí)" : "") + '</span>' +
         '<span class="actions">' +
           '<button class="btn btn-secondary" onclick="seleccionarEvento(\'' + e.id + '\')">Trabajar aquí</button>' +
           '<button class="btn btn-danger" onclick="cerrarEvento(\'' + e.id + '\')">Cerrar evento</button>' +
@@ -452,7 +454,7 @@
     if (closedEvents.length) {
       html += '<p style="font-size:12px; color:var(--muted); margin:14px 0 4px;">Cerrados recientemente — ¿cerraste alguno por error?</p>';
       html += closedEvents.map(e =>
-        '<div class="event-pick-row"><span style="color:var(--muted);">' + e.name + (e.event_date ? " — " + e.event_date : "") + '</span>' +
+        '<div class="event-pick-row"><span style="color:var(--muted);">' + posCore.esc(e.name + (e.event_date ? " — " + e.event_date : "")) + '</span>' +
         '<span class="actions"><button class="btn btn-secondary" onclick="reabrirEvento(\'' + e.id + '\')">Reabrir</button></span></div>'
       ).join("");
     }
@@ -474,14 +476,16 @@
 
   async function cerrarEvento(id){
     if (!confirm("¿Cerrar este evento? Dejará de aparecer para seguir vendiendo ahí.")) return;
-    await sb.rpc("close_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    const { error } = await sb.rpc("close_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    if (error) { showToast("No se pudo cerrar el evento: " + error.message); return; }
     showToast("Evento cerrado.");
     await loadActiveEvent();
     renderEventPicker();
   }
 
   async function reabrirEvento(id){
-    await sb.rpc("reopen_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    const { error } = await sb.rpc("reopen_event", { p_register_id: register.id, p_pin: myPin(), p_event_id: id });
+    if (error) { showToast("No se pudo reabrir el evento: " + error.message); return; }
     showToast("Evento reabierto.");
     await loadActiveEvent();
     renderEventPicker();
@@ -492,7 +496,7 @@
     const date = document.getElementById("event-date").value || null;
     if (!name) { showToast("Escribe el nombre del evento."); return; }
     const { data, error } = await sb.rpc("create_event", { p_register_id: register.id, p_pin: myPin(), p_name: name, p_event_date: date });
-    if (error) { showToast("No se pudo crear el evento."); return; }
+    if (error) { showToast("No se pudo crear el evento: " + error.message); return; }
     openEvents.push(data);
     activeEvent = data;
     sessionStorage.setItem("pos_event_" + register.id, data.id);
@@ -515,15 +519,15 @@
     menu.forEach(item => {
       const b = document.createElement("button");
       b.className = "item-btn";
-      let html = item.name;
-      if (item.color) html += '<span class="color-bar" style="background:' + item.color + ';"></span>';
-      html += '<span class="price">$' + Number(item.price).toLocaleString("es-CL") + "</span>";
+      let html = posCore.esc(item.name);
+      if (item.color && /^#[0-9a-f]{3,8}$/i.test(item.color)) html += '<span class="color-bar" style="background:' + item.color + ';"></span>';
+      html += '<span class="price">' + posCore.money(item.price) + "</span>";
       if (item.track_stock && item.stock_qty !== null) {
         const pct = item.initial_stock > 0 ? (item.stock_qty / item.initial_stock) : (item.stock_qty > 0 ? 1 : 0);
         html += '<div><span class="badge ' + (pct <= 0.25 ? "badge-warning" : "badge-success") + '">' + (pct <= 0.25 ? "⚠️ " : "") + item.stock_qty + ' en stock</span></div>';
       }
       const promo = activePromoFor(item.id);
-      if (promo) html += '<div><span class="badge badge-success">🏷️ ' + promo.bundle_qty + 'x$' + Math.round(promo.bundle_price).toLocaleString("es-CL") + '</span></div>';
+      if (promo) html += '<div><span class="badge badge-success">🏷️ ' + promo.bundle_qty + ' x ' + posCore.money(promo.bundle_price) + '</span></div>';
       b.innerHTML = html;
       b.onclick = () => addToCart(item);
       grid.appendChild(b);
@@ -551,10 +555,10 @@
     box.innerHTML = '<div class="orders-grid">' + pendingOrders.map(o => {
       const mins = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/60000));
       const cls = mins >= 5 ? "danger" : mins >= 2 ? "warn" : "";
-      const itemsHtml = o.items.map(it => '<div class="' + (it.delivered ? "done" : "") + '">' + it.qty + 'x ' + it.name + '</div>').join("");
+      const itemsHtml = o.items.map(it => '<div class="' + (it.delivered ? "done" : "") + '">' + it.qty + 'x ' + posCore.esc(it.name) + '</div>').join("");
       const isOpen = openOrderIds.has(o.id);
       return '<div class="order-card ' + (isOpen ? "open" : "") + '" onclick="toggleOrderCard(\'' + o.id + '\')">' +
-        '<div class="row1"><span>' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? " " + o.customer_name : "") + '</span><span class="mins ' + cls + '">' + mins + ' min</span></div>' +
+        '<div class="row1"><span>' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? " " + posCore.esc(o.customer_name) : "") + '</span><span class="mins ' + cls + '">' + mins + ' min</span></div>' +
         '<div class="items">' + itemsHtml + '</div>' +
       '</div>';
     }).join("") + '</div>';
@@ -583,15 +587,11 @@
   }
 
   function lineTotal(itemId, qty, price){
-    const promo = activePromoFor(itemId);
-    if (!promo) return price * qty;
-    const bundles = Math.floor(qty / promo.bundle_qty);
-    const remainder = qty % promo.bundle_qty;
-    return bundles * promo.bundle_price + remainder * price;
+    return posUtils.lineTotal(qty, price, activePromoFor(itemId));
   }
 
   function cartTotal(){
-    return Object.keys(cart).reduce((s,id) => s + lineTotal(id, cart[id].qty, cart[id].price), 0);
+    return posUtils.sumMoney(Object.keys(cart).map(id => lineTotal(id, cart[id].qty, cart[id].price)));
   }
 
   function renderCart(){
@@ -604,12 +604,12 @@
         const l = cart[id];
         const promo = activePromoFor(id);
         const lineHtml = lineTotal(id, l.qty, l.price);
-        return '<div class="cart-row"><span class="name">' + l.name + (promo ? ' <span class="badge badge-success" style="margin:0;">🏷️</span>' : '') + '</span>' +
+        return '<div class="cart-row"><span class="name">' + posCore.esc(l.name) + (promo ? ' <span class="badge badge-success" style="margin:0;">🏷️</span>' : '') + '</span>' +
           '<div class="qty"><button onclick="changeQty(\'' + id + '\',-1)">−</button><span>' + l.qty + '</span><button onclick="changeQty(\'' + id + '\',1)">+</button></div>' +
-          '<span>$' + Math.round(lineHtml).toLocaleString("es-CL") + '</span></div>';
+          '<span>' + posCore.money(lineHtml) + '</span></div>';
       }).join("");
     }
-    document.getElementById("total").textContent = "$" + Math.round(cartTotal()).toLocaleString("es-CL");
+    document.getElementById("total").textContent = posCore.money(cartTotal());
   }
 
   function changeQty(id, delta){
@@ -640,7 +640,7 @@
   function showCardConfirm(cash, card, method, receivedCash){
     pendingCardPayment = { cash, card, method, receivedCash };
     document.getElementById("cash-panel").style.display = "none";
-    document.getElementById("card-confirm-amount").textContent = "$" + Math.round(card).toLocaleString("es-CL");
+    document.getElementById("card-confirm-amount").textContent = posCore.money(card);
     document.getElementById("card-confirm-panel").style.display = "block";
   }
 
@@ -660,7 +660,7 @@
     btn.disabled = false;
   }
 
-  function round2(n){ return Math.round(n * 100) / 100; }
+  function round2(n){ return posUtils.roundMoney(n); }
 
   function mostrarEfectivo(){
     const panel = document.getElementById("cash-panel");
@@ -700,16 +700,16 @@
 
     if (received >= total) {
       const change = round2(received - total);
-      feedback.textContent = change > 0 ? ("Vuelto: $" + Math.round(change).toLocaleString("es-CL")) : "Pago exacto — sin vuelto.";
+      feedback.textContent = change > 0 ? ("Vuelto: " + posCore.money(change)) : "Pago exacto — sin vuelto.";
       feedback.className = "cash-feedback ok";
       btn.textContent = "Cobrar";
       btn.style.display = "block";
       btn.onclick = () => { if (confirmStockOk()) finalizarCobro(total, 0, "efectivo", received); };
     } else {
       const remaining = round2(total - received);
-      feedback.textContent = "Faltan $" + Math.round(remaining).toLocaleString("es-CL");
+      feedback.textContent = "Faltan " + posCore.money(remaining);
       feedback.className = "cash-feedback warn";
-      btn.textContent = "Cobrar $" + Math.round(received).toLocaleString("es-CL") + " efectivo + $" + Math.round(remaining).toLocaleString("es-CL") + " tarjeta";
+      btn.textContent = "Cobrar " + posCore.money(received) + " efectivo + " + posCore.money(remaining) + " tarjeta";
       btn.style.display = "block";
       btn.onclick = () => { if (confirmStockOk()) showCardConfirm(received, remaining, "mixto", received); };
     }
@@ -726,10 +726,10 @@
     const total = cartTotal();
     if (total <= 0) return;
     if (!confirmStockOk()) return;
-    const pin = prompt("PIN de administrador para autorizar la cortesía:");
+    const pin = prompt("PIN de supervisor para autorizar la cortesía:");
     if (pin === null) return;
-    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: pin });
-    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
+    const { data: ok } = await sb.rpc("verify_supervisor_pin", { p_register_id: register.id, p_pin: pin });
+    if (!ok) { showToast("PIN de supervisor incorrecto."); return; }
     finalizarCobro(0, 0, "cortesia", 0, pin);
   }
 
@@ -754,7 +754,7 @@
   }
   applyTestModeUI();
 
-  async function finalizarCobro(cash, card, paymentMethod, receivedCash, adminPin){
+  async function finalizarCobro(cash, card, paymentMethod, receivedCash, supervisorPin){
     if (cobrando) return;
     const keys = Object.keys(cart);
     if (keys.length === 0) return;
@@ -783,7 +783,7 @@
         p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
         p_payment_method: paymentMethod, p_cash: cash, p_card: card,
         p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
-        p_admin_pin: adminPin || null, p_is_test: testMode, p_client_transaction_id: currentTransactionId
+        p_supervisor_pin: supervisorPin || null, p_is_test: testMode, p_client_transaction_id: currentTransactionId
       });
 
       // No limpiamos currentTransactionId acá: si esto fue un error de red
@@ -833,35 +833,35 @@
     const timeStr = now.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
     const isCortesia = paymentMethod === "cortesia";
     function buildCopy(label){
-      let html = '<div class="receipt-copy"><h3>South Media</h3><h4>' + label + '</h4>';
+      let html = '<div class="receipt-copy"><h3>' + posCore.esc(posCore.org.name) + '</h3><h4>' + label + '</h4>';
       if (isTest) html += '<div class="line" style="justify-content:center; font-weight:800; color:#A3271D;"><span>***** PRUEBA — NO ES UNA VENTA REAL *****</span></div>';
-      if (activeEvent) html += '<div class="line" style="justify-content:center; font-weight:600;"><span>' + activeEvent.name + '</span></div>';
+      if (activeEvent) html += '<div class="line" style="justify-content:center; font-weight:600;"><span>' + posCore.esc(activeEvent.name) + '</span></div>';
       html += '<div class="line"><b>Ticket #' + ticketNum + '</b><span>' + timeStr + '</span></div>';
-      if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + customerName + '</span></div>';
-      if (operatorName) html += '<div class="line"><span class="iname">Atendió</span><span class="iprice">' + operatorName + '</span></div>';
+      if (customerName) html += '<div class="line"><span class="iname">Cliente</span><span class="iprice">' + posCore.esc(customerName) + '</span></div>';
+      if (operatorName) html += '<div class="line"><span class="iname">Atendió</span><span class="iprice">' + posCore.esc(operatorName) + '</span></div>';
       html += '<hr>';
       items.forEach(l => {
         const promoTag = activePromoFor(l.id) ? " 🏷️" : "";
         if (isCortesia) {
-          html += '<div class="line"><span class="iname">' + l.qty + 'x ' + l.name + promoTag + '</span><span class="iprice"><s>$' + Math.round(l.subtotal) + '</s> $0</span></div>';
+          html += '<div class="line"><span class="iname">' + l.qty + 'x ' + posCore.esc(l.name) + promoTag + '</span><span class="iprice"><s>' + posCore.money(l.subtotal) + '</s> ' + posCore.money(0) + '</span></div>';
         } else {
-          html += '<div class="line"><span class="iname">' + l.qty + 'x ' + l.name + promoTag + '</span><span class="iprice">$' + Math.round(l.subtotal) + '</span></div>';
+          html += '<div class="line"><span class="iname">' + l.qty + 'x ' + posCore.esc(l.name) + promoTag + '</span><span class="iprice">' + posCore.money(l.subtotal) + '</span></div>';
         }
       });
-      if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + obs + '</div>';
+      if (obs) html += '<hr><div class="obs"><b>OBS:</b> ' + posCore.esc(obs) + '</div>';
       html += '<hr>';
       if (isCortesia) {
         html += '<div class="line"><b>🎁 CORTESÍA — 100% DCTO.</b></div>';
-        html += '<div class="line"><span class="iname">Valor referencial</span><span class="iprice">$' + Math.round(total) + '</span></div>';
-        html += '<div class="line total"><span class="iname">TOTAL A PAGAR</span><span class="iprice">$0</span></div>';
+        html += '<div class="line"><span class="iname">Valor referencial</span><span class="iprice">' + posCore.money(total) + '</span></div>';
+        html += '<div class="line total"><span class="iname">TOTAL A PAGAR</span><span class="iprice">' + posCore.money(0) + '</span></div>';
       } else {
-        html += '<div class="line total"><span class="iname">TOTAL</span><span class="iprice">$' + Math.round(total) + '</span></div>';
+        html += '<div class="line total"><span class="iname">TOTAL</span><span class="iprice">' + posCore.money(total) + '</span></div>';
         if (paymentMethod === "mixto") {
-          html += '<div class="line"><span class="iname">Efectivo</span><span class="iprice">$' + Math.round(cash) + '</span></div>';
-          html += '<div class="line"><span class="iname">Tarjeta</span><span class="iprice">$' + Math.round(card) + '</span></div>';
+          html += '<div class="line"><span class="iname">Efectivo</span><span class="iprice">' + posCore.money(cash) + '</span></div>';
+          html += '<div class="line"><span class="iname">Tarjeta</span><span class="iprice">' + posCore.money(card) + '</span></div>';
         } else if (paymentMethod === "efectivo" && receivedCash > total) {
-          html += '<div class="line"><span class="iname">Recibido</span><span class="iprice">$' + Math.round(receivedCash) + '</span></div>';
-          html += '<div class="line"><span class="iname">Vuelto</span><span class="iprice">$' + Math.round(receivedCash - total) + '</span></div>';
+          html += '<div class="line"><span class="iname">Recibido</span><span class="iprice">' + posCore.money(receivedCash) + '</span></div>';
+          html += '<div class="line"><span class="iname">Vuelto</span><span class="iprice">' + posCore.money(posUtils.sumMoney([receivedCash, -total])) + '</span></div>';
         }
       }
       html += '</div>';
@@ -920,7 +920,8 @@
 
   async function anularUltimo(){
     if (!lastOrderId) return;
-    await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: lastOrderId });
+    const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: lastOrderId });
+    if (error) { showToast("No se pudo anular: " + error.message); return; }
     document.getElementById("void-btn").style.display = "none";
     showToast("Ticket #" + lastTicketNum + " anulado.");
     lastOrderId = null;
@@ -950,12 +951,12 @@
 
   function renderSearchRow(o){
     const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
-    const itemsTxt = o.items.map(it => it.qty + "x " + it.name).join(", ");
+    const itemsTxt = posCore.esc(o.items.map(it => it.qty + "x " + it.name).join(", "));
     const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
-    const evTxt = o.events ? o.events.name : "";
+    const evTxt = o.events ? posCore.esc(o.events.name) : "";
     return '<div class="search-row">' +
-      '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || "(sin nombre)") +
+        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
         (o.status !== "pendiente_entrega" ? '<button class="btn btn-secondary" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
         (o.status !== "anulado" ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
@@ -963,13 +964,15 @@
   }
 
   async function reabrirPedido(id){
-    await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: id });
+    const { error } = await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: id });
+    if (error) { showToast("No se pudo reabrir: " + error.message); return; }
     showToast("Pedido reabierto — vuelve a aparecer en Entrega.");
     buscarTicket();
   }
 
   async function anularPedidoBuscado(id){
-    await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: id });
+    const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myPin(), p_order_id: id });
+    if (error) { showToast("No se pudo anular: " + error.message); return; }
     showToast("Pedido anulado.");
     buscarTicket();
   }
@@ -989,42 +992,42 @@
 
     const paid = orders.filter(o => o.payment_method !== "cortesia");
     const courtesy = orders.filter(o => o.payment_method === "cortesia");
-    let total = 0, cash = 0, card = 0;
+    // Sumas en centavos enteros: sin errores de punto flotante.
+    const C = posUtils.toCents;
+    let totalC = 0, cashC = 0, cardC = 0;
     const byProduct = {};
     paid.forEach(o => {
-      total += Number(o.total);
-      cash += Number(o.cash_amount || 0);
-      card += Number(o.card_amount || 0);
+      totalC += C(o.total);
+      cashC += C(o.cash_amount || 0);
+      cardC += C(o.card_amount || 0);
       o.items.forEach(it => {
-        if (!byProduct[it.name]) byProduct[it.name] = { qty:0, total:0 };
-        byProduct[it.name].qty += it.qty; byProduct[it.name].total += it.subtotal;
+        if (!byProduct[it.name]) byProduct[it.name] = { qty:0, totalC:0 };
+        byProduct[it.name].qty += Number(it.qty); byProduct[it.name].totalC += C(it.subtotal);
       });
     });
+    const total = posUtils.fromCents(totalC), cash = posUtils.fromCents(cashC), card = posUtils.fromCents(cardC);
 
-    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">Total vendido: $' + Math.round(total).toLocaleString("es-CL") + '</p>';
-    html += '<p style="font-size:13px; color:var(--muted);">Efectivo: $' + Math.round(cash).toLocaleString("es-CL") + ' &nbsp;|&nbsp; Tarjeta: $' + Math.round(card).toLocaleString("es-CL") + '</p>';
+    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">Total vendido: ' + posCore.money(total) + '</p>';
+    html += '<p style="font-size:13px; color:var(--muted);">Efectivo: ' + posCore.money(cash) + ' &nbsp;|&nbsp; Tarjeta: ' + posCore.money(card) + '</p>';
     html += '<table class="tbl"><tr><th>Producto</th><th>Cant.</th><th>Total</th></tr>';
-    Object.keys(byProduct).sort((a,b) => byProduct[b].total - byProduct[a].total).forEach(name => {
-      html += '<tr><td>' + name + '</td><td>' + byProduct[name].qty + '</td><td>$' + Math.round(byProduct[name].total).toLocaleString("es-CL") + '</td></tr>';
+    Object.keys(byProduct).sort((a,b) => byProduct[b].totalC - byProduct[a].totalC).forEach(name => {
+      html += '<tr><td>' + posCore.esc(name) + '</td><td>' + byProduct[name].qty + '</td><td>' + posCore.money(posUtils.fromCents(byProduct[name].totalC)) + '</td></tr>';
     });
     html += '</table>';
     if (courtesy.length){
       html += '<p style="font-weight:600; margin-top:14px;">🎁 Cortesías entregadas (' + courtesy.length + ')</p>';
       html += '<table class="tbl"><tr><th>Cliente</th><th>Ticket</th><th>Hora</th><th>Productos</th></tr>';
       courtesy.forEach(o => {
-        const itemsTxt = o.items.map(it => it.qty + "x " + it.name).join(", ");
+        const itemsTxt = posCore.esc(o.items.map(it => it.qty + "x " + it.name).join(", "));
         const horaTxt = new Date(o.paid_at).toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
-        html += '<tr><td>' + (o.customer_name || "(sin nombre)") + '</td><td>#' + o.ticket_num + '</td><td>' + horaTxt + '</td><td>' + itemsTxt + '</td></tr>';
+        html += '<tr><td>' + posCore.esc(o.customer_name || "(sin nombre)") + '</td><td>#' + o.ticket_num + '</td><td>' + horaTxt + '</td><td>' + itemsTxt + '</td></tr>';
       });
       html += '</table>';
     }
     body.innerHTML = html;
   }
 
-  function csvField(val){
-    const s = String(val ?? "");
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-  }
+  function csvField(val){ return posUtils.csvField(val); }
 
   async function exportarCSV(){
     const allEvents = document.getElementById("csv-all-events").checked;
@@ -1049,7 +1052,7 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
-  init();
+  posCore.ready.then(init);
 </script>
 </body>
 </html>

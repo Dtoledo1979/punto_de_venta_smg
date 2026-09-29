@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iniciar sesión — POS</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", publicPage: true };</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
+    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
+    --danger:#E4483A; --border:#E2E6EA; --r-md:10px; --r-card:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:'Inter',Arial,sans-serif;
+       display:flex; align-items:center; justify-content:center; padding:16px;}
+  .card{background:var(--surface); border-radius:var(--r-card); padding:28px 24px; width:100%; max-width:380px;}
+  .brand{display:flex; align-items:center; gap:9px; margin-bottom:18px;}
+  .brand path{fill:var(--accent);}
+  .brand span{font-family:'Sora',sans-serif; font-weight:800; font-size:15px; letter-spacing:.5px;}
+  h1{font-family:'Sora',sans-serif; font-size:20px; margin:0 0 6px;}
+  p.sub{color:var(--muted); font-size:13.5px; margin:0 0 18px;}
+  label{display:block; font-size:13px; font-weight:600; margin:12px 0 5px;}
+  input{width:100%; font-size:16px; padding:12px; border:1px solid var(--border); border-radius:var(--r-md); font-family:inherit;}
+  input:focus{outline:2px solid var(--accent); border-color:transparent;}
+  button{width:100%; margin-top:18px; min-height:48px; font-size:15px; font-weight:700; border:0; border-radius:var(--r-md);
+         background:var(--accent); color:var(--accent-ink); cursor:pointer; font-family:inherit;}
+  button:disabled{opacity:.6; cursor:wait;}
+  .link{display:inline-block; margin-top:14px; font-size:13px; color:var(--muted); cursor:pointer; text-decoration:underline; background:none; border:0; padding:0; width:auto; min-height:0; font-weight:500;}
+  .msg{margin-top:14px; font-size:13.5px; padding:10px 12px; border-radius:var(--r-md); display:none;}
+  .msg.error{display:block; background:#FDECEA; color:#A3271D;}
+  .msg.ok{display:block; background:#EEF8DA; color:#3A5200;}
+  form{display:none;} form.active{display:block;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
+    <span>POS</span>
+  </div>
+
+  <form id="form-login" class="active" novalidate>
+    <h1>Iniciar sesión</h1>
+    <p class="sub">Entra con la cuenta de tu negocio. En un dispositivo compartido, basta con hacerlo una vez: después cada caja se abre con su PIN.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="password">Contraseña</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="btn-login">Entrar</button>
+    <button type="button" class="link" id="go-forgot">¿Olvidaste tu contraseña?</button>
+  </form>
+
+  <form id="form-forgot" novalidate>
+    <h1>Recuperar contraseña</h1>
+    <p class="sub">Te enviamos un link por email para crear una contraseña nueva.</p>
+    <label for="forgot-email">Email</label>
+    <input id="forgot-email" type="email" autocomplete="username" required>
+    <button type="submit" id="btn-forgot">Enviar link</button>
+    <button type="button" class="link" id="go-login">← Volver</button>
+  </form>
+
+  <form id="form-reset" novalidate>
+    <h1>Contraseña nueva</h1>
+    <p class="sub">Mínimo 10 caracteres, con mayúsculas, minúsculas y números.</p>
+    <label for="new-password">Contraseña nueva</label>
+    <input id="new-password" type="password" autocomplete="new-password" required>
+    <label for="new-password-2">Repítela</label>
+    <input id="new-password-2" type="password" autocomplete="new-password" required>
+    <button type="submit" id="btn-reset">Guardar contraseña</button>
+  </form>
+
+  <div id="msg" class="msg" role="status"></div>
+</div>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/pos-core.js"></script>
+<script>
+  const sb = posCore.sb;
+  const $ = (id) => document.getElementById(id);
+
+  // Solo se permite volver a una ruta de ESTE sitio (evita usar el login
+  // como redirección abierta hacia otro dominio: ?next=//sitio-malo.com).
+  function safeNext() {
+    const next = new URLSearchParams(location.search).get("next") || "";
+    return /^\/(?!\/)[^\s\\]*$/.test(next) && next !== "/login.html" ? next : "/index.html";
+  }
+
+  function show(formId) {
+    document.querySelectorAll("form").forEach((f) => f.classList.toggle("active", f.id === formId));
+    setMsg("");
+  }
+  function setMsg(text, kind) {
+    const m = $("msg");
+    m.textContent = text;
+    m.className = "msg" + (text ? " " + (kind || "error") : "");
+  }
+  function busy(btn, on) { btn.disabled = on; }
+
+  function friendlyAuthError(error) {
+    const code = error && (error.code || "");
+    if (code === "invalid_credentials") return "Email o contraseña incorrectos.";
+    if (code === "email_not_confirmed") return "Tu email todavía no está confirmado. Revisa tu correo.";
+    if (code === "weak_password") return "La contraseña es muy débil: mínimo 10 caracteres, con mayúsculas, minúsculas y números.";
+    if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") return "Demasiados intentos. Espera unos minutos y vuelve a intentar.";
+    if (code === "same_password") return "La contraseña nueva tiene que ser distinta de la anterior.";
+    if (error && /fetch|network/i.test(error.message || "")) return "Sin conexión con el servidor. Revisa tu internet.";
+    return (error && error.message) || "No se pudo completar la operación.";
+  }
+
+  $("go-forgot").onclick = () => { $("forgot-email").value = $("email").value; show("form-forgot"); };
+  $("go-login").onclick = () => show("form-login");
+
+  $("form-login").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("email").value.trim(), password = $("password").value;
+    if (!email || !password) { setMsg("Escribe tu email y contraseña."); return; }
+    busy($("btn-login"), true);
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    busy($("btn-login"), false);
+    if (error) { setMsg(friendlyAuthError(error)); return; }
+    location.replace(safeNext());
+  });
+
+  $("form-forgot").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("forgot-email").value.trim();
+    if (!email) { setMsg("Escribe tu email."); return; }
+    busy($("btn-forgot"), true);
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/login.html" });
+    busy($("btn-forgot"), false);
+    // Mismo mensaje exista o no la cuenta (no revelar qué emails están registrados).
+    if (error && error.code !== "user_not_found") { setMsg(friendlyAuthError(error)); return; }
+    setMsg("Si ese email tiene una cuenta, te llegará un link en unos minutos.", "ok");
+  });
+
+  $("form-reset").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const p1 = $("new-password").value, p2 = $("new-password-2").value;
+    if (p1 !== p2) { setMsg("Las contraseñas no coinciden."); return; }
+    busy($("btn-reset"), true);
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    busy($("btn-reset"), false);
+    if (error) { setMsg(friendlyAuthError(error)); return; }
+    setMsg("Contraseña actualizada. Entrando…", "ok");
+    setTimeout(() => location.replace("/index.html"), 900);
+  });
+
+  // Link del email de recuperación: Supabase abre esta página con una
+  // sesión temporal y dispara PASSWORD_RECOVERY.
+  sb.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") show("form-reset");
+  });
+
+  // Si ya hay sesión (y no es una recuperación), no mostrar el login.
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session && !/type=recovery/.test(location.hash)) location.replace(safeNext());
+  });
+</script>
+</body>
+</html>

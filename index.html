@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Punto de Venta — South Media Group</title>
+<title>Punto de venta</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -62,7 +64,7 @@
 
 <div class="top">
   <svg class="mark" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-  <div class="word">SOUTH MEDIA <span>GROUP</span></div>
+  <div class="word" id="org-word"></div>
 </div>
 
 <div class="hero">
@@ -85,11 +87,11 @@
   </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/pos-core.js"></script>
 <script>
-  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+  const sb = posCore.sb;
 
   let openEvents = [];
   let selectedId = sessionStorage.getItem("pos_selected_event_id");
@@ -97,7 +99,7 @@
   async function loadEvents() {
     const area = document.getElementById("event-area");
     try {
-      const { data, error } = await sb.from("events").select("*").eq("active", true).order("created_at");
+      const { data, error } = await sb.from("events").select("*").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
       if (error) throw error;
       openEvents = data || [];
 
@@ -114,7 +116,7 @@
       renderEvents();
       updateEnterBtn();
     } catch (e) {
-      area.innerHTML = '<div class="no-events">No se pudo conectar a Supabase. Revisa la configuración.</div>';
+      area.innerHTML = '<div class="no-events">No se pudieron cargar los eventos: ' + posCore.esc(e.message || "sin conexión") + '. Revisa tu internet y recarga la página.</div>';
     }
   }
 
@@ -123,8 +125,8 @@
     area.innerHTML = '<div class="event-grid">' + openEvents.map(e =>
       '<button class="event-card ' + (e.id === selectedId ? "selected" : "") + '" onclick="selectEvent(\'' + e.id + '\')">' +
         '<span class="check">✓</span>' +
-        '<div class="ename">' + e.name + '</div>' +
-        (e.event_date ? '<div class="edate">' + e.event_date + '</div>' : '') +
+        '<div class="ename">' + posCore.esc(e.name) + '</div>' +
+        (e.event_date ? '<div class="edate">' + posCore.esc(e.event_date) + '</div>' : '') +
         '<div class="live"><span class="dot"></span> EN CURSO</div>' +
       '</button>'
     ).join("") + '</div>';
@@ -148,7 +150,10 @@
     location.href = "dashboard.html";
   }
 
-  loadEvents();
+  posCore.ready.then(() => {
+    document.getElementById("org-word").textContent = posCore.org.name.toUpperCase();
+    loadEvents();
+  });
 </script>
 </body>
 </html>

@@ -1,3 +1,10 @@
 
 # Archivos locales con credenciales de ambientes (nunca a git)
 .local/
+
+# Dependencias, build y variables locales
+node_modules/
+dist/
+.env.local
+.env.*.local
+public/vendor/

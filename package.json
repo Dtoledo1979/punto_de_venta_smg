@@ -1,0 +1,24 @@
+{
+  "name": "hospitality-pos",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "vendor": "node scripts/copy-vendor.mjs",
+    "dev": "npm run vendor && vite",
+    "build": "npm run vendor && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "verificar-db": "bash scripts/verificar-db.sh --aplicado"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2"
+  }
+}

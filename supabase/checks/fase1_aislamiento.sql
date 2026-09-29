@@ -297,6 +297,49 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------
+-- 9b. Dinero exacto al centavo y montos coherentes con el método de pago.
+-- ---------------------------------------------------------------------
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+set local role authenticated;
+do $$
+declare v_reg uuid; v_ev uuid; v_item uuid; v_o pos.orders; v_items jsonb; v_sql text;
+begin
+  select id into v_reg from pos.registers where org_id = (select org_a from t_ids);
+  select id into v_ev from pos.events where org_id = (select org_a from t_ids);
+  v_item := (pos.add_menu_item(v_reg, '1234', 'Café', 4.50, 2)).id;
+  v_items := jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 3));
+
+  v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'efectivo', 13.50, 0, null, null, null);
+  if v_o.total <> 13.50 then raise exception 'FALLA: total con centavos % (esperado 13.50)', v_o.total; end if;
+  v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'mixto', 10.00, 3.50, null, null, null);
+  if v_o.id is null then raise exception 'FALLA: pago mixto exacto rechazado'; end if;
+
+  foreach v_sql in array array[
+    -- 1 centavo de diferencia (antes se aceptaba hasta $1)
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 13.49, 0, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 14.00, 0, null, null, null)', v_reg, v_ev, v_items),
+    -- método incoherente con los montos
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 10.00, 3.50, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''tarjeta'', 13.50, 0, null, null, null)', v_reg, v_ev, v_items),
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''mixto'', 13.50, 0, null, null, null)', v_reg, v_ev, v_items),
+    -- montos negativos
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''mixto'', 15.00, -1.50, null, null, null)', v_reg, v_ev, v_items),
+    -- cantidad fraccionaria
+    format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''efectivo'', 6.75, 0, null, null, null)', v_reg, v_ev,
+           jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1.5)))
+  ] loop
+    begin
+      execute v_sql;
+      raise exception 'FALLA: se aceptó un cobro inválido -> %', v_sql;
+    exception when raise_exception then
+      if sqlerrm like 'FALLA:%' then raise; end if;
+    end;
+  end loop;
+  raise notice 'OK 9b: dinero exacto al centavo y coherente con el método';
+end $$;
+reset role;
+
+-- ---------------------------------------------------------------------
 -- 10. Organización suspendida: sus usuarios pierden todo el acceso.
 -- ---------------------------------------------------------------------
 update pos.organizations set status = 'suspended' where slug = 'org-a';

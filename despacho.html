@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Entrega — South Media Group</title>
+<title>Entrega</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -124,11 +126,11 @@
 </div>
 <div id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/pos-core.js"></script>
 <script>
-  const SUPABASE_URL = "https://umbkpzhgocryhcbbczhr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYmtwemhnb2NyeWhjYmJjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc2MzIsImV4cCI6MjA5ODAxMzYzMn0.h4LlS7gUh229gnmkxw12g58SRRs0jTas-ox-em1lfbg";
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: "pos" } });
+  const sb = posCore.sb;
 
   // Umbrales del timer (segundos) — ajusta si tu operación es más rápida/lenta.
   const WARN_AFTER = 120;   // amarillo
@@ -148,7 +150,7 @@
   }
 
   async function resolveRegister(type){
-    const { data: registers, error } = await sb.from("registers").select("id,name,type,next_ticket,active,created_at").eq("type", type).eq("active", true).order("created_at");
+    const { data: registers, error } = await sb.from("registers").select("id,name,type,active,created_at,location_id,locations(name)").eq("org_id", posCore.orgId).eq("type", type).eq("active", true).order("created_at");
     if (error || !registers || registers.length === 0) return null;
     if (registers.length === 1) return registers[0];
 
@@ -160,7 +162,7 @@
       const overlay = document.getElementById("register-picker-overlay");
       const list = document.getElementById("register-picker-list");
       list.innerHTML = registers.map(r =>
-        '<button class="ok" style="display:block; width:100%; margin-bottom:8px; padding:11px; border-radius:9px; border:none; cursor:pointer;" data-id="' + r.id + '">' + r.name + '</button>'
+        '<button class="ok" style="display:block; width:100%; margin-bottom:8px; padding:11px; border-radius:9px; border:none; cursor:pointer;" data-id="' + r.id + '">' + posCore.esc((r.locations ? r.locations.name + " — " : "") + r.name) + '</button>'
       ).join("");
       overlay.style.display = "flex";
       list.querySelectorAll("button").forEach(btn => {
@@ -180,9 +182,9 @@
 
   async function init(){
     register = await resolveRegister("producto");
-    if (!register){ showToast("No hay caja de tipo Producto configurada."); return; }
+    if (!register){ showToast("Tu organización todavía no tiene una caja de tipo Producto."); return; }
 
-    const { data: evs } = await sb.from("events").select("name").eq("active", true).order("created_at");
+    const { data: evs } = await sb.from("events").select("name").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
     const ev = (evs && evs.length) ? (evs.length === 1 ? "Evento activo: " + evs[0].name : "Eventos activos: " + evs.map(e=>e.name).join(", ")) : "Sin evento activo.";
     document.getElementById("event-label").textContent = ev;
 
@@ -215,13 +217,11 @@
   }
 
   async function cambiarPinEntrega(){
-    const adminPin = prompt("PIN de administrador:");
-    if (adminPin === null) return;
-    const { data: ok } = await sb.rpc("verify_admin_pin", { p_pin: adminPin });
-    if (!ok) { showToast("PIN de administrador incorrecto."); return; }
-    const nuevoPin = prompt("Nuevo PIN de Entrega:");
+    if (!posCore.isAdmin()) { showToast("Solo una cuenta owner o admin puede cambiar el PIN de Entrega."); return; }
+    const nuevoPin = prompt("Nuevo PIN de Entrega (4 a 8 dígitos):");
     if (!nuevoPin) return;
-    await sb.rpc("admin_update_register", { p_admin_pin: adminPin, p_register_id: register.id, p_name: null, p_pin: null, p_despacho_pin: nuevoPin });
+    const { error } = await sb.rpc("update_register", { p_register_id: register.id, p_name: null, p_pin: null, p_despacho_pin: nuevoPin });
+    if (error) { showToast("No se pudo cambiar el PIN: " + error.message); return; }
     showToast("PIN de Entrega actualizado.");
   }
 
@@ -244,11 +244,15 @@
     deliveredRecent = data || [];
   }
 
+  async function refreshAll(){ await loadPending(); await loadDeliveredRecent(); render(); }
+
   function subscribeRealtime(){
     sb.channel("orders-despacho")
       .on("postgres_changes", { event:"*", schema:"pos", table:"orders", filter:"register_id=eq." + register.id },
-        async () => { await loadPending(); await loadDeliveredRecent(); render(); })
-      .subscribe();
+        () => refreshAll())
+      .subscribe((status) => { if (status === "SUBSCRIBED") refreshAll(); });
+    setInterval(refreshAll, 30000);
+    window.addEventListener("online", refreshAll);
   }
 
   function fmt(seconds){
@@ -269,20 +273,20 @@
         const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
         const doneCount = o.items.filter(it => it.delivered).length;
         const allDone = doneCount === o.items.length;
-        const eventTag = multiEvent && o.events ? '<div class="event-tag">' + o.events.name + '</div>' : '';
+        const eventTag = multiEvent && o.events ? '<div class="event-tag">' + posCore.esc(o.events.name) + '</div>' : '';
         const itemsHtml = o.items.map((it, idx) => {
           const done = !!it.delivered;
           return '<div class="item-line ' + (done ? "done" : "") + '" onclick="toggleItem(\'' + o.id + '\',' + idx + ')">' +
             '<span class="check">' + (done ? "✔" : "") + '</span>' +
-            '<span>' + it.qty + 'x ' + it.name + '</span></div>';
+            '<span>' + it.qty + 'x ' + posCore.esc(it.name) + '</span></div>';
         }).join("");
         return '<div class="order">' +
           eventTag +
-          '<div class="row1"><span class="tnum">' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? ' · ' + o.customer_name : '') + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
+          '<div class="row1"><span class="tnum">' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? ' · ' + posCore.esc(o.customer_name) : '') + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
           '<div class="progress">' + doneCount + ' de ' + o.items.length + ' entregados — toca un producto para marcarlo</div>' +
           '<div class="items">' + itemsHtml + '</div>' +
-          (o.obs ? '<div class="obs">' + o.obs + '</div>' : '') +
-          '<div class="meta"><span>' + new Date(o.paid_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) + '</span><span>' + o.payment_method + '</span></div>' +
+          (o.obs ? '<div class="obs">' + posCore.esc(o.obs) + '</div>' : '') +
+          '<div class="meta"><span>' + new Date(o.paid_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) + '</span><span>' + posCore.esc(o.payment_method) + '</span></div>' +
           '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + (allDone ? "✔ Cerrar pedido" : "Marcar todo como entregado") + '</button>' +
           '</div>';
       }).join("");
@@ -295,14 +299,16 @@
   }
 
   async function toggleItem(orderId, idx){
-    await sb.rpc("despacho_toggle_item", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_item_index: idx });
-    await loadPending(); await loadDeliveredRecent(); render();
+    const { error } = await sb.rpc("despacho_toggle_item", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_item_index: idx });
+    if (error) showToast("No se pudo marcar: " + error.message);
+    await refreshAll();
   }
 
   async function confirmarEntrega(id){
-    await sb.rpc("despacho_confirm_all", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: id, p_delivered_by: operatorName || null });
+    const { error } = await sb.rpc("despacho_confirm_all", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: id, p_delivered_by: operatorName || null });
+    if (error) { showToast("No se pudo cerrar el pedido: " + error.message); return; }
     showToast("Pedido entregado.");
-    await loadPending(); await loadDeliveredRecent(); render();
+    await refreshAll();
   }
 
   function toggleSearch(){
@@ -324,12 +330,12 @@
 
   function renderSearchRow(o){
     const statusLabel = { pendiente_entrega:"Por entregar", entregado:"Entregado", anulado:"Anulado" }[o.status] || o.status;
-    const itemsTxt = o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", ");
+    const itemsTxt = posCore.esc(o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", "));
     const timeTxt = new Date(o.paid_at).toLocaleString("es-CL", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
-    const evTxt = o.events ? o.events.name : "";
+    const evTxt = o.events ? posCore.esc(o.events.name) : "";
     return '<div class="search-row">' +
-      '<div><b>#' + o.ticket_num + '</b> — ' + (o.customer_name || "(sin nombre)") +
-        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · $' + Math.round(o.total).toLocaleString("es-CL") + ' · ' + itemsTxt + '</div></div>' +
+      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || "(sin nombre)") +
+        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + statusLabel + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
         (o.status !== "pendiente_entrega" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">Reabrir</button>' : '') +
         (o.status !== "anulado" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">Anular</button>' : '') +
@@ -337,18 +343,20 @@
   }
 
   async function reabrirPedido(id){
-    await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
+    const { error } = await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
+    if (error) { showToast("No se pudo reabrir: " + error.message); return; }
     showToast("Pedido reabierto.");
     buscarTicket();
   }
 
   async function anularPedidoBuscado(id){
-    await sb.rpc("void_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
+    const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
+    if (error) { showToast("No se pudo anular: " + error.message); return; }
     showToast("Pedido anulado.");
     buscarTicket();
   }
 
-  init();
+  posCore.ready.then(init);
 </script>
 </body>
 </html>

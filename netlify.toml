@@ -1,8 +1,34 @@
+# Sitio del POS SaaS (rama "saas"). Build con Vite → carpeta dist/.
+# Variables requeridas en Netlify (Site configuration → Environment variables):
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY   (ver .env.example)
 [build]
-  publish = "."
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# La raíz lleva al inicio; el inicio exige sesión y redirige al login.
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    # 'unsafe-inline' en script-src es necesario mientras las pantallas usen
+    # scripts y onclick="" en línea; todo lo demás queda restringido: solo
+    # este sitio, Supabase (API + Realtime) y Google Fonts.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+# Los HTML nunca se cachean (cada deploy se ve de inmediato); los assets
+# con hash de Vite sí.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
