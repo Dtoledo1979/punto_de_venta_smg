@@ -588,6 +588,7 @@
 
   function vaciarCarro(){
     cart = {}; document.getElementById("obs").value = ""; document.getElementById("customer-name").value = "";
+    currentTransactionId = null;
     resetCashPanel();
     renderCart();
   }
@@ -679,6 +680,11 @@
   }
 
   let cobrando = false;
+  // Un identificador único por intento de cobro — se genera una sola vez y
+  // se reutiliza si hay que reintentar. Un reintento nunca puede crear una
+  // segunda venta: create_order() reconoce el mismo identificador y
+  // devuelve la venta que ya existe.
+  let currentTransactionId = null;
   let testMode = sessionStorage.getItem("pos_test_mode") === "1";
 
   function toggleTestMode(){
@@ -709,15 +715,18 @@
       // El navegador solo manda qué producto y cuánta cantidad — precio y
       // subtotal los calcula siempre create_order() en el servidor.
       const items = keys.map(id => ({ id, qty: cart[id].qty }));
+      if (!currentTransactionId) currentTransactionId = crypto.randomUUID();
 
       const { data: order, error } = await sb.rpc("create_order", {
         p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
         p_payment_method: paymentMethod, p_cash: cash, p_card: card,
         p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
-        p_admin_pin: adminPin || null, p_is_test: testMode
+        p_admin_pin: adminPin || null, p_is_test: testMode, p_client_transaction_id: currentTransactionId
       });
 
       if (error || !order) { showToast("No se pudo registrar la venta: " + (error ? error.message : "")); return; }
+
+      currentTransactionId = null; // venta confirmada — la próxima usa un id nuevo
 
       const ticketNum = order.ticket_num;
       lastOrderId = order.id; lastTicketNum = ticketNum;

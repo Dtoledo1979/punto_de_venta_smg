@@ -620,6 +620,7 @@
 
   function vaciarCarro(){
     cart = {}; document.getElementById("obs").value = ""; document.getElementById("customer-name").value = "";
+    currentTransactionId = null;
     resetCashPanel();
     renderCart();
   }
@@ -711,6 +712,12 @@
   }
 
   let cobrando = false;
+  // Un identificador único por intento de cobro — se genera una sola vez y
+  // se reutiliza si hay que reintentar (ej. se cortó la red justo después
+  // de que el servidor ya había confirmado la venta). Así, un reintento
+  // nunca puede crear una segunda venta: create_order() reconoce el mismo
+  // identificador y devuelve la venta que ya existe.
+  let currentTransactionId = null;
   let testMode = sessionStorage.getItem("pos_test_mode") === "1";
 
   function toggleTestMode(){
@@ -748,15 +755,21 @@
       // la promoción vigente y el subtotal los calcula siempre create_order()
       // en el servidor, nunca se confía en lo que el cliente calculó.
       const items = keys.map(id => ({ id, qty: cart[id].qty }));
+      if (!currentTransactionId) currentTransactionId = crypto.randomUUID();
 
       const { data: order, error } = await sb.rpc("create_order", {
         p_register_id: register.id, p_pin: myPin(), p_event_id: activeEvent.id, p_items: items,
         p_payment_method: paymentMethod, p_cash: cash, p_card: card,
         p_customer_name: customerName || null, p_obs: obs, p_attended_by: operatorName || null,
-        p_admin_pin: adminPin || null, p_is_test: testMode
+        p_admin_pin: adminPin || null, p_is_test: testMode, p_client_transaction_id: currentTransactionId
       });
 
+      // No limpiamos currentTransactionId acá: si esto fue un error de red
+      // (no una venta rechazada de verdad), el mismo id se reutiliza en el
+      // próximo intento en vez de generar uno nuevo.
       if (error || !order) { showToast("No se pudo registrar el pedido: " + (error ? error.message : "")); return; }
+
+      currentTransactionId = null; // venta confirmada — la próxima usa un id nuevo
 
       const ticketNum = order.ticket_num;
       lastOrderId = order.id; lastTicketNum = ticketNum;

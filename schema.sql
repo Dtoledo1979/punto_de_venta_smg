@@ -71,6 +71,7 @@ create table pos.orders (
   delivered_by text,
   ingredient_consumption jsonb,
   is_test boolean not null default false,
+  client_transaction_id uuid,
   status text not null default 'pendiente_entrega'
     check (status in ('pendiente_entrega','entregado','anulado')),
   obs text,
@@ -79,6 +80,14 @@ create table pos.orders (
   created_at timestamptz not null default now(),
   unique (register_id, event_id, ticket_num)
 );
+
+-- Idempotencia: si el mismo intento de cobro (mismo client_transaction_id)
+-- llega más de una vez — por un reintento tras un corte de red — nunca
+-- puede crear una segunda venta. Índice parcial porque los pedidos viejos
+-- no tienen este valor (null), y Postgres permite muchos null en un
+-- índice único sin que choquen entre sí.
+create unique index orders_client_transaction_id_key
+  on pos.orders (client_transaction_id) where client_transaction_id is not null;
 
 -- Contador de tickets por caja+evento (reemplaza a registers.next_ticket
 -- para la numeración real de venta — cada evento nuevo empieza en #1
@@ -653,7 +662,8 @@ create or replace function pos.create_order(
   p_register_id uuid, p_pin text, p_event_id uuid, p_items jsonb,
   p_payment_method text, p_cash numeric, p_card numeric,
   p_customer_name text, p_obs text, p_attended_by text,
-  p_admin_pin text default null, p_is_test boolean default false
+  p_admin_pin text default null, p_is_test boolean default false,
+  p_client_transaction_id uuid default null
 ) returns pos.orders language plpgsql security definer set search_path = pos as $$
 declare
   v_register pos.registers;
@@ -662,6 +672,7 @@ declare
   v_status text;
   v_delivered_at timestamptz := null;
   v_order pos.orders;
+  v_existing pos.orders;
   v_item jsonb;
   v_stock_after numeric;
   v_recipe_line record;
@@ -677,6 +688,18 @@ declare
   v_resolved_items jsonb := '[]'::jsonb;
   v_max_qty_per_line constant numeric := 500; -- tope de cordura por línea, no una regla de negocio real
 begin
+  -- Idempotencia: si ya existe un pedido con este identificador de intento
+  -- de cobro (generado una sola vez en el navegador por cada venta),
+  -- devolverlo tal cual en vez de crear uno nuevo. Esto cubre el caso de
+  -- un reintento después de que la respuesta se perdió por un corte de
+  -- red, pero el servidor ya había confirmado la venta la primera vez.
+  if p_client_transaction_id is not null then
+    select * into v_existing from pos.orders where client_transaction_id = p_client_transaction_id;
+    if v_existing is not null then
+      return v_existing;
+    end if;
+  end if;
+
   select * into v_register from pos.registers where id = p_register_id;
   if v_register is null or v_register.pin <> p_pin then
     raise exception 'PIN incorrecto';
@@ -786,15 +809,27 @@ begin
     end loop;
   end loop;
 
-  insert into pos.orders (
-    register_id, event_id, ticket_num, items, total, payment_method,
-    cash_amount, card_amount, customer_name, attended_by, status, obs, delivered_at,
-    ingredient_consumption, is_test
-  ) values (
-    p_register_id, p_event_id, v_ticket_num, v_resolved_items, v_total, p_payment_method,
-    coalesce(p_cash,0), coalesce(p_card,0), p_customer_name, p_attended_by, v_status, p_obs, v_delivered_at,
-    v_consumption, coalesce(p_is_test, false)
-  ) returning * into v_order;
+  begin
+    insert into pos.orders (
+      register_id, event_id, ticket_num, items, total, payment_method,
+      cash_amount, card_amount, customer_name, attended_by, status, obs, delivered_at,
+      ingredient_consumption, is_test, client_transaction_id
+    ) values (
+      p_register_id, p_event_id, v_ticket_num, v_resolved_items, v_total, p_payment_method,
+      coalesce(p_cash,0), coalesce(p_card,0), p_customer_name, p_attended_by, v_status, p_obs, v_delivered_at,
+      v_consumption, coalesce(p_is_test, false), p_client_transaction_id
+    ) returning * into v_order;
+  exception
+    when unique_violation then
+      -- Dos peticiones con el mismo identificador llegaron casi al mismo
+      -- tiempo y la otra ganó la carrera — devolvemos esa venta ya creada
+      -- en vez de crear una segunda o descontar stock dos veces. El N° de
+      -- ticket que se le había asignado a este intento perdedor queda sin
+      -- usar (un salto en la numeración), lo cual es preferible a cobrar
+      -- dos veces por la misma venta.
+      select * into v_order from pos.orders where client_transaction_id = p_client_transaction_id;
+      return v_order;
+  end;
 
   -- En modo prueba no se toca inventario real: el pedido igual queda
   -- creado (para poder imprimir y probar el flujo de Entrega completo),
@@ -839,7 +874,7 @@ begin
   return v_order;
 end;
 $$;
-grant execute on function pos.create_order(uuid, text, uuid, jsonb, text, numeric, numeric, text, text, text, text, boolean) to anon, authenticated;
+grant execute on function pos.create_order(uuid, text, uuid, jsonb, text, numeric, numeric, text, text, text, text, boolean, uuid) to anon, authenticated;
 
 create or replace function pos.void_order(p_register_id uuid, p_pin text, p_order_id uuid)
 returns boolean language plpgsql security definer set search_path = pos as $$
