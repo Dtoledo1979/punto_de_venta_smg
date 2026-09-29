@@ -74,7 +74,7 @@
   </div>
 
   <div class="metrics" id="metrics">
-    <div class="metric-card"><div class="label" data-i18n>Sales</div><div class="value loading-txt">—</div></div>
+    <div class="metric-card"><div class="label" data-i18n>Net sales</div><div class="value loading-txt">—</div></div>
     <div class="metric-card"><div class="label" data-i18n>Orders</div><div class="value loading-txt">—</div></div>
     <div class="metric-card"><div class="label" data-i18n>Waiting</div><div class="value loading-txt">—</div></div>
     <div class="metric-card"><div class="label" data-i18n>Low stock</div><div class="value loading-txt">—</div></div>
@@ -109,9 +109,10 @@
       ? t("LIVE · {date}", { date: posCore.fmtDate(ev.event_date + "T12:00:00") })
       : t("LIVE");
 
-    const { data: orders } = await sb.from("orders").select("total,status,payment_method").eq("org_id", posCore.orgId).eq("event_id", eventId).neq("status","voided").eq("is_test", false);
+    const { data: orders } = await sb.from("orders").select("total,status,payment_method,refunded_total").eq("org_id", posCore.orgId).eq("event_id", eventId).neq("status","voided").eq("is_test", false);
     const list = orders || [];
-    const ventas = posUtils.sumMoney(list.filter(o => o.payment_method !== "complimentary").map(o => o.total));
+    // Ventas netas: lo cobrado menos lo reembolsado (las cortesías no son ventas).
+    const ventas = posUtils.sumMoney(list.filter(o => o.payment_method !== "complimentary").flatMap(o => [o.total, -o.refunded_total]));
     const pendientes = list.filter(o => o.status === "pending_delivery").length;
 
     const { data: menuItems } = await sb.from("menu_items").select("stock_qty,initial_stock,track_stock").eq("org_id", posCore.orgId).eq("active", true).eq("track_stock", true);

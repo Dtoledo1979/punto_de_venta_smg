@@ -205,7 +205,8 @@
       <p style="font-size:12px; color:var(--muted); text-align:center; margin:0 0 10px;" data-i18n>Only continue once the terminal shows <b>APPROVED</b>.</p>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-secondary" style="margin:0;" onclick="cancelarConfirmacionTarjeta()" data-i18n>Cancel</button>
-        <button class="btn btn-primary" id="card-confirm-btn" style="margin:0;" onclick="confirmarPagoTarjeta()" data-i18n>✓ Payment approved</button>
+        <button class="btn btn-danger" style="margin:0;" onclick="rechazarPagoTarjeta()" data-i18n>✗ Declined</button>
+        <button class="btn btn-primary" id="card-confirm-btn" style="margin:0;" onclick="confirmarPagoTarjeta()" data-i18n>✓ Approved</button>
       </div>
     </div>
 
@@ -275,6 +276,7 @@
 <script src="/js/i18n.js"></script>
 <script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
+<script src="/js/pos-refunds.js"></script>
 <script>
   const sb = posCore.sb;
   const REGISTER_TYPE = "product";
@@ -658,9 +660,21 @@
     document.getElementById("card-confirm-panel").style.display = "block";
   }
 
-  function cancelarConfirmacionTarjeta(){
+  // Un intento de tarjeta que no terminó en venta (rechazado por el
+  // terminal, o cancelado por el cajero) queda registrado para conciliar con
+  // el terminal y para auditoría — pero no crea pedido, stock ni boleta.
+  async function registrarIntentoTarjeta(status){
+    const p = pendingCardPayment;
     pendingCardPayment = null;
     document.getElementById("card-confirm-panel").style.display = "none";
+    if (!p || !(p.card > 0)) return;
+    const { error } = await sb.rpc("record_payment_attempt", { p_register_id: register.id, p_pin: myPin(), p_amount: p.card, p_status: status, p_operator: operatorName || null, p_is_test: testMode });
+    if (error) showError("Could not record the card attempt", error);
+  }
+  function cancelarConfirmacionTarjeta(){ registrarIntentoTarjeta("cancelled"); }
+  async function rechazarPagoTarjeta(){
+    await registrarIntentoTarjeta("declined");
+    showToast(t("Card declined — nothing was charged, printed or sent."));
   }
 
   async function confirmarPagoTarjeta(){
@@ -891,6 +905,7 @@
   }
 
   let printQueue = [];
+  function enqueueSingle(html){ printQueue.push({ single: html }); processPrintQueue(); }
   let printingNow = false;
   let printingSince = 0;
 
@@ -918,6 +933,10 @@
       setTimeout(finish, 4000);
     }
 
+    if (job.single) {
+      printCopy(job.single, () => { printingNow = false; processPrintQueue(); });
+      return;
+    }
     printCopy(job.copyBarra, () => {
       setTimeout(() => {
         printCopy(job.copyCliente, () => {
@@ -956,7 +975,44 @@
       results.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>" + posCore.esc(allEvents ? t("No results.") : t("No results in this event — try \"Search all events\".")) + "</p>";
       return;
     }
+    lastSearch = Object.fromEntries(data.map(o => [o.id, o]));
     results.innerHTML = data.map(renderSearchRow).join("");
+  }
+  let lastSearch = {};
+
+  function puedeReembolsar(o){
+    return o.status !== "voided" && o.payment_method !== "complimentary" && Number(o.refunded_total) < Number(o.total);
+  }
+
+  function reembolsarPedido(id){
+    const o = lastSearch[id];
+    if (!o) return;
+    posRefunds.open(o, {
+      registerId: register.id, pin: myPin(), operator: operatorName,
+      onError: (e) => showError("Could not refund", e),
+      onDone: (refund) => {
+        showToast(t("Refund of {amount} recorded ({method}).", { amount: posCore.money(refund.amount), method: posCore.label("payment", refund.method) }));
+        printRefundSlip(o, refund);
+        buscarTicket();
+        if (document.getElementById("summary").style.display !== "none") renderSummary();
+      },
+    });
+  }
+
+  // Comprobante de reembolso para el cliente (idioma de la organización).
+  function printRefundSlip(o, refund){
+    const rl = posCore.receiptLang();
+    const r = (text, params) => posCore.esc(t(text, params, rl));
+    let html = '<div class="receipt-copy"><h3>' + posCore.esc(posCore.org.name) + '</h3><h4>' + r("REFUND") + '</h4>';
+    if (refund.is_test) html += '<div class="line" style="justify-content:center; font-weight:800;"><span>' + r("***** TEST — NOT A REAL SALE *****") + '</span></div>';
+    html += '<div class="line"><b>' + r("Ticket #{n}", { n: o.ticket_num }) + '</b><span>' + posCore.fmtDayTime(refund.created_at) + '</span></div><hr>';
+    refund.lines.forEach(l => {
+      html += '<div class="line"><span class="iname">' + l.qty + 'x ' + posCore.esc(l.name) + '</span><span class="iprice">-' + posCore.money(l.amount) + '</span></div>';
+    });
+    html += '<hr><div class="line total"><span class="iname">' + r("REFUNDED") + '</span><span class="iprice">-' + posCore.money(refund.amount) + '</span></div>';
+    html += '<div class="line"><span class="iname">' + r("Method") + '</span><span class="iprice">' + posCore.esc(posCore.label("payment", refund.method, rl)) + '</span></div>';
+    html += '</div>';
+    enqueueSingle(html);
   }
 
   function renderSearchRow(o){
@@ -965,10 +1021,11 @@
     const evTxt = o.events ? posCore.esc(o.events.name) : "";
     return '<div class="search-row">' +
       '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || t("(no name)")) +
-        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + posCore.esc(posCore.label("status", o.status)) + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
+        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + posCore.esc(posCore.label("status", o.status)) + ' · ' + posCore.money(o.total) + (Number(o.refunded_total) > 0 ? ' · ' + posCore.esc(t("Refunded {amount}", { amount: posCore.money(o.refunded_total) })) : '') + ' · ' + itemsTxt + '</div></div>' +
       '<div class="search-actions">' +
         (o.status !== "pending_delivery" ? '<button class="btn btn-secondary" onclick="reabrirPedido(\'' + o.id + '\')">' + posCore.esc(t("Reopen")) + '</button>' : '') +
-        (o.status !== "voided" ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">' + posCore.esc(t("Void")) + '</button>' : '') +
+        (puedeReembolsar(o) ? '<button class="btn btn-secondary" onclick="reembolsarPedido(\'' + o.id + '\')">' + posCore.esc(t("Refund")) + '</button>' : '') +
+        (o.status !== "voided" && !(Number(o.refunded_total) > 0) ? '<button class="btn btn-danger" onclick="anularPedidoBuscado(\'' + o.id + '\')">' + posCore.esc(t("Void")) + '</button>' : '') +
       '</div></div>';
   }
 
@@ -993,43 +1050,39 @@
     if (willShow) renderSummary();
   }
 
+  const SUMMARY_ITEM_LABEL = "Product";
   async function renderSummary(){
     const body = document.getElementById("summary-body");
     if (!activeEvent) { body.innerHTML = "<p>" + posCore.esc(t("No active event.")) + "</p>"; return; }
     body.innerHTML = posCore.esc(t("Loading…"));
-    const { data: orders } = await sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","voided").eq("is_test", false);
+    const [{ data: orders, error: e1 }, { data: refunds, error: e2 }] = await Promise.all([
+      sb.from("orders").select("*").eq("event_id", activeEvent.id).eq("register_id", register.id).neq("status","voided").eq("is_test", false),
+      sb.from("refunds").select("amount, method, lines, orders!inner(event_id)").eq("register_id", register.id).eq("is_test", false).eq("orders.event_id", activeEvent.id),
+    ]);
+    if (e1 || e2) { body.innerHTML = "<p>" + posCore.esc(posCore.errorText(e1 || e2)) + "</p>"; return; }
     if (!orders || orders.length === 0) { body.innerHTML = "<p style='color:#9AA7B2; font-size:13px;'>" + posCore.esc(t("No sales in this event yet.")) + "</p>"; return; }
 
-    const paid = orders.filter(o => o.payment_method !== "complimentary");
-    const courtesy = orders.filter(o => o.payment_method === "complimentary");
-    // Sumas en centavos enteros: sin errores de punto flotante.
-    const C = posUtils.toCents;
-    let totalC = 0, cashC = 0, cardC = 0;
-    const byProduct = {};
-    paid.forEach(o => {
-      totalC += C(o.total);
-      cashC += C(o.cash_amount || 0);
-      cardC += C(o.card_amount || 0);
-      o.items.forEach(it => {
-        if (!byProduct[it.name]) byProduct[it.name] = { qty:0, totalC:0 };
-        byProduct[it.name].qty += Number(it.qty); byProduct[it.name].totalC += C(it.subtotal);
-      });
-    });
-    const total = posUtils.fromCents(totalC), cash = posUtils.fromCents(cashC), card = posUtils.fromCents(cardC);
-
-    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">' + posCore.esc(t("Total sold: {amount}", { amount: posCore.money(total) })) + '</p>';
-    html += '<p style="font-size:13px; color:var(--muted);">' + posCore.esc(t("Cash: {cash} | Card: {card}", { cash: posCore.money(cash), card: posCore.money(card) })) + '</p>';
-    html += '<table class="tbl"><tr><th>' + posCore.esc(t("Product")) + '</th><th>' + posCore.esc(t("Qty")) + '</th><th>' + posCore.esc(t("Total")) + '</th></tr>';
-    Object.keys(byProduct).sort((a,b) => byProduct[b].totalC - byProduct[a].totalC).forEach(name => {
-      html += '<tr><td>' + posCore.esc(name) + '</td><td>' + byProduct[name].qty + '</td><td>' + posCore.money(posUtils.fromCents(byProduct[name].totalC)) + '</td></tr>';
+    // Un solo cálculo (posUtils.summarize, con tests) para cajas y dashboard.
+    const s = posUtils.summarize(orders, refunds);
+    const M = posCore.money, E = posCore.esc;
+    let html = '<p style="font-size:19px; font-weight:700; font-family:Sora,sans-serif;">' + E(t("Net sales: {amount}", { amount: M(s.net) })) + '</p>';
+    html += '<p style="font-size:13px; color:var(--muted);">' + E(t("Cash: {cash} | Card: {card}", { cash: M(s.cash), card: M(s.card) })) + '</p>';
+    if (s.refundCount) {
+      html += '<p style="font-size:13px; color:var(--muted);">' + E(t("Gross {gross} − refunds {refunds} ({n})", { gross: M(s.gross), refunds: M(s.refunds), n: s.refundCount })) + '</p>';
+    }
+    html += '<p style="font-size:13px; color:var(--muted);">' + E(t("{n} sales · average {amount}", { n: s.paidCount, amount: M(s.avgTicket) })) + '</p>';
+    html += '<table class="tbl"><tr><th>' + E(t(SUMMARY_ITEM_LABEL)) + '</th><th>' + E(t("Qty")) + '</th><th>' + E(t("Total")) + '</th></tr>';
+    s.byProduct.forEach(p => {
+      html += '<tr><td>' + E(p.name) + '</td><td>' + p.qty + '</td><td>' + M(p.total) + '</td></tr>';
     });
     html += '</table>';
+    const courtesy = orders.filter(o => o.payment_method === "complimentary");
     if (courtesy.length){
-      html += '<p style="font-weight:600; margin-top:14px;">' + posCore.esc(t("🎁 Complimentary sales ({n})", { n: courtesy.length })) + '</p>';
-      html += '<table class="tbl"><tr><th>' + posCore.esc(t("Customer")) + '</th><th>' + posCore.esc(t("Ticket")) + '</th><th>' + posCore.esc(t("Time")) + '</th><th>' + posCore.esc(t("Products")) + '</th></tr>';
+      html += '<p style="font-weight:600; margin-top:14px;">' + E(t("🎁 Complimentary sales ({n})", { n: courtesy.length })) + ' · ' + E(t("reference value {amount}", { amount: M(s.compValue) })) + '</p>';
+      html += '<table class="tbl"><tr><th>' + E(t("Customer")) + '</th><th>' + E(t("Ticket")) + '</th><th>' + E(t("Time")) + '</th><th>' + E(t("Products")) + '</th></tr>';
       courtesy.forEach(o => {
-        const itemsTxt = posCore.esc(o.items.map(it => it.qty + "x " + it.name).join(", "));
-        html += '<tr><td>' + posCore.esc(o.customer_name || t("(no name)")) + '</td><td>#' + o.ticket_num + '</td><td>' + posCore.fmtTime(o.paid_at) + '</td><td>' + itemsTxt + '</td></tr>';
+        const itemsTxt = E(o.items.map(it => it.qty + "x " + it.name).join(", "));
+        html += '<tr><td>' + E(o.customer_name || t("(no name)")) + '</td><td>#' + o.ticket_num + '</td><td>' + posCore.fmtTime(o.paid_at) + '</td><td>' + itemsTxt + '</td></tr>';
       });
       html += '</table>';
     }
@@ -1046,14 +1099,14 @@
     if (!allEvents && activeEvent) query = query.eq("event_id", activeEvent.id);
     const { data: orders, error } = await query;
     if (error) { showError("Could not export", error); return; }
-    const rows = [["Event","Date","Ticket","Time","Customer","Product","Quantity","UnitPrice","Subtotal","TicketTotal","PaymentMethod","Cash","Card","Status","Note"]];
+    const rows = [["Event","Date","Ticket","Time","Customer","Product","Quantity","UnitPrice","Subtotal","TicketTotal","PaymentMethod","Cash","Card","RefundedTotal","Status","Note"]];
     (orders||[]).forEach(o => {
       const evName = o.events ? o.events.name : "";
       const fecha = posCore.fmtDate(o.paid_at);
       const hora = posCore.fmtTimeSec(o.paid_at);
       o.items.forEach(it => {
         const m2 = v => Number(v || 0).toFixed(2); // montos siempre con 2 decimales
-        rows.push([evName, fecha, o.ticket_num, hora, o.customer_name||"", it.name, it.qty, m2(it.price), m2(it.subtotal), m2(o.total), o.payment_method, m2(o.cash_amount), m2(o.card_amount), o.status, o.obs||""]);
+        rows.push([evName, fecha, o.ticket_num, hora, o.customer_name||"", it.name, it.qty, m2(it.price), m2(it.subtotal), m2(o.total), o.payment_method, m2(o.cash_amount), m2(o.card_amount), m2(o.refunded_total), o.status, o.obs||""]);
       });
     });
     const csv = rows.map(r => r.map(csvField).join(",")).join("\n");

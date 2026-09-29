@@ -113,6 +113,7 @@
     <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')"><span data-i18n>Overview</span></button>
     <button class="tab-btn" data-tab="productos" onclick="switchTab('productos')"><span data-i18n>📋 Products</span></button>
     <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')"><span data-i18n>🧪 Ingredients</span></button>
+    <button class="tab-btn" data-tab="audit" id="audit-tab-btn" style="display:none;" onclick="switchTab('audit'); loadAudit();"><span data-i18n>🛡️ Audit log</span></button>
   </div>
 
   <div id="tab-overview" class="tab-panel">
@@ -153,6 +154,13 @@
       <input type="text" id="new-ing-container-label" placeholder="bottle (optional)" data-i18n-ph>
       <button class="btn btn-primary" onclick="addIngredient()" data-i18n>Add ingredient</button>
     </div>
+  </div>
+  </div>
+  <div id="tab-audit" class="tab-panel" style="display:none;">
+  <div class="card">
+    <h2 data-i18n>🛡️ Audit log</h2>
+    <p class="sub" data-i18n>Sensitive actions (voids, refunds, complimentary sales, price and recipe changes, stock loads, PIN and role changes). Nobody can edit or delete these entries.</p>
+    <div id="audit-list"></div>
   </div>
   </div>
 </main>
@@ -278,6 +286,7 @@
   }
 
   async function afterUnlock() {
+    if (["owner","admin","manager"].includes(posCore.role)) document.getElementById("audit-tab-btn").style.display = "";
     await loadMenu();
     await loadIngredients();
     renderAll();
@@ -810,6 +819,38 @@
       if (error) { showError("Could not update the organisation", error); return; }
       showToast(t("Organisation language updated."));
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Auditoría (solo owner/admin/manager; la RLS lo garantiza en la base)
+  // ---------------------------------------------------------------------
+  function auditSummary(a){
+    const d = a.details || {};
+    const parts = [];
+    if (d.ticket) parts.push("#" + d.ticket);
+    if (d.amount !== undefined) parts.push(posCore.money(d.amount) + (d.method ? " " + posCore.label("payment", d.method) : ""));
+    if (d.reason) parts.push(posCore.label("reason", d.reason));
+    if (d.total !== undefined && d.amount === undefined) parts.push(posCore.money(d.total));
+    if (d.reference_value !== undefined) parts.push(posCore.money(d.reference_value));
+    if (d.old_price !== undefined && d.old_price !== d.new_price) parts.push(posCore.money(d.old_price) + " → " + posCore.money(d.new_price));
+    if (d.old_name && d.old_name !== d.new_name) parts.push(d.old_name + " → " + d.new_name);
+    if (d.name) parts.push(d.name);
+    if (d.qty_change !== undefined) parts.push((d.qty_change > 0 ? "+" : "") + d.qty_change);
+    if (d.pin_changed) parts.push(t("PIN changed"));
+    if (d.delivery_pin_changed) parts.push(t("Delivery PIN changed"));
+    if (d.new_role && d.new_role !== d.old_role) parts.push(posCore.label("role", d.old_role) + " → " + posCore.label("role", d.new_role));
+    if (d.is_test) parts.push("🧪");
+    return parts.join(" · ");
+  }
+
+  async function loadAudit(){
+    const box = document.getElementById("audit-list");
+    box.textContent = t("Loading…");
+    const { data, error } = await sb.from("audit_log").select("created_at, action, details, operator_name, register_id").eq("org_id", posCore.orgId).order("created_at", { ascending:false }).limit(150);
+    if (error) { box.textContent = posCore.errorText(error); return; }
+    if (!data.length) { box.innerHTML = "<p class='qty-sub'>" + E(t("No entries yet.")) + "</p>"; return; }
+    box.innerHTML = '<table class="tbl"><tr><th>' + E(t("Date")) + '</th><th>' + E(t("Action")) + '</th><th>' + E(t("Details")) + '</th><th>' + E(t("Who")) + '</th></tr>' +
+      data.map(a => '<tr><td>' + posCore.fmtDayTime(a.created_at) + '</td><td>' + E(posCore.label("audit", a.action)) + '</td><td>' + E(auditSummary(a)) + '</td><td>' + E(a.operator_name || "—") + '</td></tr>').join("") + '</table>';
   }
 
   posCore.ready.then(init);

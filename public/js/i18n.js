@@ -41,9 +41,22 @@
     register: { product: "Products", ticket: "Tickets" },
     movement: {
       opening_stock: "Opening stock", purchase: "Restock", sale: "Sale", adjustment: "Adjustment",
-      void_return: "Returned (void)", reopen_sale: "Deducted (reopen)",
+      void_return: "Returned (void)", reopen_sale: "Deducted (reopen)", refund_return: "Returned (refund)",
     },
     role: { owner: "Owner", admin: "Admin", manager: "Manager", staff: "Staff" },
+    reason: { wrong_item: "Wrong item", quality: "Quality issue", changed_mind: "Customer changed their mind", overcharged: "Overcharged", other: "Other" },
+    payment_status: { approved: "Approved", declined: "Declined", cancelled: "Cancelled", voided: "Voided" },
+    audit: {
+      "order.void": "Order voided", "order.reopen": "Order reopened", "order.complimentary": "Complimentary sale",
+      "order.refund": "Refund", "payment.declined": "Card declined", "payment.cancelled": "Card payment cancelled",
+      "menu.add": "Product added", "menu.update": "Product changed", "menu.remove": "Product removed",
+      "recipe.change": "Recipe changed", "promotion.insert": "Promotion created", "promotion.update": "Promotion changed",
+      "promotion.delete": "Promotion removed", "stock.opening_stock": "Opening stock", "stock.purchase": "Restock",
+      "stock.adjustment": "Stock adjustment", "register.create": "Register created", "register.update": "Register changed",
+      "supervisor_pin.change": "Supervisor PIN changed", "member.add": "Member added", "member.update": "Member changed",
+      "event.close": "Event closed", "event.reopen": "Event reopened", "ticket.reset_numbering": "Ticket numbering reset",
+      "org.update": "Organisation changed",
+    },
   };
   function label(kind, code, lang) {
     const en = LABELS[kind] && LABELS[kind][code];
@@ -89,6 +102,21 @@
     "stock.invalid_mode": "Invalid stock operation.",
     "ticket.invalid_start": "The starting number must be 1 or more.",
     "validation.name_required": "The name is required.",
+    "order.immutable": "A sale can't be modified after it's recorded.",
+    "order.invalid_transition": "That order can't change from {from} to {to}.",
+    "order.has_refunds": "This order has refunds and can't be voided.",
+    "payment.immutable": "Payments can't be modified.",
+    "payment.invalid_attempt": "Invalid payment attempt.",
+    "refund.immutable": "Refunds can't be modified.",
+    "refund.invalid_reason": "Choose a reason for the refund.",
+    "refund.order_voided": "This order is voided — there is nothing to refund.",
+    "refund.complimentary": "Complimentary sales can't be refunded.",
+    "refund.no_lines": "Choose at least one item to refund.",
+    "refund.invalid_line": "Invalid refund line.",
+    "refund.qty_exceeds": "Only {available} of {name} can still be refunded.",
+    "refund.zero": "The refund amount must be greater than zero.",
+    "refund.exceeds_method": "You can refund at most {amount} by {method}.",
+    "audit.immutable": "The audit log can't be modified.",
   };
 
   // Recibe el error de supabase-js ({ message, details, code }) y devuelve

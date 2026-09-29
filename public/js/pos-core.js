@@ -53,6 +53,7 @@
     "set_recipe", "upsert_promotion", "delete_promotion",
     "create_order", "void_order", "reopen_order",
     "despacho_toggle_item", "despacho_confirm_all",
+    "record_payment_attempt", "refund_order",
   ]);
   const rawRpc = sb.rpc.bind(sb);
   sb.rpc = function (fn, args, opts) {
@@ -100,7 +101,8 @@
     fmtDate(d) { return dtf({ day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(d)); },
     fmtDayTime(d) { return dtf({ day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(d)); },
     errorText(error) {
-      return posI18n.errorText(error, (k, v) => (["paid", "total"].includes(k) ? core.money(v) : v));
+      return posI18n.errorText(error, (k, v) =>
+        ["paid", "total", "amount"].includes(k) ? core.money(v) : k === "method" ? core.label("payment", v) : v);
     },
     setLang(lang) {
       storage.set(LANG_KEY, lang);

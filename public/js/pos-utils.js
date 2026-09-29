@@ -71,5 +71,43 @@
     return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
-  root.posUtils = { toCents, fromCents, sumMoney, roundMoney, formatMoney, lineTotal, escapeHtml, csvField };
+  // ---------------------------------------------------------------------
+  // Resumen de ventas (fuente única para cajas y dashboard).
+  //   orders:  pedidos NO anulados y NO de prueba
+  //   refunds: reembolsos NO de prueba de esos pedidos
+  // Todo en centavos. Ventas netas = cobrado − reembolsado; las cortesías
+  // no son ventas (se informan aparte, con su valor de referencia).
+  // ---------------------------------------------------------------------
+  function summarize(orders, refunds) {
+    const C = toCents;
+    const s = { grossC: 0, cashC: 0, cardC: 0, refundC: 0, refundCashC: 0, refundCardC: 0, paidCount: 0, compCount: 0, compValueC: 0, refundCount: 0 };
+    const byProduct = {};
+    const prod = (name) => (byProduct[name] = byProduct[name] || { qty: 0, totalC: 0 });
+    for (const o of orders || []) {
+      if (o.payment_method === "complimentary") { s.compCount++; s.compValueC += C(o.total); continue; }
+      s.paidCount++;
+      s.grossC += C(o.total); s.cashC += C(o.cash_amount); s.cardC += C(o.card_amount);
+      for (const it of o.items || []) { const p = prod(it.name); p.qty += Number(it.qty); p.totalC += C(it.subtotal); }
+    }
+    for (const r of refunds || []) {
+      s.refundCount++;
+      s.refundC += C(r.amount);
+      if (r.method === "cash") s.refundCashC += C(r.amount); else s.refundCardC += C(r.amount);
+      for (const l of r.lines || []) { const p = prod(l.name); p.qty -= Number(l.qty); p.totalC -= C(l.amount); }
+    }
+    const netC = s.grossC - s.refundC;
+    return {
+      gross: fromCents(s.grossC), refunds: fromCents(s.refundC), net: fromCents(netC),
+      cash: fromCents(s.cashC - s.refundCashC), card: fromCents(s.cardC - s.refundCardC),
+      refundsCash: fromCents(s.refundCashC), refundsCard: fromCents(s.refundCardC),
+      paidCount: s.paidCount, refundCount: s.refundCount,
+      compCount: s.compCount, compValue: fromCents(s.compValueC),
+      avgTicket: s.paidCount ? fromCents(Math.round(netC / s.paidCount)) : 0,
+      byProduct: Object.entries(byProduct)
+        .map(([name, p]) => ({ name, qty: p.qty, total: fromCents(p.totalC) }))
+        .sort((a, b) => b.total - a.total),
+    };
+  }
+
+  root.posUtils = { toCents, fromCents, sumMoney, roundMoney, formatMoney, lineTotal, escapeHtml, csvField, summarize };
 })(typeof globalThis !== "undefined" ? globalThis : window);

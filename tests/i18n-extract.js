@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
 export const PAGES = readdirSync(ROOT).filter((f) => f.endsWith(".html")).map((f) => join(ROOT, f));
-export const SCRIPTS = [join(ROOT, "public/js/pos-core.js")];
+export const SCRIPTS = [join(ROOT, "public/js/pos-core.js"), join(ROOT, "public/js/pos-refunds.js")];
 
 const unescapeJs = (s, q) => (q === '"' ? JSON.parse('"' + s + '"') : JSON.parse('"' + s.replace(/\\'/g, "'").replace(/"/g, '\\"') + '"'));
 
