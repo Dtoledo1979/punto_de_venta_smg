@@ -301,21 +301,89 @@ revoke execute on function pos.next_ticket(uuid) from anon, authenticated;
 -- ---------------------------------------------------------------------
 -- Verificación de PIN (devuelven true/false, nunca el valor real)
 -- ---------------------------------------------------------------------
-create or replace function pos.verify_register_pin(p_register_id uuid, p_pin text)
+-- ---------------------------------------------------------------------
+-- Límite de intentos de PIN (auditoría P1 — antes no existía ningún
+-- freno: con PINs numéricos cortos y la función pública, se podían
+-- probar las 10.000 combinaciones en segundos). Nunca accesible
+-- directamente desde el navegador — solo lo tocan las funciones de
+-- verificación de acá abajo.
+-- ---------------------------------------------------------------------
+create table pos.pin_attempts (
+  scope text not null,       -- 'register' | 'despacho' | 'admin'
+  scope_id uuid not null,    -- register_id, o un uuid fijo para 'admin' (PIN único del sistema)
+  fail_count int not null default 0,
+  locked_until timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (scope, scope_id)
+);
+revoke all on pos.pin_attempts from anon, authenticated;
+
+create or replace function pos._pin_locked(p_scope text, p_scope_id uuid)
 returns boolean language sql security definer set search_path = pos as $$
-  select exists(select 1 from pos.registers where id = p_register_id and pin = p_pin);
+  select exists(
+    select 1 from pos.pin_attempts
+    where scope = p_scope and scope_id = p_scope_id
+      and locked_until is not null and locked_until > now()
+  );
+$$;
+
+create or replace function pos._pin_record(p_scope text, p_scope_id uuid, p_success boolean, p_max_fails int, p_lockout_minutes int)
+returns void language plpgsql security definer set search_path = pos as $$
+begin
+  if p_success then
+    insert into pos.pin_attempts (scope, scope_id, fail_count, locked_until, updated_at)
+      values (p_scope, p_scope_id, 0, null, now())
+      on conflict (scope, scope_id) do update set fail_count = 0, locked_until = null, updated_at = now();
+  else
+    insert into pos.pin_attempts (scope, scope_id, fail_count, locked_until, updated_at)
+      values (p_scope, p_scope_id, 1, null, now())
+      on conflict (scope, scope_id) do update set
+        fail_count = pos.pin_attempts.fail_count + 1,
+        locked_until = case when pos.pin_attempts.fail_count + 1 >= p_max_fails
+                             then now() + (p_lockout_minutes || ' minutes')::interval
+                             else pos.pin_attempts.locked_until end,
+        updated_at = now();
+  end if;
+end;
+$$;
+
+create or replace function pos.verify_register_pin(p_register_id uuid, p_pin text)
+returns boolean language plpgsql security definer set search_path = pos as $$
+declare v_ok boolean;
+begin
+  if pos._pin_locked('register', p_register_id) then return false; end if;
+  select exists(select 1 from pos.registers where id = p_register_id and pin = p_pin) into v_ok;
+  perform pos._pin_record('register', p_register_id, v_ok, 5, 5);
+  return v_ok;
+end;
 $$;
 grant execute on function pos.verify_register_pin(uuid, text) to anon, authenticated;
 
 create or replace function pos.verify_despacho_pin(p_register_id uuid, p_pin text)
-returns boolean language sql security definer set search_path = pos as $$
-  select exists(select 1 from pos.registers where id = p_register_id and despacho_pin = p_pin);
+returns boolean language plpgsql security definer set search_path = pos as $$
+declare v_ok boolean;
+begin
+  if pos._pin_locked('despacho', p_register_id) then return false; end if;
+  select exists(select 1 from pos.registers where id = p_register_id and despacho_pin = p_pin) into v_ok;
+  perform pos._pin_record('despacho', p_register_id, v_ok, 5, 5);
+  return v_ok;
+end;
 $$;
 grant execute on function pos.verify_despacho_pin(uuid, text) to anon, authenticated;
 
 create or replace function pos.verify_admin_pin(p_pin text)
-returns boolean language sql security definer set search_path = pos as $$
-  select exists(select 1 from pos.admin_settings where id = true and admin_pin = p_pin);
+returns boolean language plpgsql security definer set search_path = pos as $$
+declare v_ok boolean; v_admin_scope constant uuid := '00000000-0000-0000-0000-000000000000';
+begin
+  -- El PIN de administrador es único para todo el sistema (una sola fila
+  -- en admin_settings) — por eso usa un scope_id fijo en vez del id de
+  -- una caja. Límite más estricto que el de las cajas: es el PIN que
+  -- puede cambiar todos los demás.
+  if pos._pin_locked('admin', v_admin_scope) then return false; end if;
+  select exists(select 1 from pos.admin_settings where id = true and admin_pin = p_pin) into v_ok;
+  perform pos._pin_record('admin', v_admin_scope, v_ok, 3, 15);
+  return v_ok;
+end;
 $$;
 grant execute on function pos.verify_admin_pin(text) to anon, authenticated;
 
