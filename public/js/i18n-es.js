@@ -676,4 +676,10 @@ posI18n.register("es", {
   "{email} added to the team.": "{email} agregado al equipo.",
   "Plan: {plan} ({status}) · locations {l}/{lm} · registers {r}/{rm}": "Plan: {plan} ({status}) · ubicaciones {l}/{lm} · cajas {r}/{rm}",
   "Your business is ready! Add your products below, then open the register to start selling.": "¡Tu negocio está listo! Agrega tus productos abajo y después abre la caja para empezar a vender.",
+  "🧹 Clear test data": "🧹 Borrar datos de prueba",
+  "Deletes every test-mode sale (and its payments and refunds) of this business. Real sales are never touched.": "Borra todas las ventas de modo prueba (con sus pagos y reembolsos) de este negocio. Las ventas reales nunca se tocan.",
+  "Delete all test-mode sales of this business? Real sales are not affected. This can't be undone.": "¿Borrar todas las ventas de modo prueba de este negocio? Las ventas reales no se tocan. No se puede deshacer.",
+  "Could not clear the test data": "No se pudieron borrar los datos de prueba",
+  "Test data cleared: {n} test orders deleted.": "Datos de prueba borrados: {n} pedidos de prueba eliminados.",
+  "Test data cleared": "Datos de prueba borrados",
 });

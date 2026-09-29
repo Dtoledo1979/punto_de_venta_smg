@@ -59,7 +59,7 @@
       "stock.adjustment": "Stock adjustment", "stock.waste": "Waste", "stock.stocktake": "Stocktake", "register.create": "Register created", "register.update": "Register changed",
       "supervisor_pin.change": "Supervisor PIN changed", "member.add": "Member added", "member.update": "Member changed",
       "event.close": "Event closed", "event.reopen": "Event reopened", "ticket.reset_numbering": "Ticket numbering reset",
-      "org.update": "Organisation changed",
+      "org.update": "Organisation changed", "test_data.purge": "Test data cleared",
       "session.open": "Register opened", "session.close": "Register closed",
       "cash.cash_in": "Cash in", "cash.cash_out": "Cash out",
     },

@@ -36,7 +36,7 @@
   .card{background:var(--surface); border-radius:20px; padding:20px; box-shadow:0 1px 2px rgba(15,23,32,.06); border:1px solid var(--border); margin-bottom:18px;}
   .card h2{font-family:'Sora',sans-serif; font-size:17px; margin:0 0 4px;}
   .card .sub{font-size:12.5px; color:var(--muted); margin:0 0 14px;}
-  .toggle{color:#3E6BD6; font-size:12.5px; cursor:pointer; background:none; border:none; padding:0; text-decoration:underline;}
+  .toggle{color:#3E6BD6; font-size:12.5px; cursor:pointer; background:none; border:none; padding:0; text-decoration:underline; display:inline-flex; align-items:center; min-height:36px;}
 
   .item-card{border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:10px; background:var(--surface-alt);}
   .item-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
@@ -181,6 +181,10 @@
     </div>
     <p class="qty-sub" style="margin-top:8px;" data-i18n>The person needs an account first (they can create one from the sign-in screen).</p>
     <div id="plan-box" class="qty-sub" style="margin-top:14px;"></div>
+    <div style="margin-top:14px; border-top:1px dashed var(--border); padding-top:12px;">
+      <button class="reset-btn" onclick="purgeTestData()" data-i18n>🧹 Clear test data</button>
+      <span class="qty-sub" data-i18n>Deletes every test-mode sale (and its payments and refunds) of this business. Real sales are never touched.</span>
+    </div>
   </div>
   </div>
 
@@ -1043,6 +1047,13 @@
     if (error) showError("Could not update the member", error);
     else showToast(t("Team updated."));
     loadTeam();
+  }
+
+  async function purgeTestData(){
+    if (!confirm(t("Delete all test-mode sales of this business? Real sales are not affected. This can't be undone."))) return;
+    const { data, error } = await sb.rpc("purge_test_data", { p_org_id: posCore.orgId });
+    if (error) { showError("Could not clear the test data", error); return; }
+    showToast(t("Test data cleared: {n} test orders deleted.", { n: data.orders }));
   }
 
   async function addMember(){
