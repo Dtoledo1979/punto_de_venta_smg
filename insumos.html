@@ -205,6 +205,7 @@
   const sb = posCore.sb;
   const REGISTER_TYPE = "product";
 
+  const STATIONS = ["bar", "kitchen", "coffee", "collection", "none"];
   const PALETTE = ["#E4483A","#F0A202","#F5D547","#3AD16A","#4FB3E8","#3E6BD6","#8B5FBF","#E85D9C","#8A97A3"];
 
   let register = null;
@@ -387,6 +388,10 @@
           '<button class="del-btn">✕</button>' +
         '</div>' +
         '<div class="color-row">' +
+          '<span class="lbl">' + E(t("Station:")) + '</span>' +
+          '<select class="station-sel" style="padding:5px; border:1px solid var(--border); border-radius:6px; margin-right:10px;">' +
+            STATIONS.map(st => '<option value="' + st + '"' + ((item.station || "bar") === st ? " selected" : "") + '>' + E(posCore.label("station", st)) + '</option>').join("") +
+          '</select>' +
           '<span class="lbl">' + E(t("Colour:")) + '</span>' +
           '<span class="swatch none ' + (!item.color ? "selected" : "") + '" data-color="">∅</span>' +
           swatches +
@@ -416,6 +421,13 @@
       nameInput.onchange = () => updateItem(item.id, { name: nameInput.value });
       priceInput.onchange = () => updateItem(item.id, { price: posUtils.roundMoney(priceInput.value) });
       wrap.querySelector(".del-btn").onclick = () => removeItem(item.id);
+
+      wrap.querySelector(".station-sel").onchange = async (e) => {
+        const { error } = await sb.rpc("set_item_station", { p_register_id: register.id, p_pin: myPin(), p_item_id: item.id, p_station: e.target.value });
+        if (error) showError("Could not change the station", error);
+        else showToast(t("{name} now goes to: {station}.", { name: item.name, station: posCore.label("station", e.target.value) }));
+        await loadMenu(); renderAll();
+      };
 
       wrap.querySelectorAll(".swatch").forEach(sw => {
         sw.onclick = async () => {

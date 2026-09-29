@@ -96,6 +96,8 @@
   </div>
 </div>
 
+<div class="search-card" id="station-bar" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"></div>
+
 <main>
   <div id="board" class="grid"></div>
   <div id="empty-msg" class="empty" style="display:none;" data-i18n>No orders waiting for delivery.</div>
@@ -237,6 +239,7 @@
 
   async function afterUnlock(){
     document.getElementById("event-label").textContent += " · " + t("Receiving: {name}", { name: operatorName });
+    renderStationBar();
     await loadPending();
     await loadDeliveredRecent();
     render();
@@ -269,6 +272,33 @@
     window.addEventListener("online", refreshAll);
   }
 
+  // Estación de esta pantalla (se recuerda por dispositivo): "all" ve todo
+  // y cierra pedidos; una estación ve y marca solo sus productos.
+  const STATIONS = ["all", "bar", "kitchen", "coffee", "collection"];
+  let station = (() => { try { return localStorage.getItem("pos_kds_station") || "all"; } catch (_) { return "all"; } })();
+  const stationOf = (it) => it.station || "bar";
+
+  function renderStationBar(){
+    const bar = document.getElementById("station-bar");
+    bar.innerHTML = '<span style="font-size:13px; color:#9AA7B2; margin-right:4px;">' + posCore.esc(t("This screen shows:")) + '</span>' +
+      STATIONS.map(st => '<button class="search-toggle" style="width:auto; padding:8px 12px;' + (st === station ? ' background:#A8E020; color:#1A2333; font-weight:700;' : '') + '" onclick="setStation(\'' + st + '\')">' +
+        posCore.esc(st === "all" ? t("All stations") : posCore.label("station", st)) + '</button>').join("");
+  }
+
+  function setStation(st){
+    station = st;
+    try { localStorage.setItem("pos_kds_station", st); } catch (_) { /* sin storage */ }
+    renderStationBar();
+    render();
+  }
+
+  async function marcarEstacion(orderId){
+    const { error } = await sb.rpc("despacho_mark_station", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_station: station, p_by: operatorName || null });
+    if (error) { showError("Could not mark it", error); return; }
+    showToast(t("{station}: ready.", { station: posCore.label("station", station) }));
+    await refreshAll();
+  }
+
   function fmt(seconds){
     const m = Math.floor(seconds/60), s = seconds%60;
     return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
@@ -277,22 +307,25 @@
   function render(){
     const board = document.getElementById("board");
     const empty = document.getElementById("empty-msg");
-    if (pendingOrders.length === 0){
+    const visible = station === "all" ? pendingOrders
+      : pendingOrders.filter(o => o.items.some(it => stationOf(it) === station && !it.delivered));
+    if (visible.length === 0){
       board.innerHTML = ""; empty.style.display = "block";
     } else {
       empty.style.display = "none";
-      const multiEvent = new Set(pendingOrders.map(o => o.event_id)).size > 1;
-      board.innerHTML = pendingOrders.map(o => {
+      const multiEvent = new Set(visible.map(o => o.event_id)).size > 1;
+      board.innerHTML = visible.map(o => {
         const elapsed = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/1000));
         const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
         const doneCount = o.items.filter(it => it.delivered).length;
         const allDone = doneCount === o.items.length;
         const eventTag = multiEvent && o.events ? '<div class="event-tag">' + posCore.esc(o.events.name) + '</div>' : '';
         const itemsHtml = o.items.map((it, idx) => {
+          if (station !== "all" && stationOf(it) !== station) return "";
           const done = !!it.delivered;
           return '<div class="item-line ' + (done ? "done" : "") + '" onclick="toggleItem(\'' + o.id + '\',' + idx + ')">' +
             '<span class="check">' + (done ? "✔" : "") + '</span>' +
-            '<span>' + it.qty + 'x ' + posCore.esc(it.name) + '</span></div>';
+            '<span>' + it.qty + 'x ' + posCore.esc(it.name) + (station === "all" && stationOf(it) !== "none" ? ' <small style="color:#7C8996;">· ' + posCore.esc(posCore.label("station", stationOf(it))) + '</small>' : '') + '</span></div>';
         }).join("");
         return '<div class="order">' +
           eventTag +
@@ -301,7 +334,9 @@
           '<div class="items">' + itemsHtml + '</div>' +
           (o.obs ? '<div class="obs">' + posCore.esc(o.obs) + '</div>' : '') +
           '<div class="meta"><span>' + posCore.fmtTime(o.paid_at) + '</span><span>' + posCore.esc(posCore.label("payment", o.payment_method)) + '</span></div>' +
-          '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + posCore.esc(allDone ? t("✔ Close order") : t("Mark all as delivered")) + '</button>' +
+          (station === "all"
+            ? '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + posCore.esc(allDone ? t("✔ Close order") : t("Mark all as delivered")) + '</button>'
+            : '<button class="btn-deliver ready" onclick="marcarEstacion(\'' + o.id + '\')">' + posCore.esc(t("✔ {station} ready", { station: posCore.label("station", station) })) + '</button>') +
           '</div>';
       }).join("");
     }

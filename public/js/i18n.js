@@ -47,6 +47,7 @@
     role: { owner: "Owner", admin: "Admin", manager: "Manager", staff: "Staff" },
     reason: { wrong_item: "Wrong item", quality: "Quality issue", changed_mind: "Customer changed their mind", overcharged: "Overcharged", other: "Other" },
     payment_status: { approved: "Approved", declined: "Declined", cancelled: "Cancelled", voided: "Voided" },
+    station: { bar: "Bar", kitchen: "Kitchen", coffee: "Coffee", collection: "Collection", none: "No preparation" },
     waste_reason: { spillage: "Spillage", breakage: "Breakage", expired: "Expired", staff: "Staff consumption", prep_error: "Preparation error", other: "Other" },
     audit: {
       "order.void": "Order voided", "order.reopen": "Order reopened", "order.complimentary": "Complimentary sale",
@@ -137,6 +138,7 @@
     "session.immutable": "A closed register session can't be modified.",
     "order.session_closed": "That sale belongs to a register that's already closed — refund it instead of voiding.",
     "org.invalid_tax_rate": "Invalid tax rate.",
+    "station.invalid": "Invalid station.",
   };
 
   // Recibe el error de supabase-js ({ message, details, code }) y devuelve

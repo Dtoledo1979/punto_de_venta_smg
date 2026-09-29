@@ -596,4 +596,19 @@ posI18n.register("es", {
   "{tax} included: {amount}": "{tax} incluido: {amount}",
   "{tax} number printed on receipts (leave blank to keep it):": "Número de {tax} impreso en las boletas (deja vacío para no cambiarlo):",
   "{tax} number updated.": "Número de {tax} actualizado.",
+
+  // ---- Fase 5: estaciones ----
+  "Bar": "Barra",
+  "Kitchen": "Cocina",
+  "Coffee": "Café",
+  "Collection": "Retiro",
+  "No preparation": "Sin preparación",
+  "Invalid station.": "Estación inválida.",
+  "All stations": "Todas las estaciones",
+  "This screen shows:": "Esta pantalla muestra:",
+  "Station:": "Estación:",
+  "Could not change the station": "No se pudo cambiar la estación",
+  "{name} now goes to: {station}.": "{name} ahora va a: {station}.",
+  "{station}: ready.": "{station}: listo.",
+  "✔ {station} ready": "✔ {station} listo",
 });
