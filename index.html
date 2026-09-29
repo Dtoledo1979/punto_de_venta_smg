@@ -147,6 +147,11 @@
 
   function enterEvent(){
     if (!selectedId) return;
+    // Guardar siempre la selección: con un solo evento abierto se elige solo
+    // (sin pasar por selectEvent) y el dashboard no lo encontraba.
+    const ev = openEvents.find(e => e.id === selectedId);
+    sessionStorage.setItem("pos_selected_event_id", selectedId);
+    sessionStorage.setItem("pos_selected_event_name", ev ? ev.name : "");
     location.href = "dashboard.html";
   }
 

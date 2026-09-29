@@ -1041,7 +1041,8 @@
       const fecha = paidDate.toLocaleDateString("es-CL");
       const hora = paidDate.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
       o.items.forEach(it => {
-        rows.push([evName, fecha, o.ticket_num, hora, o.customer_name||"", it.name, it.qty, it.price, it.subtotal, o.total, o.payment_method, o.cash_amount, o.card_amount, o.status, o.obs||""]);
+        const m2 = v => Number(v || 0).toFixed(2); // montos siempre con 2 decimales
+        rows.push([evName, fecha, o.ticket_num, hora, o.customer_name||"", it.name, it.qty, m2(it.price), m2(it.subtotal), m2(o.total), o.payment_method, m2(o.cash_amount), m2(o.card_amount), o.status, o.obs||""]);
       });
     });
     const csv = rows.map(r => r.map(csvField).join(",")).join("\n");

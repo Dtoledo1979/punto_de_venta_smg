@@ -275,6 +275,32 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- 8b. Idempotencia: el mismo intento de cobro (reintento tras corte de red,
+--     doble envío) = UN pedido, UN descuento de stock, UN movimiento.
+-- ---------------------------------------------------------------------
+do $$
+declare v_reg uuid; v_ev uuid; v_item uuid; v_tx uuid := gen_random_uuid();
+        v_o1 pos.orders; v_o2 pos.orders; v_stock_before numeric; v_movs int;
+begin
+  select id into v_reg from pos.registers where org_id = (select org_a from t_ids);
+  select id into v_ev from pos.events where org_id = (select org_a from t_ids);
+  select id, stock_qty into v_item, v_stock_before from pos.menu_items where register_id = v_reg and name = 'Piscola';
+  v_o1 := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
+                           'efectivo', 10, 0, 'Reintento', null, null, null, false, v_tx);
+  v_o2 := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
+                           'efectivo', 10, 0, 'Reintento', null, null, null, false, v_tx);
+  if v_o1.id is null or v_o1.id <> v_o2.id then raise exception 'FALLA: el reintento creó un segundo pedido'; end if;
+  if (select count(*) from pos.orders where client_transaction_id = v_tx) <> 1 then raise exception 'FALLA: hay más de un pedido con el mismo intento'; end if;
+  if (select stock_qty from pos.menu_items where id = v_item) <> v_stock_before - 1 then
+    raise exception 'FALLA: el reintento descontó stock dos veces';
+  end if;
+  select count(*) into v_movs from pos.stock_movements
+    where menu_item_id = v_item and type = 'venta' and created_at = now();
+  if v_movs <> 1 then raise exception 'FALLA: % movimientos de venta para un solo cobro', v_movs; end if;
+  raise notice 'OK 8b: idempotencia (un pedido, un descuento)';
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 9. anon: sin ningún acceso al schema pos.
 -- ---------------------------------------------------------------------
 reset role;
