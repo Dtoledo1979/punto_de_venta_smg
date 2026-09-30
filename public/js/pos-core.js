@@ -188,12 +188,9 @@
     if (!e) return;
     core.entitlements = e;
     let text = null, bad = false;
-    if (!e.can_operate) { text = core.t("Your subscription isn't active (trial ended or cancelled). You can look around and use test mode, but registers can't open for real sales."); bad = true; }
+    if (e.status === "incomplete") { text = core.t("Your subscription is awaiting payment. You can set everything up and use test mode; registers open for real sales once payment is confirmed."); bad = true; }
+    else if (!e.can_operate) { text = core.t("Your subscription isn't active (cancelled). You can look around and use test mode, but registers can't open for real sales."); bad = true; }
     else if (e.status === "past_due") { text = core.t("Payment is overdue — please update your billing to avoid interruption."); bad = true; }
-    else if (e.status === "trialing" && e.trial_ends_at) {
-      const days = Math.max(0, Math.ceil((new Date(e.trial_ends_at) - Date.now()) / 86400000));
-      text = core.t("Free trial: {n} days left.", { n: days });
-    }
     if (!text) return;
     const div = document.createElement("div");
     div.style.cssText = "text-align:center;font:600 13px Inter,Arial,sans-serif;padding:7px 12px;" + (bad ? "background:#FDECEA;color:#A3271D" : "background:#EEF8DA;color:#3A5200");

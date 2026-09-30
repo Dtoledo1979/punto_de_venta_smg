@@ -35,6 +35,15 @@ select
   (select id from pos.organizations where slug = 'org-b') as org_b;
 grant select on t_ids to authenticated, anon;
 
+-- Las organizaciones nacen con pago pendiente (fase 6): se activan como lo
+-- haría el webhook de billing, para poder abrir caja y vender.
+do $$
+begin
+  if exists (select 1 from pg_proc where proname = 'set_subscription') then
+    perform pos.set_subscription(id, 'pro', 'active') from pos.organizations where slug in ('org-a', 'org-b');
+  end if;
+end $$;
+
 do $$
 declare v_org uuid; v_slug text; v_loc uuid; v_reg uuid; v_ev uuid; v_item uuid; v_user text; v_order pos.orders;
 begin
