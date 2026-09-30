@@ -91,7 +91,8 @@ en `main` siguen hasta decidir el cambio o aplicar un parche aparte).
 | Vitest (36): dinero, resumen, i18n completo, sintaxis de todas las pantallas | — | PASS |
 | Navegador (staging): login, venta efectivo/tarjeta/mixto, doble clic, modo prueba, rechazo, reembolso (PIN del usuario), anular/reabrir con stock, mermas, toma, caja completa + Z, estaciones, Entrega, EN/ES, tablet 1024×768 y móvil 375 px | — | PASS |
 | Navegador: cortesía (requiere PIN de supervisor), envío del onboarding, crear cuenta, cerrar sesión | — | NOT TESTED (requieren credenciales o crearían cuentas reales; cubiertos por SQL) |
-| Headers de seguridad (CSP) en Netlify | — | NOT TESTED (solo aplican en Netlify) |
+| Sitio publicado `pointsalesforyou.netlify.app`: headers (CSP, HSTS, X-Frame-Options, Referrer/Permissions-Policy), variables inyectadas (clave anon del proyecto correcto), archivos internos no publicados (404), redirección a login, consola sin errores con la CSP | — | PASS |
+| Sitio publicado con sesión iniciada (Realtime por wss bajo la CSP) | — | NOT TESTED (la sesión quedó en localhost; mismo código y base, probado ahí) |
 
 ## 7. Seguridad
 
@@ -131,6 +132,8 @@ Build `npm run build`, publish `dist`, Node 22, rama `saas`. Todo en `netlify.to
 ## 11. Variables de entorno
 
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (ambas públicas). Nada secreto en el frontend.
+
+Sitio staging publicado: **https://pointsalesforyou.netlify.app** (rama `saas`). Supabase Auth ya tiene esa URL como Site URL y redirect.
 
 ## 12. Procedimiento de despliegue
 
