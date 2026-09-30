@@ -20,12 +20,12 @@ insert into auth.users (id, email, aud, role) values
 -- Crear cada organización COMO su usuario, a través de la API real.
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 set local role authenticated;
-select pos.create_organization('Org A', 'org-a', '4321');
+select pos.create_organization('Org A', 'org-a', '4321', p_legal_name => 'Test Ltd', p_address_line => '1 Test St', p_city => 'Christchurch', p_contact_name => 'Tester', p_contact_phone => '021 000 0000');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}', true);
 set local role authenticated;
-select pos.create_organization('Org B', 'org-b', '8765');
+select pos.create_organization('Org B', 'org-b', '8765', p_legal_name => 'Test Ltd', p_address_line => '1 Test St', p_city => 'Christchurch', p_contact_name => 'Tester', p_contact_phone => '021 000 0000');
 reset role;
 
 -- Ubicación, caja, evento, producto y un pedido por organización.

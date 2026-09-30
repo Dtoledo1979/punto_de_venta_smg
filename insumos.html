@@ -182,6 +182,20 @@
     <p class="qty-sub" style="margin-top:8px;" data-i18n>The person needs an account first (they can create one from the sign-in screen).</p>
     <div id="plan-box" class="qty-sub" style="margin-top:14px;"></div>
     <div style="margin-top:14px; border-top:1px dashed var(--border); padding-top:12px;">
+      <h2 data-i18n>Legal and contact details</h2>
+      <p class="sub" data-i18n>Used for your subscription invoices and tax invoices. NZBN and postcode are optional.</p>
+      <div class="add-form" id="details-form">
+        <input type="text" id="d-legal-name" placeholder="Legal name" data-i18n-ph autocomplete="organization">
+        <input type="text" id="d-nzbn" placeholder="NZBN (optional)" data-i18n-ph inputmode="numeric" maxlength="17">
+        <input type="text" id="d-address" placeholder="Street address" data-i18n-ph autocomplete="street-address">
+        <input type="text" id="d-city" placeholder="Town / city" data-i18n-ph autocomplete="address-level2">
+        <input type="text" id="d-postcode" placeholder="Postcode" data-i18n-ph inputmode="numeric" maxlength="12">
+        <input type="text" id="d-contact-name" placeholder="Contact person" data-i18n-ph autocomplete="name">
+        <input type="tel" id="d-contact-phone" placeholder="Phone" data-i18n-ph autocomplete="tel">
+        <button class="btn btn-primary" onclick="saveDetails()" data-i18n>Save details</button>
+      </div>
+    </div>
+    <div style="margin-top:14px; border-top:1px dashed var(--border); padding-top:12px;">
       <button class="reset-btn" onclick="purgeTestData()" data-i18n>🧹 Clear test data</button>
       <span class="qty-sub" data-i18n>Deletes every test-mode sale (and its payments and refunds) of this business. Real sales are never touched.</span>
     </div>
@@ -1040,6 +1054,27 @@
     const { data: ent } = await sb.rpc("org_entitlements", { p_org_id: posCore.orgId });
     if (ent) document.getElementById("plan-box").textContent = t("Plan: {plan} ({status}) · locations {l}/{lm} · registers {r}/{rm}", {
       plan: ent.plan, status: ent.status, l: ent.usage.locations, lm: ent.limits.locations, r: ent.usage.registers, rm: ent.limits.registers });
+
+    const { data: org } = await sb.from("organizations")
+      .select("legal_name, nzbn, address_line, city, postcode, contact_name, contact_phone").eq("id", posCore.orgId).maybeSingle();
+    if (org) {
+      const set = (id, val) => { document.getElementById(id).value = val || ""; };
+      set("d-legal-name", org.legal_name); set("d-nzbn", org.nzbn); set("d-address", org.address_line); set("d-city", org.city);
+      set("d-postcode", org.postcode); set("d-contact-name", org.contact_name); set("d-contact-phone", org.contact_phone);
+    }
+  }
+
+  async function saveDetails(){
+    const v = (id) => document.getElementById(id).value.trim();
+    if (!v("d-legal-name") || !v("d-address") || !v("d-city") || !v("d-contact-name") || !v("d-contact-phone")) {
+      showToast(t("Fill in the legal name, address, city, contact person and phone.")); return;
+    }
+    const { error } = await sb.rpc("update_organization_details", {
+      p_org_id: posCore.orgId, p_legal_name: v("d-legal-name"), p_address_line: v("d-address"), p_city: v("d-city"),
+      p_postcode: v("d-postcode") || null, p_contact_name: v("d-contact-name"), p_contact_phone: v("d-contact-phone"), p_nzbn: v("d-nzbn") || null,
+    });
+    if (error) { showError("Could not update the organisation", error); return; }
+    showToast(t("Details saved."));
   }
 
   async function setMember(userId, role, status){

@@ -52,6 +52,28 @@
       <div><label for="tax-number"><span data-i18n>GST number</span> <small data-i18n>Optional — printed on receipts.</small></label>
         <input id="tax-number"></div>
     </div>
+
+    <h2 data-i18n>Legal and contact details</h2>
+    <label for="legal-name"><span data-i18n>Legal name</span> <small data-i18n>The registered company or sole trader name.</small></label>
+    <input id="legal-name" required autocomplete="organization">
+    <label for="nzbn"><span data-i18n>NZBN</span> <small data-i18n>Optional — 13 digits.</small></label>
+    <input id="nzbn" inputmode="numeric" maxlength="17">
+    <label for="address" data-i18n>Street address</label>
+    <input id="address" required autocomplete="street-address">
+    <div class="row">
+      <div><label for="city" data-i18n>Town / city</label>
+        <input id="city" required autocomplete="address-level2"></div>
+      <div><label for="postcode" data-i18n>Postcode</label>
+        <input id="postcode" inputmode="numeric" maxlength="12" autocomplete="postal-code"></div>
+    </div>
+    <div class="row">
+      <div><label for="contact-name" data-i18n>Contact person</label>
+        <input id="contact-name" required autocomplete="name"></div>
+      <div><label for="contact-phone" data-i18n>Phone</label>
+        <input id="contact-phone" type="tel" required autocomplete="tel" placeholder="e.g. 021 123 4567" data-i18n-ph></div>
+    </div>
+
+    <h2 data-i18n>Security</h2>
     <label for="sup-pin"><span data-i18n>Supervisor PIN</span> <small data-i18n>4 to 8 digits. Authorises complimentary sales and refunds.</small></label>
     <input id="sup-pin" type="password" inputmode="numeric" maxlength="8" required>
 
@@ -95,6 +117,10 @@
     e.preventDefault();
     const v = (id) => $(id).value.trim();
     if (!v("name") || !v("location") || !v("register")) { setMsg(t("Fill in the business, location and register names.")); return; }
+    if (!v("legal-name") || !v("address") || !v("city") || !v("contact-name") || !v("contact-phone")) { setMsg(t("Fill in the legal name, address, city, contact person and phone.")); return; }
+    if (!/^\+?[0-9 ()-]{6,20}$/.test(v("contact-phone"))) { setMsg(t("Enter a valid phone number (digits, spaces, +, dashes).")); return; }
+    const nzbn = v("nzbn").replace(/[\s-]/g, "");
+    if (nzbn && !/^[0-9]{13}$/.test(nzbn)) { setMsg(t("The NZBN must be 13 digits.")); return; }
     if (!/^[a-z0-9-]{3,40}$/.test(v("slug"))) { setMsg(t("The short name must be 3 to 40 lowercase letters, numbers or dashes.")); return; }
     if (!PIN.test(v("sup-pin")) || !PIN.test(v("reg-pin")) || !PIN.test(v("del-pin"))) { setMsg(t("Each PIN must be 4 to 8 digits.")); return; }
     const rate = Number(v("tax-rate"));
@@ -104,6 +130,8 @@
     const { data: org, error: e1 } = await sb.rpc("create_organization", {
       p_name: v("name"), p_slug: v("slug"), p_supervisor_pin: v("sup-pin"), p_language: $("language").value,
       p_locale: "en-NZ", p_currency: $("currency").value, p_tax_rate: Math.round(rate * 100) / 10000, p_tax_number: v("tax-number") || null,
+      p_legal_name: v("legal-name"), p_address_line: v("address"), p_city: v("city"), p_postcode: v("postcode") || null,
+      p_contact_name: v("contact-name"), p_contact_phone: v("contact-phone"), p_nzbn: nzbn || null,
     });
     if (e1) { $("go").disabled = false; setMsg(posCore.errorText(e1)); return; }
     const { data: loc, error: e2 } = await sb.rpc("create_location", { p_org_id: org.id, p_name: v("location") });

@@ -14,15 +14,44 @@ set local role authenticated;
 do $$
 declare v_org pos.organizations; v_e jsonb; v_loc uuid; v_reg uuid; v_i int;
 begin
-  v_org := pos.create_organization('Coffee Cart', 'coffee-cart', '2468', 'en', 'en-NZ', 'NZD', 0.15, '111-222-333');
+  v_org := pos.create_organization('Coffee Cart', 'coffee-cart', '2468', 'en', 'en-NZ', 'NZD', 0.15, '111-222-333',
+    p_legal_name => 'Coffee Cart Ltd', p_address_line => '5 Cuba St', p_city => 'Wellington', p_postcode => '6011',
+    p_contact_name => 'Ana', p_contact_phone => '+64 21 123 4567', p_nzbn => '9429 0000-00000');
   if v_org.plan <> 'starter' or v_org.subscription_status <> 'incomplete' or v_org.trial_ends_at is not null then
     raise exception 'FALLA O1: alta % % %', v_org.plan, v_org.subscription_status, v_org.trial_ends_at;
   end if;
   if v_org.tax_number <> '111-222-333' or v_org.currency <> 'NZD' then raise exception 'FALLA O1: GST/moneda'; end if;
+  -- O1b. Datos legales y de contacto: obligatorios; NZBN opcional y normalizado.
+  if v_org.legal_name <> 'Coffee Cart Ltd' or v_org.city <> 'Wellington' or v_org.nzbn <> '9429000000000'
+     or v_org.contact_phone <> '+64 21 123 4567' or v_org.country <> 'NZ' then
+    raise exception 'FALLA O1b: datos del negocio % %', v_org.legal_name, v_org.nzbn;
+  end if;
+  begin
+    perform pos.create_organization('No Details', 'no-details', '2468');
+    raise exception 'FALLA O1b: creó un negocio sin datos legales';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+    if sqlerrm <> 'org.details_required' then raise exception 'FALLA O1b: error inesperado %', sqlerrm; end if;
+  end;
+  begin
+    perform pos.create_organization('Bad', 'bad-nzbn', '2468', p_legal_name => 'X', p_address_line => 'Y', p_city => 'Z',
+      p_contact_name => 'W', p_contact_phone => '021 000 0000', p_nzbn => '123');
+    raise exception 'FALLA O1b: aceptó un NZBN inválido';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+    if sqlerrm <> 'org.invalid_nzbn' then raise exception 'FALLA O1b: error inesperado %', sqlerrm; end if;
+  end;
+  begin
+    perform pos.update_organization_details(v_org.id, 'Coffee Cart Ltd', '5 Cuba St', 'Wellington', null, 'Ana', 'call me');
+    raise exception 'FALLA O1b: aceptó un teléfono inválido';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+    if sqlerrm <> 'org.invalid_phone' then raise exception 'FALLA O1b: error inesperado %', sqlerrm; end if;
+  end;
+  if (pos.update_organization_details(v_org.id, 'Coffee Cart Limited', '7 Cuba St', 'Wellington', '6011', 'Ana', '04 123 4567', '')).nzbn is not null then
+    raise exception 'FALLA O1b: vaciar el NZBN no lo borró';
+  end if;
   v_e := pos.org_entitlements(v_org.id);
   if (v_e->>'can_operate')::boolean then raise exception 'FALLA O1: con pago pendiente no debería poder operar'; end if;
   begin
-    perform pos.create_organization('Coffee Cart 2', 'coffee-cart', '2468');
+    perform pos.create_organization('Coffee Cart 2', 'coffee-cart', '2468', p_legal_name => 'Test Ltd', p_address_line => '1 Test St', p_city => 'Christchurch', p_contact_name => 'Tester', p_contact_phone => '021 000 0000');
     raise exception 'FALLA O1: aceptó un slug repetido';
   exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
     if sqlerrm <> 'org.slug_taken' then raise exception 'FALLA O1: error inesperado %', sqlerrm; end if;
@@ -63,10 +92,10 @@ begin
   end;
 
   -- O5. Máximo 3 organizaciones propias.
-  perform pos.create_organization('Two', 'org-two-d', '2468');
-  perform pos.create_organization('Three', 'org-three-d', '2468');
+  perform pos.create_organization('Two', 'org-two-d', '2468', p_legal_name => 'Test Ltd', p_address_line => '1 Test St', p_city => 'Christchurch', p_contact_name => 'Tester', p_contact_phone => '021 000 0000');
+  perform pos.create_organization('Three', 'org-three-d', '2468', p_legal_name => 'Test Ltd', p_address_line => '1 Test St', p_city => 'Christchurch', p_contact_name => 'Tester', p_contact_phone => '021 000 0000');
   begin
-    perform pos.create_organization('Four', 'org-four-d', '2468');
+    perform pos.create_organization('Four', 'org-four-d', '2468', p_legal_name => 'Test Ltd', p_address_line => '1 Test St', p_city => 'Christchurch', p_contact_name => 'Tester', p_contact_phone => '021 000 0000');
     raise exception 'FALLA O5: creó una cuarta organización';
   exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
   end;
@@ -115,6 +144,11 @@ begin
     raise exception 'FALLA O7: vio el equipo de otra organización';
   exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
   end;
+  begin
+    perform pos.update_organization_details((select v from t2 where k = 'org_d')::uuid, 'Hijack Ltd', 'x', 'y', null, 'z', '021 000 0000');
+    raise exception 'FALLA O7: editó los datos legales de otra organización';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+  end;
 end $$;
 select set_config('request.jwt.claims', '{"sub":"cccccccc-0000-0000-0000-00000000000c","role":"authenticated"}', true);
 do $$
@@ -122,6 +156,11 @@ begin
   begin
     perform pos.list_members((select org_a from t_ids));
     raise exception 'FALLA O7: staff vio la lista de emails';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+  end;
+  begin
+    perform pos.update_organization_details((select org_a from t_ids), 'Staff Ltd', 'x', 'y', null, 'z', '021 000 0000');
+    raise exception 'FALLA O7: staff editó los datos legales';
   exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
   end;
   raise notice 'OK O7: equipo visible solo para owner/admin de la org';

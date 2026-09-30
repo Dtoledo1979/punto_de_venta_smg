@@ -133,6 +133,8 @@ window.POS_INITIAL_HASH = location.hash;</script>
     if (code === "email_not_confirmed") return t("Your email isn't confirmed yet. Check your inbox.");
     if (code === "weak_password") return t("That password is too weak: at least 10 characters, with upper-case, lower-case letters and numbers.");
     if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") return t("Too many attempts. Wait a few minutes and try again.");
+    if (code === "email_address_not_authorized") return t("We can't send emails to that address yet. Try again later or contact us.");
+    if (code === "user_already_exists" || code === "email_exists") return t("There's already an account with that email. Sign in or reset your password.");
     if (code === "same_password") return t("The new password must be different from the old one.");
     if (error && /fetch|network/i.test(error.message || "")) return t("No connection to the server. Check your internet.");
     return (error && error.message) || t("Something went wrong.");

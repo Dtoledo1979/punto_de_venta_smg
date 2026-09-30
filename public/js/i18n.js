@@ -146,6 +146,10 @@
     "org.invalid_currency": "Invalid currency.",
     "org.invalid_slug": "The short name must be 3 to 40 lowercase letters, numbers or dashes.",
     "org.slug_taken": "That short name is already taken — try another.",
+    "org.details_required": "Fill in the legal name, address, city, contact person and phone.",
+    "org.invalid_phone": "Enter a valid phone number (digits, spaces, +, dashes).",
+    "org.invalid_nzbn": "The NZBN must be 13 digits.",
+    "validation.too_long": "One of the fields is too long.",
   };
 
   // Recibe el error de supabase-js ({ message, details, code }) y devuelve

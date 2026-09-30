@@ -173,8 +173,11 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-# Desactivado: por ahora las cuentas se crean a mano (panel de Supabase).
-enable_signup = false
+# Activado en staging: cualquiera puede crear su cuenta desde el sitio
+# (confirmación por email obligatoria). Con el email integrado de Supabase
+# solo llegan correos a direcciones del equipo del proyecto y ~2/hora:
+# para clientes reales hace falta SMTP propio ([auth.email.smtp]).
+enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts

@@ -16,7 +16,9 @@ import { join } from "node:path";
 
 const PROD_REF = "umbkpzhgocryhcbbczhr";
 
-const ORG = { name: "South Media Group", slug: "south-media" };
+// Datos legales: placeholders — el owner los corrige en Settings → Team.
+const ORG = { name: "South Media Group", slug: "south-media",
+  legalName: "South Media Group", address: "(update in Settings)", city: "Christchurch", contact: "(update in Settings)", phone: "000000" };
 const LOCATIONS = [
   { name: "Christchurch", registers: [
     { name: "Barra Principal", type: "product" },
@@ -90,7 +92,9 @@ set local role authenticated;
 do $$
 declare v_org uuid; v_loc uuid;
 begin
-  v_org := (pos.create_organization(${lit(ORG.name)}, ${lit(ORG.slug)}, ${lit(supervisorPin)})).id;
+  v_org := (pos.create_organization(${lit(ORG.name)}, ${lit(ORG.slug)}, ${lit(supervisorPin)},
+    p_legal_name => ${lit(ORG.legalName)}, p_address_line => ${lit(ORG.address)}, p_city => ${lit(ORG.city)},
+    p_contact_name => ${lit(ORG.contact)}, p_contact_phone => ${lit(ORG.phone)})).id;
 ${LOCATIONS.map((l) => `
   v_loc := (pos.create_location(v_org, ${lit(l.name)})).id;
 ${registers.filter((r) => r.location === l.name).map((r) =>
