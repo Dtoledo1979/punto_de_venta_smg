@@ -335,6 +335,9 @@
   async function afterUnlock() {
     if (["owner","admin","manager"].includes(posCore.role)) document.getElementById("audit-tab-btn").style.display = "";
     if (posCore.isAdmin()) document.getElementById("team-tab-btn").style.display = "";
+    // Accesos directos desde el menú de la oficina (#productos, #insumos…).
+    const tabFromHash = location.hash.slice(1);
+    if (["productos", "insumos", "stocktake"].includes(tabFromHash)) switchTab(tabFromHash);
     if (location.hash === "#welcome") {
       showToast(t("Your business is ready! Add your products below, then open the register to start selling."));
       switchTab("productos");

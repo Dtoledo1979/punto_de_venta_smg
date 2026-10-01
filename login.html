@@ -7,90 +7,60 @@
 <script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", publicPage: true };
 // supabase-js limpia el #... del link del email apenas lo procesa: se guarda antes.
 window.POS_INITIAL_HASH = location.hash;</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/ui.css">
 <style>
-  :root{
-    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
-    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
-    --danger:#E4483A; --border:#E2E6EA; --r-md:10px; --r-card:16px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:'Inter',Arial,sans-serif;
-       display:flex; align-items:center; justify-content:center; padding:16px;}
-  .card{background:var(--surface); border-radius:var(--r-card); padding:28px 24px; width:100%; max-width:380px;}
-  .brand{display:flex; align-items:center; gap:9px; margin-bottom:18px;}
-  .brand path{fill:var(--accent);}
-  .lang{margin-left:auto;} .lang select{font-size:13px; padding:3px 6px; border-radius:6px; border:1px solid var(--border);}
-  .brand span{font-family:'Sora',sans-serif; font-weight:800; font-size:15px; letter-spacing:.5px;}
-  h1{font-family:'Sora',sans-serif; font-size:20px; margin:0 0 6px;}
-  p.sub{color:var(--muted); font-size:13.5px; margin:0 0 18px;}
-  label{display:block; font-size:13px; font-weight:600; margin:12px 0 5px;}
-  input{width:100%; font-size:16px; padding:12px; border:1px solid var(--border); border-radius:var(--r-md); font-family:inherit;}
-  input:focus{outline:2px solid var(--accent); border-color:transparent;}
-  button{width:100%; margin-top:18px; min-height:48px; font-size:15px; font-weight:700; border:0; border-radius:var(--r-md);
-         background:var(--accent); color:var(--accent-ink); cursor:pointer; font-family:inherit;}
-  button:disabled{opacity:.6; cursor:wait;}
-  .link{display:inline-block; margin-top:14px; font-size:13px; color:var(--muted); cursor:pointer; text-decoration:underline; background:none; border:0; padding:0; width:auto; min-height:0; font-weight:500;}
-  .msg{margin-top:14px; font-size:13.5px; padding:10px 12px; border-radius:var(--r-md); display:none;}
-  .msg.error{display:block; background:#FDECEA; color:#A3271D;}
-  .msg.ok{display:block; background:#EEF8DA; color:#3A5200;}
-  form{display:none;} form.active{display:block;}
+  form{display:none;} form.active{display:grid; gap:14px;}
+  .auth-links{display:flex; gap:18px; flex-wrap:wrap; font-size:14px;}
+  .auth-head{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .auth-head select{font:13px var(--f-body); padding:3px 6px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink);}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="brand">
-    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-    <span>POS</span>
-    <div class="lang" id="lang-slot"></div>
+<div class="auth">
+<div class="auth-card">
+  <div class="auth-head">
+    <div class="auth-brand"><span class="mark">P</span><span>Point Sales For You</span></div>
+    <div id="lang-slot"></div>
   </div>
 
   <form id="form-login" class="active" novalidate>
-    <h1 data-i18n>Sign in</h1>
-    <p class="sub" data-i18n>Use your business account. On a shared device you only need to do this once: after that each register opens with its PIN.</p>
-    <label for="email" data-i18n>Email</label>
-    <input id="email" type="email" autocomplete="username" required>
-    <label for="password" data-i18n>Password</label>
-    <input id="password" type="password" autocomplete="current-password" required>
-    <button type="submit" id="btn-login" data-i18n>Sign in</button>
-    <button type="button" class="link" id="go-forgot" data-i18n>Forgot your password?</button>
-    <button type="button" class="link" id="go-signup" style="margin-left:14px;" data-i18n>Create an account</button>
+    <div class="stack-sm"><h1 data-i18n>Sign in</h1>
+    <p class="muted" data-i18n>Use your business account. On a shared device you only need to do this once: after that each register opens with its PIN.</p></div>
+    <div class="field"><label for="email" data-i18n>Email</label><input class="input" id="email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="password" data-i18n>Password</label><input class="input" id="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn btn-primary btn-lg btn-block" type="submit" id="btn-login" data-i18n>Sign in</button>
+    <div class="auth-links"><button type="button" class="link" id="go-forgot" data-i18n>Forgot your password?</button>
+    <button type="button" class="link" id="go-signup" data-i18n>Create an account</button></div>
   </form>
 
   <form id="form-signup" novalidate>
-    <h1 data-i18n>Create an account</h1>
-    <p class="sub" data-i18n>Create your account to set up your business. We'll email you a link to confirm your address.</p>
-    <label for="su-email" data-i18n>Email</label>
-    <input id="su-email" type="email" autocomplete="username" required>
-    <label for="su-password" data-i18n>Password</label>
-    <input id="su-password" type="password" autocomplete="new-password" required>
-    <label for="su-password-2" data-i18n>Repeat it</label>
-    <input id="su-password-2" type="password" autocomplete="new-password" required>
-    <button type="submit" id="btn-signup" data-i18n>Create account</button>
-    <button type="button" class="link" id="go-login-2" data-i18n>← Back</button>
+    <div class="stack-sm"><h1 data-i18n>Create an account</h1>
+    <p class="muted" data-i18n>Create your account to set up your business. We'll email you a link to confirm your address.</p></div>
+    <div class="field"><label for="su-email" data-i18n>Email</label><input class="input" id="su-email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="su-password"><span data-i18n>Password</span> <span class="hint" data-i18n>At least 10 characters, with upper-case, lower-case letters and numbers.</span></label><input class="input" id="su-password" type="password" autocomplete="new-password" required></div>
+    <div class="field"><label for="su-password-2" data-i18n>Repeat it</label><input class="input" id="su-password-2" type="password" autocomplete="new-password" required></div>
+    <button class="btn btn-primary btn-lg btn-block" type="submit" id="btn-signup" data-i18n>Create account</button>
+    <div class="auth-links"><button type="button" class="link" id="go-login-2" data-i18n>← Back</button></div>
   </form>
 
   <form id="form-forgot" novalidate>
-    <h1 data-i18n>Reset password</h1>
-    <p class="sub" data-i18n>We'll email you a link to create a new password.</p>
-    <label for="forgot-email" data-i18n>Email</label>
-    <input id="forgot-email" type="email" autocomplete="username" required>
-    <button type="submit" id="btn-forgot" data-i18n>Send link</button>
-    <button type="button" class="link" id="go-login" data-i18n>← Back</button>
+    <div class="stack-sm"><h1 data-i18n>Reset password</h1>
+    <p class="muted" data-i18n>We'll email you a link to create a new password.</p></div>
+    <div class="field"><label for="forgot-email" data-i18n>Email</label><input class="input" id="forgot-email" type="email" autocomplete="username" required></div>
+    <button class="btn btn-primary btn-lg btn-block" type="submit" id="btn-forgot" data-i18n>Send link</button>
+    <div class="auth-links"><button type="button" class="link" id="go-login" data-i18n>← Back</button></div>
   </form>
 
   <form id="form-reset" novalidate>
-    <h1 data-i18n>New password</h1>
-    <p class="sub" data-i18n>At least 10 characters, with upper-case, lower-case letters and numbers.</p>
-    <label for="new-password" data-i18n>New password</label>
-    <input id="new-password" type="password" autocomplete="new-password" required>
-    <label for="new-password-2" data-i18n>Repeat it</label>
-    <input id="new-password-2" type="password" autocomplete="new-password" required>
-    <button type="submit" id="btn-reset" data-i18n>Save password</button>
+    <div class="stack-sm"><h1 data-i18n>New password</h1>
+    <p class="muted" data-i18n>At least 10 characters, with upper-case, lower-case letters and numbers.</p></div>
+    <div class="field"><label for="new-password" data-i18n>New password</label><input class="input" id="new-password" type="password" autocomplete="new-password" required></div>
+    <div class="field"><label for="new-password-2" data-i18n>Repeat it</label><input class="input" id="new-password-2" type="password" autocomplete="new-password" required></div>
+    <button class="btn btn-primary btn-lg btn-block" type="submit" id="btn-reset" data-i18n>Save password</button>
   </form>
 
-  <div id="msg" class="msg" role="status"></div>
+  <div id="msg" class="msg" role="status" hidden></div>
+</div>
 </div>
 
 <script src="/vendor/supabase.js"></script>
@@ -123,7 +93,8 @@ window.POS_INITIAL_HASH = location.hash;</script>
   function setMsg(text, kind) {
     const m = $("msg");
     m.textContent = text;
-    m.className = "msg" + (text ? " " + (kind || "error") : "");
+    m.className = "msg " + (kind || "error");
+    m.hidden = !text;
   }
   function busy(btn, on) { btn.disabled = on; }
 

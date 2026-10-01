@@ -24,6 +24,14 @@
   // dispositivo, o inglés.
   posI18n.setLang(storage.get(LANG_KEY) || "en");
 
+  // Tema de este dispositivo: "system" (sigue al sistema), "light" o "dark".
+  const THEME_KEY = "pos_theme";
+  function applyTheme(theme) {
+    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+  }
+  applyTheme(storage.get(THEME_KEY));
+
   const env = window.POS_ENV || {};
   const configured = env.supabaseUrl && env.supabaseAnonKey &&
     !String(env.supabaseUrl).startsWith("%") && !String(env.supabaseAnonKey).startsWith("%");
@@ -110,6 +118,8 @@
       storage.set(LANG_KEY, lang);
       location.reload();
     },
+    theme() { return storage.get(THEME_KEY) || "system"; },
+    setTheme(theme) { storage.set(THEME_KEY, theme); applyTheme(theme); },
     async logout() {
       try { sessionStorage.clear(); } catch (_) { /* sin storage */ }
       await sb.auth.signOut();
@@ -192,6 +202,12 @@
     else if (!e.can_operate) { text = core.t("Your subscription isn't active (cancelled). You can look around and use test mode, but registers can't open for real sales."); bad = true; }
     else if (e.status === "past_due") { text = core.t("Payment is overdue — please update your billing to avoid interruption."); bad = true; }
     if (!text) return;
+    const slot = document.getElementById("office-banner");
+    if (slot) {
+      slot.className = "sub-banner" + (bad ? " bad" : "");
+      slot.textContent = text;
+      return;
+    }
     const div = document.createElement("div");
     div.style.cssText = "text-align:center;font:600 13px Inter,Arial,sans-serif;padding:7px 12px;" + (bad ? "background:#FDECEA;color:#A3271D" : "background:#EEF8DA;color:#3A5200");
     div.textContent = text;
@@ -252,7 +268,7 @@
     // La pantalla arranca (init) recién con el HTML traducido.
     await new Promise((resolve) => whenDomReady(resolve));
     posI18n.translateDom();
-    renderUserBar();
+    if (!env.officePage) renderUserBar();   // la oficina tiene su propio menú (office.js)
     document.documentElement.classList.remove("pos-auth-pending");
     showSubscriptionBanner();
 

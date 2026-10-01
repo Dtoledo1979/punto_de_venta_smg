@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Locations and registers</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "locations" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
+<link rel="stylesheet" href="/css/ui.css">
+</head>
+<body>
+<main class="main-inner">
+  <div class="page-head">
+    <div><h1 data-i18n>Locations and registers</h1><p data-i18n>Each location is a place where you sell. Each register is a device that takes orders there.</p></div>
+    <button class="btn btn-primary" type="button" id="add-location" data-i18n>Add location</button>
+  </div>
+  <p class="muted num" id="plan-usage"></p>
+  <div class="stack" id="locations"></div>
+</main>
+
+<dialog class="dialog" id="dlg-location">
+  <form class="dialog-body" id="form-location" novalidate>
+    <h2 id="dlg-location-title" data-i18n>Add location</h2>
+    <div class="field"><label for="loc-name" data-i18n>Location name</label><input class="input" id="loc-name" required maxlength="80" placeholder="e.g. Riccarton" data-i18n-ph></div>
+    <div class="msg error" id="loc-msg" hidden></div>
+    <div class="dialog-actions"><button class="btn" type="button" data-close data-i18n>Cancel</button><button class="btn btn-primary" type="submit" data-i18n>Save</button></div>
+  </form>
+</dialog>
+
+<dialog class="dialog" id="dlg-register">
+  <form class="dialog-body" id="form-register" novalidate>
+    <div><h2 id="dlg-register-title" data-i18n>Add register</h2><p class="muted" id="dlg-register-sub"></p></div>
+    <div class="field"><label for="reg-name" data-i18n>Register name</label><input class="input" id="reg-name" required maxlength="80" placeholder="e.g. Front counter" data-i18n-ph></div>
+    <div class="field" id="reg-type-field"><label for="reg-type" data-i18n>Register type</label>
+      <select class="select" id="reg-type"><option value="product" data-i18n>Products (with Delivery)</option><option value="ticket" data-i18n>Tickets (delivered when charged)</option></select></div>
+    <div class="fields">
+      <div class="field"><label for="reg-pin"><span data-i18n>Register PIN</span> <span class="hint" id="reg-pin-hint" data-i18n>4 to 8 digits, to sell.</span></label><input class="input" id="reg-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></div>
+      <div class="field"><label for="reg-del-pin"><span data-i18n>Delivery PIN</span> <span class="hint" data-i18n>4 to 8 digits.</span></label><input class="input" id="reg-del-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></div>
+    </div>
+    <p class="hint" id="reg-pin-keep" hidden data-i18n>Leave a PIN blank to keep the current one.</p>
+    <div class="msg error" id="reg-msg" hidden></div>
+    <div class="dialog-actions">
+      <button class="btn btn-danger" type="button" id="reg-toggle" hidden></button>
+      <span class="grow"></span>
+      <button class="btn" type="button" data-close data-i18n>Cancel</button><button class="btn btn-primary" type="submit" data-i18n>Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
+<script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
+<script>
+  const sb = posCore.sb;
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  const PIN = /^[0-9]{4,8}$/;
+  let locations = [], registers = [], openIds = new Set();
+  let editingLocation = null, editingRegister = null, registerLocation = null;
+
+  document.querySelectorAll("dialog [data-close]").forEach((b) => b.onclick = () => b.closest("dialog").close());
+  function showMsg(id, text) { const m = $(id); m.textContent = text || ""; m.hidden = !text; }
+
+  async function load() {
+    const [l, r, s, ent] = await Promise.all([
+      sb.from("locations").select("id, name, active, created_at").eq("org_id", posCore.orgId).order("created_at"),
+      sb.from("registers").select("id, name, type, active, location_id, created_at").eq("org_id", posCore.orgId).order("created_at"),
+      sb.from("register_sessions").select("register_id").eq("org_id", posCore.orgId).eq("status", "open"),
+      sb.rpc("org_entitlements", { p_org_id: posCore.orgId }),
+    ]);
+    locations = l.data || []; registers = r.data || [];
+    openIds = new Set((s.data || []).map((x) => x.register_id));
+    if (ent.data) {
+      const e = ent.data;
+      $("plan-usage").textContent = t("Plan {plan}: {l} of {lm} locations · {r} of {rm} registers", {
+        plan: posCore.label("plan", e.plan), l: e.usage.locations, lm: e.limits.locations, r: e.usage.registers, rm: e.limits.registers });
+    }
+    render();
+  }
+
+  function render() {
+    const box = $("locations");
+    if (!locations.length) {
+      box.innerHTML = '<div class="panel"><div class="empty"><b>' + E(t("No locations yet")) + "</b><span>" +
+        E(t("Add the place where you sell, then a register for it.")) + "</span></div></div>";
+      return;
+    }
+    box.innerHTML = locations.map((loc) => {
+      const regs = registers.filter((r) => r.location_id === loc.id);
+      return '<section class="panel">' +
+        '<div class="panel-head"><div class="row"><h2>' + E(loc.name) + "</h2>" + (loc.active ? "" : '<span class="pill">' + E(t("Inactive")) + "</span>") + "</div>" +
+          '<div class="row"><button class="btn btn-sm btn-ghost" type="button" data-edit-loc="' + loc.id + '">' + E(t("Rename")) + "</button>" +
+          '<button class="btn btn-sm" type="button" data-add-reg="' + loc.id + '">' + E(t("Add register")) + "</button></div></div>" +
+        '<div class="list">' + (regs.length ? regs.map((r) =>
+          '<div class="list-item"><div class="grow"><b>' + E(r.name) + '</b><div class="muted">' + E(posCore.label("register", r.type)) + "</div></div>" +
+            (!r.active ? '<span class="pill">' + E(t("Inactive")) + "</span>"
+              : openIds.has(r.id) ? '<span class="pill ok"><span class="dot"></span>' + E(t("Open")) + "</span>"
+              : '<span class="pill">' + E(t("Closed")) + "</span>") +
+            '<button class="btn btn-sm btn-ghost" type="button" data-edit-reg="' + r.id + '">' + E(t("Edit")) + "</button></div>").join("")
+          : '<div class="empty"><span>' + E(t("No registers in this location yet.")) + "</span></div>") + "</div></section>";
+    }).join("");
+    box.querySelectorAll("[data-edit-loc]").forEach((b) => b.onclick = () => openLocation(locations.find((l) => l.id === b.dataset.editLoc)));
+    box.querySelectorAll("[data-add-reg]").forEach((b) => b.onclick = () => openRegister(null, b.dataset.addReg));
+    box.querySelectorAll("[data-edit-reg]").forEach((b) => b.onclick = () => openRegister(registers.find((r) => r.id === b.dataset.editReg)));
+  }
+
+  function openLocation(loc) {
+    editingLocation = loc || null;
+    $("dlg-location-title").textContent = loc ? t("Rename location") : t("Add location");
+    $("loc-name").value = loc ? loc.name : "";
+    showMsg("loc-msg", "");
+    $("dlg-location").showModal();
+    $("loc-name").focus();
+  }
+  $("add-location").onclick = () => openLocation(null);
+  $("form-location").onsubmit = async (e) => {
+    e.preventDefault();
+    const name = $("loc-name").value.trim();
+    if (!name) { showMsg("loc-msg", t("Type a name.")); return; }
+    const { error } = editingLocation
+      ? await sb.rpc("update_location", { p_location_id: editingLocation.id, p_name: name })
+      : await sb.rpc("create_location", { p_org_id: posCore.orgId, p_name: name });
+    if (error) { showMsg("loc-msg", posCore.errorText(error)); return; }
+    $("dlg-location").close();
+    posOffice.toast(editingLocation ? t("Location renamed.") : t("Location added."));
+    load();
+  };
+
+  function openRegister(reg, locationId) {
+    editingRegister = reg || null;
+    registerLocation = reg ? reg.location_id : locationId;
+    const loc = locations.find((l) => l.id === registerLocation);
+    $("dlg-register-title").textContent = reg ? t("Edit register") : t("Add register");
+    $("dlg-register-sub").textContent = loc ? loc.name : "";
+    $("reg-name").value = reg ? reg.name : "";
+    $("reg-type-field").hidden = !!reg;
+    $("reg-pin").value = ""; $("reg-del-pin").value = "";
+    $("reg-pin-keep").hidden = !reg;
+    const toggle = $("reg-toggle");
+    toggle.hidden = !reg;
+    if (reg) toggle.textContent = reg.active ? t("Deactivate") : t("Reactivate");
+    showMsg("reg-msg", "");
+    $("dlg-register").showModal();
+    $("reg-name").focus();
+  }
+  $("form-register").onsubmit = async (e) => {
+    e.preventDefault();
+    const name = $("reg-name").value.trim(), pin = $("reg-pin").value, del = $("reg-del-pin").value;
+    if (!name) { showMsg("reg-msg", t("Type a name.")); return; }
+    if (editingRegister) {
+      if ((pin && !PIN.test(pin)) || (del && !PIN.test(del))) { showMsg("reg-msg", t("Each PIN must be 4 to 8 digits.")); return; }
+      const { error } = await sb.rpc("update_register", { p_register_id: editingRegister.id, p_name: name, p_pin: pin || null, p_despacho_pin: del || null });
+      if (error) { showMsg("reg-msg", posCore.errorText(error)); return; }
+      if (pin) try { sessionStorage.setItem("pos_pin_" + editingRegister.id, pin); } catch (_) { /* sin storage */ }
+      posOffice.toast(t("Register updated."));
+    } else {
+      if (!PIN.test(pin) || !PIN.test(del)) { showMsg("reg-msg", t("Each PIN must be 4 to 8 digits.")); return; }
+      const { error } = await sb.rpc("create_register", { p_location_id: registerLocation, p_name: name, p_type: $("reg-type").value, p_pin: pin, p_despacho_pin: del });
+      if (error) { showMsg("reg-msg", posCore.errorText(error)); return; }
+      posOffice.toast(t("Register added."));
+    }
+    $("dlg-register").close();
+    load();
+  };
+  $("reg-toggle").onclick = async () => {
+    if (!editingRegister) return;
+    if (editingRegister.active && openIds.has(editingRegister.id)) { showMsg("reg-msg", t("Close this register before deactivating it.")); return; }
+    const { error } = await sb.rpc("update_register", { p_register_id: editingRegister.id, p_active: !editingRegister.active });
+    if (error) { showMsg("reg-msg", posCore.errorText(error)); return; }
+    $("dlg-register").close();
+    posOffice.toast(editingRegister.active ? t("Register deactivated.") : t("Register reactivated."));
+    load();
+  };
+
+  posCore.ready.then(() => { if (posOffice.require(["owner", "admin"])) load(); });
+</script>
+</body>
+</html>

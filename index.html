@@ -3,87 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Point of sale</title>
-<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<title>Today</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "today" }; document.documentElement.classList.add("pos-auth-pending");</script>
 <style>html.pos-auth-pending body{visibility:hidden}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/ui.css">
 <style>
-  :root{
-    --bg:#0E1116; --surface:#FFFFFF; --surface-dark:#151B23; --surface-dark-2:#171C24; --surface-alt:#F4F6F8;
-    --text-primary:#12161C; --text-muted:#62707D;
-    --primary:#A8E020; --primary-hover:#96CB1D; --primary-active:#87B518; --primary-ink:#1A2333;
-    --danger:#E4483A; --danger-bg:#FBE6E4; --warning:#D98B00; --warning-bg:#FBEBD3; --success:#2FA35A; --success-bg:#E3F5EA;
-    --border:#E2E6EA; --border-dark:#232B36;
-    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; background:var(--bg); color:var(--text-primary); font-family:'Inter',Arial,sans-serif; min-height:100vh;}
-  .top{display:flex; align-items:center; gap:10px; padding:22px 24px 0;}
-  .mark{width:30px; height:30px; flex:none;}
-  .mark path{fill:var(--primary);}
-  .word{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; letter-spacing:.3px;}
-  .word span{color:var(--primary);}
-  .hero{padding:36px 24px 8px; max-width:920px; margin:0 auto;}
-  .hero h1{color:#fff; font-family:'Sora',sans-serif; font-weight:800; font-size:clamp(26px,5vw,38px); line-height:1.15; margin:0 0 8px;}
-  .hero p{color:#9AA7B2; font-size:14.5px; margin:0; max-width:56ch; line-height:1.5;}
-  main{max-width:920px; margin:0 auto; padding:20px 24px 60px;}
-
-  .step-title{color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; margin:26px 0 10px; display:flex; align-items:center; gap:8px;}
-  .step-title .num{background:var(--primary); color:var(--primary-ink); width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px;}
-
-  .event-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:10px;}
-  .event-card{background:var(--surface-dark); border:2px solid var(--border-dark); border-radius:var(--r-card); padding:16px; cursor:pointer; text-align:left; color:#fff; font-family:inherit; min-height:44px; transition:border-color .15s;}
-  .event-card:hover{border-color:#3A4552;}
-  .event-card.selected{border-color:var(--primary); background:#1A2314;}
-  .event-card .ename{font-weight:700; font-size:15px;}
-  .event-card .edate{font-size:12.5px; color:#9AA7B2; margin-top:3px;}
-  .event-card .live{display:none; align-items:center; gap:5px; font-size:11px; font-weight:700; color:var(--primary); margin-top:8px;}
-  .event-card.selected .live{display:flex;}
-  .event-card .live .dot{width:6px; height:6px; border-radius:50%; background:var(--primary);}
-  .event-card .check{float:right; color:var(--primary); font-weight:800; display:none;}
-  .event-card.selected .check{display:inline;}
-  .no-events{color:#9AA7B2; font-size:13.5px; background:var(--surface-dark); border:1px solid var(--border-dark); border-radius:var(--r-card); padding:16px;}
-
-  .enter-row{margin-top:18px;}
-  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px; border:none; border-radius:var(--r-md); padding:12px 20px; min-height:46px; cursor:pointer; transition:background .15s, transform .1s, opacity .15s; display:inline-flex; align-items:center; justify-content:center; gap:8px;}
-  .btn:active{transform:scale(.97);}
-  .btn:disabled{opacity:.4; cursor:not-allowed;}
-  .btn-primary{background:var(--primary); color:var(--primary-ink);}
-  .btn-primary:hover:not(:disabled){background:var(--primary-hover);}
-  .btn-primary:active:not(:disabled){background:var(--primary-active);}
-
-  .quick-row{display:flex; gap:12px; margin-top:28px; flex-wrap:wrap;}
-  .quick-link{flex:1; min-width:220px; background:var(--surface-dark); border:1px solid var(--border-dark); color:#C9D3DC; border-radius:var(--r-card); padding:16px 18px; text-decoration:none; display:flex; align-items:center; justify-content:space-between; font-size:13.5px; min-height:44px;}
-  .quick-link b{color:#fff; font-weight:600;}
-  .quick-link .go{color:var(--primary); font-size:17px;}
-  .quick-title{color:#5C6A77; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-top:24px;}
+  .today-grid{display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(0, 1fr); gap:16px; align-items:start;}
+  @media (max-width: 1000px){ .today-grid{grid-template-columns:1fr;} }
+  .start-card{display:grid; gap:12px; justify-items:start;}
 </style>
 </head>
 <body>
-
-<div class="top">
-  <svg class="mark" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-  <div class="word" id="org-word"></div>
-</div>
-
-<div class="hero">
-  <h1 data-i18n>Event operations</h1>
-  <p data-i18n>Choose the event you'll be working on. Inside you'll find sales, delivery, inventory and reports for that event.</p>
-</div>
-
-<main>
-  <div class="step-title"><span class="num">1</span> <span data-i18n>Choose the event</span></div>
-  <div id="event-area"></div>
-
-  <div class="enter-row">
-    <button class="btn btn-primary" id="enter-btn" disabled onclick="enterEvent()" data-i18n>Enter event →</button>
+<main class="main-inner" id="today">
+  <div class="page-head">
+    <div><h1 data-i18n>Today</h1><p id="today-date"></p></div>
+    <select class="select" id="loc-filter" style="width:auto; min-width:200px;" hidden aria-label="Location"></select>
   </div>
 
-  <div class="quick-title" data-i18n>Shortcuts (skip the dashboard)</div>
-  <div class="quick-row">
-    <a class="quick-link" href="despacho.html"><span data-i18n><b>Delivery</b> screen</span><span class="go">→</span></a>
-    <a class="quick-link" href="insumos.html"><span data-i18n><b>Inventory, stock and recipes</b></span><span class="go">→</span></a>
+  <div id="staff-start" class="panel start-card" hidden>
+    <h2 data-i18n>Ready to sell?</h2>
+    <p class="muted" data-i18n>Open the register for your location and start taking orders.</p>
+    <button class="btn btn-primary btn-lg" type="button" onclick="posOffice.openRegisterDialog()" data-i18n>Open a register</button>
+  </div>
+
+  <div id="owner-view" class="stack" hidden>
+    <div class="kpis" id="kpis"></div>
+    <div class="today-grid">
+      <div class="stack">
+        <section class="panel" id="by-location-panel" hidden>
+          <div class="panel-head"><h2 data-i18n>By location</h2></div>
+          <div class="bars" id="by-location"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2 data-i18n>Best sellers today</h2></div>
+          <div class="bars" id="top-products"></div>
+        </section>
+        <section class="panel" id="events-panel" hidden>
+          <div class="panel-head"><h2 data-i18n>Active events</h2></div>
+          <div class="list" id="events-list"></div>
+        </section>
+      </div>
+      <div class="stack">
+        <section class="panel" id="setup-panel" hidden>
+          <div class="panel-head"><h2 data-i18n>Getting started</h2><span class="muted num" id="setup-count"></span></div>
+          <div class="checklist" id="setup-list"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2 data-i18n>Needs attention</h2></div>
+          <div class="stack-sm" id="attention"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2 data-i18n>Registers open now</h2></div>
+          <div class="list" id="open-sessions"></div>
+        </section>
+      </div>
+    </div>
+    <p class="faint" id="as-of" style="font-size:12.5px;"></p>
   </div>
 </main>
 
@@ -92,81 +67,128 @@
 <script src="/js/i18n.js"></script>
 <script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
 <script>
   const sb = posCore.sb;
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  let locationId = null;
+  let refreshTimer = null;
 
-  let openEvents = [];
-  let selectedId = sessionStorage.getItem("pos_selected_event_id");
+  function delta(now, before) {
+    if (!before) return '<span class="k-delta">' + E(t("No sales this time last week")) + "</span>";
+    const pct = Math.round(((now - before) / before) * 100);
+    const cls = pct > 0 ? "up" : pct < 0 ? "down" : "";
+    return '<span class="k-delta ' + cls + '">' + E(t("{pct}% vs. last {weekday}", { pct: (pct > 0 ? "+" : "") + pct, weekday: weekdayName(-7) })) + "</span>";
+  }
+  function dayFormatter(opts) {
+    const loc = posI18n.lang === "es" ? "es-NZ" : ((posCore.org && posCore.org.locale) || "en-NZ");
+    return new Intl.DateTimeFormat(loc, { ...opts, timeZone: posCore.org.timezone || "Pacific/Auckland" });
+  }
+  function weekdayName(offsetDays) { return dayFormatter({ weekday: "long" }).format(new Date(Date.now() + offsetDays * 86400000)); }
 
-  async function loadEvents() {
-    const area = document.getElementById("event-area");
-    try {
-      const { data, error } = await sb.from("events").select("*").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
-      if (error) throw error;
-      openEvents = data || [];
+  function bars(rows, valueFn, labelFn, fmt) {
+    const max = Math.max(0, ...rows.map(valueFn));
+    return rows.map((r) => {
+      const v = valueFn(r);
+      const w = max > 0 ? Math.max(2, Math.round((v / max) * 100)) : 0;
+      return '<div class="bar"><span class="b-label" title="' + E(labelFn(r)) + '">' + E(labelFn(r)) + '</span>' +
+        '<span class="b-track"><span class="b-fill" style="width:' + w + '%"></span></span><span class="b-value">' + E(fmt(v)) + "</span></div>";
+    }).join("");
+  }
 
-      if (openEvents.length === 0) {
-        // Estado vacío: sin cajas todavía (organización nueva) o sin eventos.
-        const { count } = await sb.from("registers").select("id", { count: "exact", head: true }).eq("org_id", posCore.orgId);
-        const msg = !count
-          ? (posCore.isAdmin()
-              ? t("Welcome! Start by creating your first location and register in \"Inventory, stock and recipes\" → New location.")
-              : t("Your organisation isn't set up yet. Ask an owner or admin to create the first register."))
-          : t("No active events yet — open a Products or Tickets register and use \"Start new event\" to create the first one.");
-        area.innerHTML = '<div class="no-events">' + posCore.esc(msg) + '</div>';
-        selectedId = null;
-        updateEnterBtn();
-        return;
-      }
+  async function load() {
+    const { data: o, error } = await sb.rpc("today_overview", { p_org_id: posCore.orgId, p_location_id: locationId });
+    if (error) { $("kpis").innerHTML = '<div class="msg error">' + E(posCore.errorText(error)) + "</div>"; return; }
+    const money = (v) => posCore.money(Number(v));
 
-      if (selectedId && !openEvents.some(e => e.id === selectedId)) selectedId = null;
-      if (!selectedId && openEvents.length === 1) selectedId = openEvents[0].id;
+    $("kpis").innerHTML = [
+      { l: t("Sales"), v: money(o.sales), d: delta(Number(o.sales), Number(o.last_week.sales)) },
+      { l: t("Orders"), v: String(o.orders), d: delta(o.orders, o.last_week.orders) },
+      { l: t("Average sale"), v: money(o.avg_ticket), d: delta(Number(o.avg_ticket), Number(o.last_week.avg_ticket)) },
+      { l: t("Registers open"), v: t("{open} of {total}", { open: o.registers.open, total: o.registers.total }), d: '<span class="k-delta">' + E(t("Refunds today: {amount}", { amount: money(o.refunds) })) + "</span>" },
+    ].map((k) => '<div class="kpi"><span class="k-label">' + E(k.l) + '</span><span class="k-value">' + E(k.v) + "</span>" + k.d + "</div>").join("");
 
-      renderEvents();
-      updateEnterBtn();
-    } catch (e) {
-      area.innerHTML = '<div class="no-events">' + posCore.esc(t("Could not load the events: {msg}. Check your internet and reload the page.", { msg: posCore.errorText(e) })) + '</div>';
+    const showLocs = !locationId && o.by_location.length > 1;
+    $("by-location-panel").hidden = !showLocs;
+    if (showLocs) $("by-location").innerHTML = bars(o.by_location, (r) => Number(r.sales), (r) => r.name, money);
+
+    $("top-products").innerHTML = o.top_products.length
+      ? bars(o.top_products, (r) => Number(r.qty), (r) => r.name, (v) => String(Number(v)))
+      : '<div class="empty"><b>' + E(t("No sales yet today")) + "</b><span>" + E(t("Sales show up here as soon as a register charges an order.")) + "</span></div>";
+
+    // Lo que necesita atención: stock bajo y diferencias del último cierre.
+    const att = [];
+    for (const s of o.low_stock) {
+      const qty = Number(s.qty).toLocaleString(posCore.org.locale || "en-NZ", { maximumFractionDigits: 2 });
+      att.push('<div class="notice ' + (s.pct <= 0.1 ? "bad" : "warn") + '"><span class="dot"></span><span><b>' + E(s.name) + "</b> · " +
+        E(t("{qty} {unit} left ({pct}% of the last restock)", { qty, unit: s.unit || t("units"), pct: Math.round(s.pct * 100) })) +
+        ' <span class="muted">· ' + E(s.register) + "</span></span></div>");
     }
+    if (o.last_close_variance) {
+      const v = o.last_close_variance;
+      att.push('<div class="notice warn"><span class="dot"></span><span>' + E(t("{register} closed with a cash difference of {amount}.", { register: v.register, amount: money(v.variance) })) + "</span></div>");
+    }
+    $("attention").innerHTML = att.length ? att.join("") : '<div class="notice ok"><span class="dot"></span><span>' + E(t("All good. Nothing needs your attention.")) + "</span></div>";
+
+    $("open-sessions").innerHTML = o.open_sessions.length
+      ? o.open_sessions.map((s) => '<div class="list-item"><span class="pill ok"><span class="dot"></span>' + E(t("Open")) + '</span><div class="grow"><b>' + E(s.register) + '</b> <span class="muted">· ' + E(s.location) + '</span></div><span class="muted num">' +
+          E(t("since {time}", { time: posCore.fmtTime(s.opened_at) })) + (s.opened_by ? " · " + E(s.opened_by) : "") + "</span></div>").join("")
+      : '<div class="empty"><span>' + E(t("No register is open right now.")) + '</span><button class="btn" type="button" onclick="posOffice.openRegisterDialog()">' + E(t("Open a register")) + "</button></div>";
+
+    // Primeros pasos: se oculta cuando todo está listo.
+    const steps = [
+      { done: o.setup.details, label: t("Add your business details"), href: "/ajustes.html" },
+      { done: o.setup.registers, label: t("Create a location and register"), href: "/locales.html" },
+      { done: o.setup.products, label: t("Add your products"), href: "/insumos.html#productos" },
+      { done: o.setup.first_sale, label: t("Make a test sale"), action: true },
+      { done: o.setup.team, label: t("Invite your team"), href: "/equipo.html" },
+    ];
+    const doneCount = steps.filter((s) => s.done).length;
+    $("setup-panel").hidden = doneCount === steps.length || !posCore.isAdmin();
+    $("setup-count").textContent = t("{done} of {total}", { done: doneCount, total: steps.length });
+    $("setup-list").innerHTML = steps.map((s) => s.done
+      ? '<span class="check done"><span class="box"></span>' + E(s.label) + "</span>"
+      : s.action ? '<a class="check" href="#" data-open-register><span class="box"></span>' + E(s.label) + "</a>"
+      : '<a class="check" href="' + s.href + '"><span class="box"></span>' + E(s.label) + "</a>").join("");
+    const openLink = $("setup-list").querySelector("[data-open-register]");
+    if (openLink) openLink.onclick = (e) => { e.preventDefault(); posOffice.openRegisterDialog(); };
+
+    $("as-of").textContent = t("Updated {time}. Test-mode sales are not included.", { time: posCore.fmtTime(o.as_of) });
   }
 
-  function renderEvents(){
-    const area = document.getElementById("event-area");
-    area.innerHTML = '<div class="event-grid">' + openEvents.map(e =>
-      '<button class="event-card ' + (e.id === selectedId ? "selected" : "") + '" onclick="selectEvent(\'' + e.id + '\')">' +
-        '<span class="check">✓</span>' +
-        '<div class="ename">' + posCore.esc(e.name) + '</div>' +
-        (e.event_date ? '<div class="edate">' + posCore.esc(posCore.fmtDate(e.event_date + "T12:00:00")) + '</div>' : '') +
-        '<div class="live"><span class="dot"></span> ' + posCore.esc(t("LIVE")) + '</div>' +
-      '</button>'
-    ).join("") + '</div>';
+  // Negocios de eventos (South Media): acceso directo al reporte de cada evento.
+  async function loadEvents() {
+    const { data } = await sb.from("events").select("id, name, event_date").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
+    $("events-panel").hidden = !(data && data.length);
+    if (!data || !data.length) return;
+    $("events-list").innerHTML = data.map((e) => '<div class="list-item"><div class="grow"><b>' + E(e.name) + "</b>" +
+      (e.event_date ? ' <span class="muted">· ' + E(posCore.fmtDate(e.event_date + "T12:00:00")) + "</span>" : "") + "</div>" +
+      '<button class="btn btn-sm" type="button" data-id="' + E(e.id) + '" data-name="' + E(e.name) + '">' + E(t("View report")) + "</button></div>").join("");
+    $("events-list").querySelectorAll("button").forEach((b) => b.onclick = () => {
+      sessionStorage.setItem("pos_selected_event_id", b.dataset.id);
+      sessionStorage.setItem("pos_selected_event_name", b.dataset.name);
+      location.href = "/dashboard.html";
+    });
   }
 
-  function selectEvent(id){
-    selectedId = id;
-    const ev = openEvents.find(e => e.id === id);
-    sessionStorage.setItem("pos_selected_event_id", id);
-    sessionStorage.setItem("pos_selected_event_name", ev ? ev.name : "");
-    renderEvents();
-    updateEnterBtn();
-  }
-
-  function updateEnterBtn(){
-    document.getElementById("enter-btn").disabled = !selectedId;
-  }
-
-  function enterEvent(){
-    if (!selectedId) return;
-    // Guardar siempre la selección: con un solo evento abierto se elige solo
-    // (sin pasar por selectEvent) y el dashboard no lo encontraba.
-    const ev = openEvents.find(e => e.id === selectedId);
-    sessionStorage.setItem("pos_selected_event_id", selectedId);
-    sessionStorage.setItem("pos_selected_event_name", ev ? ev.name : "");
-    location.href = "dashboard.html";
+  async function loadLocations() {
+    const { data } = await sb.from("locations").select("id, name").eq("org_id", posCore.orgId).order("created_at");
+    if (!data || data.length < 2) return;
+    const sel = $("loc-filter");
+    sel.innerHTML = '<option value="">' + E(t("All locations")) + "</option>" + data.map((l) => '<option value="' + E(l.id) + '">' + E(l.name) + "</option>").join("");
+    sel.hidden = false;
+    sel.onchange = () => { locationId = sel.value || null; load(); };
   }
 
   posCore.ready.then(() => {
-    document.getElementById("org-word").textContent = posCore.org.name.toUpperCase();
+    $("today-date").textContent = dayFormatter({ weekday: "long", day: "numeric", month: "long" }).format(new Date());
+    if (!["owner", "admin", "manager"].includes(posCore.role)) { $("staff-start").hidden = false; return; }
+    $("owner-view").hidden = false;
+    loadLocations();
     loadEvents();
+    load();
+    refreshTimer = setInterval(() => { if (!document.hidden) load(); }, 60000);
   });
 </script>
 </body>

@@ -48,6 +48,7 @@
     reason: { wrong_item: "Wrong item", quality: "Quality issue", changed_mind: "Customer changed their mind", overcharged: "Overcharged", other: "Other" },
     payment_status: { approved: "Approved", declined: "Declined", cancelled: "Cancelled", voided: "Voided" },
     limit: { locations: "locations", registers: "registers" },
+    plan: { starter: "Starter", pro: "Pro" },
     station: { bar: "Bar", kitchen: "Kitchen", coffee: "Coffee", collection: "Collection", none: "No preparation" },
     waste_reason: { spillage: "Spillage", breakage: "Breakage", expired: "Expired", staff: "Staff consumption", prep_error: "Preparation error", other: "Other" },
     audit: {
@@ -146,6 +147,7 @@
     "org.invalid_currency": "Invalid currency.",
     "org.invalid_slug": "The short name must be 3 to 40 lowercase letters, numbers or dashes.",
     "org.slug_taken": "That short name is already taken — try another.",
+    "register.session_open": "Close this register before deactivating it.",
     "org.details_required": "Fill in the legal name, address, city, contact person and phone.",
     "org.invalid_phone": "Enter a valid phone number (digits, spaces, +, dashes).",
     "org.invalid_nzbn": "The NZBN must be 13 digits.",

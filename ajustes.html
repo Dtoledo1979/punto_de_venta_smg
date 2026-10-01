@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "settings" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
+<link rel="stylesheet" href="/css/ui.css">
+<style>
+  .settings{display:grid; gap:16px; max-width:760px;}
+  .panel form{display:grid; gap:14px;}
+  .form-actions{display:flex; justify-content:flex-end; gap:10px;}
+</style>
+</head>
+<body>
+<main class="main-inner">
+  <div class="page-head">
+    <div><h1 data-i18n>Settings</h1><p data-i18n>Business details, tax, security and how the system looks on this device.</p></div>
+  </div>
+
+  <div class="settings">
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Business</h2></div>
+      <form id="f-business" novalidate>
+        <div class="fields">
+          <div class="field"><label for="b-name" data-i18n>Business name</label><input class="input" id="b-name" maxlength="120"></div>
+          <div class="field"><label for="b-lang"><span data-i18n>Receipt language</span> <span class="hint" data-i18n>Also the default for new devices.</span></label>
+            <select class="select" id="b-lang"><option value="en">English</option><option value="es" lang="es">Español</option></select></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" data-i18n>Save</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Legal and contact details</h2></div>
+      <p class="hint" data-i18n>Used for your subscription invoices and tax invoices. NZBN and postcode are optional.</p>
+      <form id="f-details" novalidate>
+        <div class="fields">
+          <div class="field"><label for="d-legal-name" data-i18n>Legal name</label><input class="input" id="d-legal-name" autocomplete="organization"></div>
+          <div class="field"><label for="d-nzbn" data-i18n>NZBN</label><input class="input" id="d-nzbn" inputmode="numeric" maxlength="17"></div>
+        </div>
+        <div class="field"><label for="d-address" data-i18n>Street address</label><input class="input" id="d-address" autocomplete="street-address"></div>
+        <div class="fields">
+          <div class="field"><label for="d-city" data-i18n>Town / city</label><input class="input" id="d-city" autocomplete="address-level2"></div>
+          <div class="field"><label for="d-postcode" data-i18n>Postcode</label><input class="input" id="d-postcode" inputmode="numeric" maxlength="12"></div>
+        </div>
+        <div class="fields">
+          <div class="field"><label for="d-contact-name" data-i18n>Contact person</label><input class="input" id="d-contact-name" autocomplete="name"></div>
+          <div class="field"><label for="d-contact-phone" data-i18n>Phone</label><input class="input" id="d-contact-phone" type="tel" autocomplete="tel"></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" data-i18n>Save details</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Tax</h2></div>
+      <form id="f-tax" novalidate>
+        <div class="fields">
+          <div class="field"><label for="tax-rate"><span data-i18n>GST rate (%)</span> <span class="hint" data-i18n>Prices include it.</span></label><input class="input" id="tax-rate" type="number" step="0.01" min="0" max="99"></div>
+          <div class="field"><label for="tax-number"><span data-i18n>GST number</span> <span class="hint" data-i18n>Printed on receipts.</span></label><input class="input" id="tax-number"></div>
+        </div>
+        <p class="hint" data-i18n>Changing the rate only affects new sales. Past sales keep the rate they were charged with.</p>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" data-i18n>Save</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Supervisor PIN</h2></div>
+      <form id="f-pin" novalidate>
+        <p class="hint" data-i18n>Authorises complimentary sales and refunds at the register. 4 to 8 digits.</p>
+        <div class="fields">
+          <div class="field"><label for="pin-1" data-i18n>New PIN</label><input class="input" id="pin-1" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></div>
+          <div class="field"><label for="pin-2" data-i18n>Repeat the new PIN</label><input class="input" id="pin-2" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" data-i18n>Change PIN</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Subscription</h2><span id="sub-pill"></span></div>
+      <p class="muted num" id="sub-usage"></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Appearance on this device</h2></div>
+      <div class="seg" id="theme-seg" role="group" aria-label="Theme">
+        <button type="button" data-theme-opt="system" data-i18n>System</button>
+        <button type="button" data-theme-opt="light" data-i18n>Light</button>
+        <button type="button" data-theme-opt="dark" data-i18n>Dark</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Test data</h2></div>
+      <p class="muted" data-i18n>Deletes every test-mode sale (and its payments and refunds) of this business. Real sales are never touched.</p>
+      <div><button class="btn btn-danger" type="button" id="purge-btn" data-i18n>Clear test data</button></div>
+    </section>
+  </div>
+</main>
+
+<dialog class="dialog" id="dlg-purge">
+  <div class="dialog-body">
+    <h2 data-i18n>Clear test data?</h2>
+    <p class="muted" data-i18n>Delete all test-mode sales of this business? Real sales are not affected. This can't be undone.</p>
+    <div class="dialog-actions"><button class="btn" type="button" id="purge-cancel" data-i18n>Cancel</button><button class="btn btn-danger" type="button" id="purge-ok" data-i18n>Clear test data</button></div>
+  </div>
+</dialog>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
+<script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
+<script>
+  const sb = posCore.sb;
+  const $ = (id) => document.getElementById(id);
+  const v = (id) => $(id).value.trim();
+  const fail = (error) => posOffice.toast(posCore.errorText(error));
+  let org = null;
+
+  async function load() {
+    const { data } = await sb.from("organizations")
+      .select("name, language, tax_rate, tax_number, tax_name, legal_name, nzbn, address_line, city, postcode, contact_name, contact_phone")
+      .eq("id", posCore.orgId).maybeSingle();
+    if (!data) return;
+    org = data;
+    $("b-name").value = org.name || ""; $("b-lang").value = org.language || "en";
+    const set = (id, val) => { $(id).value = val || ""; };
+    set("d-legal-name", org.legal_name); set("d-nzbn", org.nzbn); set("d-address", org.address_line); set("d-city", org.city);
+    set("d-postcode", org.postcode); set("d-contact-name", org.contact_name); set("d-contact-phone", org.contact_phone);
+    $("tax-rate").value = Math.round(Number(org.tax_rate) * 10000) / 100;
+    set("tax-number", org.tax_number);
+
+    const { data: e } = await sb.rpc("org_entitlements", { p_org_id: posCore.orgId });
+    if (e) {
+      const cls = e.status === "active" ? "ok" : e.status === "past_due" || e.status === "incomplete" ? "warn" : "bad";
+      $("sub-pill").innerHTML = '<span class="pill ' + cls + '"><span class="dot"></span>' + posUtils.escapeHtml(t(SUB_STATUS[e.status] || e.status)) + "</span>";
+      $("sub-usage").textContent = t("Plan {plan}: {l} of {lm} locations · {r} of {rm} registers", {
+        plan: posCore.label("plan", e.plan), l: e.usage.locations, lm: e.limits.locations, r: e.usage.registers, rm: e.limits.registers });
+    }
+  }
+  const SUB_STATUS = { active: "Active", incomplete: "Awaiting payment", past_due: "Payment overdue", cancelled: "Cancelled", suspended: "Suspended" };
+
+  $("f-business").onsubmit = async (e) => {
+    e.preventDefault();
+    if (!v("b-name")) { posOffice.toast(t("Type a name.")); return; }
+    const { error } = await sb.rpc("update_organization", { p_org_id: posCore.orgId, p_name: v("b-name"), p_language: $("b-lang").value });
+    if (error) return fail(error);
+    posOffice.toast(t("Saved."));
+  };
+
+  $("f-details").onsubmit = async (e) => {
+    e.preventDefault();
+    if (!v("d-legal-name") || !v("d-address") || !v("d-city") || !v("d-contact-name") || !v("d-contact-phone")) {
+      posOffice.toast(t("Fill in the legal name, address, city, contact person and phone.")); return;
+    }
+    const { error } = await sb.rpc("update_organization_details", {
+      p_org_id: posCore.orgId, p_legal_name: v("d-legal-name"), p_address_line: v("d-address"), p_city: v("d-city"),
+      p_postcode: v("d-postcode") || null, p_contact_name: v("d-contact-name"), p_contact_phone: v("d-contact-phone"), p_nzbn: v("d-nzbn") || null,
+    });
+    if (error) return fail(error);
+    posOffice.toast(t("Details saved."));
+  };
+
+  $("f-tax").onsubmit = async (e) => {
+    e.preventDefault();
+    const rate = Number(v("tax-rate"));
+    if (!Number.isFinite(rate) || rate < 0 || rate >= 100) { posOffice.toast(t("Enter a valid GST rate.")); return; }
+    const { error } = await sb.rpc("update_organization_tax", { p_org_id: posCore.orgId, p_tax_rate: Math.round(rate * 100) / 10000, p_tax_number: v("tax-number") || null });
+    if (error) return fail(error);
+    posOffice.toast(t("Saved."));
+  };
+
+  $("f-pin").onsubmit = async (e) => {
+    e.preventDefault();
+    const p1 = $("pin-1").value, p2 = $("pin-2").value;
+    if (!/^[0-9]{4,8}$/.test(p1)) { posOffice.toast(t("Each PIN must be 4 to 8 digits.")); return; }
+    if (p1 !== p2) { posOffice.toast(t("The two PINs don't match.")); return; }
+    const { error } = await sb.rpc("set_supervisor_pin", { p_org_id: posCore.orgId, p_new_pin: p1 });
+    if (error) return fail(error);
+    $("pin-1").value = ""; $("pin-2").value = "";
+    posOffice.toast(t("Supervisor PIN updated."));
+  };
+
+  // Tema de este dispositivo (pos-core lo aplica al cargar cada pantalla).
+  function paintTheme() {
+    const cur = posCore.theme();
+    document.querySelectorAll("[data-theme-opt]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeOpt === cur)));
+  }
+  document.querySelectorAll("[data-theme-opt]").forEach((b) => b.onclick = () => { posCore.setTheme(b.dataset.themeOpt); paintTheme(); });
+
+  $("purge-btn").onclick = () => $("dlg-purge").showModal();
+  $("purge-cancel").onclick = () => $("dlg-purge").close();
+  $("purge-ok").onclick = async () => {
+    $("dlg-purge").close();
+    const { data, error } = await sb.rpc("purge_test_data", { p_org_id: posCore.orgId });
+    if (error) return fail(error);
+    posOffice.toast(t("Test data cleared: {n} test orders deleted.", { n: data.orders }));
+  };
+
+  posCore.ready.then(() => { paintTheme(); if (posOffice.require(["owner", "admin"])) load(); });
+</script>
+</body>
+</html>
