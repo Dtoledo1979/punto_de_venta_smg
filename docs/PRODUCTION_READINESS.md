@@ -118,7 +118,7 @@ register_sessions, cash_movements.
 |---|---|---|---|---|
 | Authentication → URL Configuration → Site URL | URL de producción | `https://<sitio>.netlify.app` o dominio propio | links de email | recuperar contraseña desde la URL publicada |
 | Authentication → URL Configuration → Redirect URLs | agregar | `https://<sitio>/**` | idem | idem |
-| Project Settings → Authentication → SMTP Settings | SMTP propio (Resend, Postmark, SES…) | credenciales del proveedor | el correo de Supabase solo envía a miembros del equipo y ~2/hora: **sin esto no hay registro público** | crear cuenta con un email externo |
+| Project Settings → Authentication → SMTP Settings | SMTP propio (Resend, Postmark, SES…) | credenciales del proveedor | el correo de Supabase solo envía a miembros del equipo y ~2/hora: **sin esto no hay registro público** | crear cuenta con un email externo — **staging: Resend, no-reply@mail.southmedia.co.nz** |
 | Authentication → Sign In / Providers → Email | Allow new users to sign up = ON | cuando exista SMTP propio | onboarding público | "Create an account" en el login |
 | Authentication → Attack Protection | Prevent use of leaked passwords = ON | (plan Pro) | aviso del advisor | intentar una contraseña conocida filtrada |
 | Authentication → Attack Protection | CAPTCHA (Turnstile/hCaptcha) | recomendado al abrir el registro | evitar altas masivas | — |

@@ -31,7 +31,7 @@ completo: revisar el diff que imprime y comparar con lo que hay en el panel.
 | Ajuste | Valor | Por qué |
 |---|---|---|
 | `[api] schemas` | incluye `pos` | la app habla con el schema `pos` |
-| `[auth] enable_signup` | `false` hasta configurar SMTP propio | el correo de Supabase solo envía a miembros del equipo |
+| `[auth] enable_signup` | `true` (staging) | los correos salen por Resend (`[auth.email.smtp]`, remitente no-reply@mail.southmedia.co.nz); antes de `config push` exportar `RESEND_SMTP_KEY` |
 | `[auth.email] enable_signup` | `true` | **es el proveedor de email (login)**, no el registro |
 | `[auth] minimum_password_length` / `password_requirements` | 10 / `lower_upper_letters_digits` | política de contraseñas |
 | `[auth.email] enable_confirmations` | `true` | confirmar email antes de entrar |
