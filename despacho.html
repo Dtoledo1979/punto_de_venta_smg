@@ -2,132 +2,58 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Delivery</title>
-<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "delivery" }; document.documentElement.classList.add("pos-auth-pending");</script>
 <style>html.pos-auth-pending body{visibility:hidden}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/ui.css">
+<link rel="stylesheet" href="/css/register.css">
 <style>
-  :root{
-    --bg:#0E1116; --surface:#FFFFFF; --surface-alt:#F4F6F8; --ink:#12161C;
-    --muted:#62707D; --accent:#A8E020; --accent-ink:#1A2333;
-    --danger:#E4483A; --warn:#D98B00; --ok:#2FA35A; --border:#E2E6EA;
-    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; background:var(--bg); color:#fff; font-family:'Inter',Arial,sans-serif; min-height:100vh;}
-  header{padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid #1E2530;}
-  header .id{display:flex; align-items:center; gap:9px;}
-  header .mark path{fill:var(--accent);}
-  header h1{font-family:'Sora',sans-serif; font-size:16px; font-weight:700; margin:0;}
-  header .back{color:#9AA7B2; text-decoration:none; font-size:13px;}
-  .sub{color:#9AA7B2; font-size:13px; padding:12px 20px 0;}
-  main{max-width:1200px; margin:0 auto; padding:16px 20px 40px;}
-  .empty{color:#5C6A77; text-align:center; padding:80px 20px; font-size:15px;}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;}
-  .order{background:#151B23; border:1px solid #232B36; border-radius:var(--r-card); padding:16px; display:flex; flex-direction:column; gap:10px;}
-  .event-tag{font-size:11px; font-weight:700; color:var(--accent-ink); background:var(--accent); display:inline-block; padding:2px 8px; border-radius:999px; align-self:flex-start;}
-  .order .row1{display:flex; justify-content:space-between; align-items:baseline;}
-  .order .tnum{font-family:'Sora',sans-serif; font-size:20px; font-weight:800;}
-  .timer{font-family:'Sora',sans-serif; font-size:22px; font-weight:800; padding:3px 10px; border-radius:8px; background:#1E2A1F; color:var(--ok);}
-  .timer.warn{background:#2A2312; color:var(--warn);}
-  .timer.danger{background:#2E1B19; color:var(--danger);}
-  .items{display:flex; flex-direction:column; gap:2px;}
-  .item-line{display:flex; align-items:center; gap:9px; padding:9px 6px; cursor:pointer; font-size:13.5px; color:#C9D3DC; border-radius:var(--r-sm); min-height:44px;}
-  .item-line:active{background:#1B222B;}
-  .item-line .check{width:19px; height:19px; border:1.5px solid #3A4552; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--accent-ink); flex:none;}
-  .item-line.done{color:#5C6A77; text-decoration:line-through;}
-  .item-line.done .check{background:var(--accent); border-color:var(--accent);}
-  .progress{font-size:11.5px; color:#5C6A77; font-weight:600;}
-  .obs{font-size:12.5px; color:var(--accent); background:#1A2314; padding:6px 9px; border-radius:8px;}
-  .meta{font-size:12px; color:#5C6A77; display:flex; justify-content:space-between;}
-  .btn-deliver{border:none; background:#232B36; color:#C9D3DC; font-weight:600; padding:12px; border-radius:var(--r-md); cursor:pointer; font-size:13.5px; min-height:44px; transition:background .12s, transform .08s;}
-  .btn-deliver:active{transform:scale(.98);}
-  .btn-deliver:hover{background:#2A3440;}
-  .btn-deliver.ready{background:var(--accent); color:var(--accent-ink); font-weight:700;}
-  .delivered-title{margin-top:32px; font-family:'Sora',sans-serif; font-size:15px; color:#9AA7B2;}
-  .delivered-list{margin-top:10px; font-size:13px; color:#7C8996; display:flex; flex-direction:column; gap:6px;}
-  #pin-overlay{position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
-  .modal{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:24px; max-width:320px; width:100%; text-align:center;}
-  .modal h3{font-family:'Sora',sans-serif; margin:0 0 6px; font-size:17px;}
-  .modal p{font-size:13.5px; color:#9AA7B2; margin:0 0 16px;}
-  .modal input{width:100%; padding:12px; border:1px solid #2A323D; border-radius:9px; font-size:20px; text-align:center; letter-spacing:4px; background:#0E1116; color:#fff;}
-  .modal .row{display:flex; gap:8px; margin-top:14px;}
-  .modal button{flex:1; padding:11px; border-radius:9px; border:none; font-weight:600; cursor:pointer;}
-  .modal .ok{background:var(--accent); color:var(--accent-ink);}
-  .modal .cancel{background:#232B36; color:#fff;}
-  #toast{display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--accent); color:var(--accent-ink); padding:11px 20px; border-radius:9px; font-size:13.5px; z-index:10000; font-weight:600;}
-  .search-card{background:#151B23; border:1px solid #232B36; border-radius:14px; padding:14px 16px; margin:0 20px 16px;}
-  @media (min-width:1240px){ .search-card{max-width:1160px; margin:0 auto 16px;} }
-  .search-toggle{color:var(--accent); font-size:13px; cursor:pointer; background:none; border:none; padding:0;}
-  .search-box{display:flex; gap:8px; margin-top:10px;}
-  .search-box input{flex:1; padding:10px; border:1px solid #2A323D; border-radius:8px; font-size:13px; background:#0E1116; color:#fff;}
-  .search-box button{border:none; background:var(--accent); color:var(--accent-ink); font-weight:700; padding:10px 14px; border-radius:8px; cursor:pointer; font-size:13px;}
-  .search-results{margin-top:10px;}
-  .search-row{display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid #232B36; font-size:13.5px; gap:8px;}
-  .search-row .meta{font-size:12px; color:#7C8996; margin-top:2px;}
-  .search-actions{display:flex; gap:6px; flex:none;}
-  .search-actions button{padding:7px 10px; font-size:12px; border:none; border-radius:7px; cursor:pointer; font-weight:600;}
-  .search-actions .reopen{background:#232B36; color:#C9D3DC;}
-  .search-actions .void{background:#2E1B19; color:#E4483A;}
+  body{overflow:auto;}
+  .kds-top{display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--surface); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; flex-wrap:wrap;}
+  .kds-top .who{display:flex; align-items:center; gap:10px; flex:1; min-width:0;}
+  .kds-top .who .mark{width:32px; height:32px; border-radius:9px; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font:700 15px var(--f-display); flex:none;}
+  .kds-top b{font:700 16px var(--f-display);}
+  .kds-top .muted{font-size:13px;}
+  .kds-wrap{padding:14px; display:grid; gap:14px;}
+  .board{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; align-items:start;}
+  .kcard{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); display:grid; overflow:hidden;}
+  .kcard .kh{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; background:var(--sunken);}
+  .kcard .kh .num{font:700 22px var(--f-display);}
+  .kcard .kh .timer{font:700 16px var(--f-display); font-variant-numeric:tabular-nums; padding:2px 10px; border-radius:20px; background:var(--surface);}
+  .kcard.warn .kh{background:var(--warn-soft);} .kcard.warn .timer{color:var(--warn);}
+  .kcard.bad .kh{background:var(--bad-soft);} .kcard.bad .timer{color:var(--bad);}
+  .kcard .kmeta{padding:6px 12px 0; font-size:13px; color:var(--muted); display:flex; gap:6px; flex-wrap:wrap;}
+  .kline{display:grid; grid-template-columns:28px minmax(0,1fr); gap:8px; padding:10px 12px; border-top:1px solid var(--line); cursor:pointer; text-align:left; background:transparent; border-left:0; border-right:0; border-bottom:0; color:var(--ink); font:inherit;}
+  .kline:first-of-type{border-top:0;}
+  .kline .ck{width:24px; height:24px; border-radius:7px; border:2px solid var(--line-strong); display:grid; place-items:center; font-size:14px; color:var(--accent-ink);}
+  .kline.done{color:var(--faint);} .kline.done .ck{background:var(--accent); border-color:var(--accent);}
+  .kline .q{font:700 17px var(--f-body);}
+  .kline .mods{font-size:14.5px; color:var(--ink); font-weight:600;} .kline.done .mods{color:var(--faint);}
+  .kline .note{font-size:14px; color:var(--warn); font-weight:600;}
+  .kline .st{font-size:12px; color:var(--muted);}
+  .kcard .kfoot{padding:10px 12px; border-top:1px solid var(--line);}
+  .kcard .kfoot .btn{width:100%; min-height:48px;}
+  .recent{display:flex; gap:8px; flex-wrap:wrap; font-size:13.5px;}
 </style>
 </head>
 <body>
-
-<header>
-  <div class="id">
-    <svg class="mark" width="20" height="20" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-    <h1 data-i18n>Delivery</h1>
-  </div>
-  <a class="back" onclick="cambiarUbicacion()" style="cursor:pointer;" data-i18n>📍 Change location</a>
-  <a class="back" href="index.html" data-i18n>← Home</a>
+<header class="kds-top">
+  <div class="who"><span class="mark" id="mark">·</span><div><b data-i18n>Delivery</b> <span class="muted" id="place"></span></div></div>
+  <div class="seg" id="stations" role="group" aria-label="Station"></div>
+  <button class="top-btn" type="button" id="find-btn" data-i18n>Find a sale</button>
+  <button class="top-btn" type="button" id="menu-btn" aria-label="Menu">⋯</button>
 </header>
-<div class="sub" id="event-label" data-i18n>Loading…</div>
-
-<div class="search-card">
-  <button class="search-toggle" onclick="toggleSearch()" data-i18n>🔎 Find a ticket (by customer or number) — view, reopen or void</button>
-  <div id="search-panel" style="display:none;">
-    <div class="search-box">
-      <input type="text" id="search-input" placeholder="Customer name or ticket #" data-i18n-ph onkeydown="if(event.key==='Enter') buscarTicket()">
-      <button onclick="buscarTicket()" data-i18n>Search</button>
-    </div>
-    <div id="search-results" class="search-results"></div>
-  </div>
-</div>
-
-<div class="search-card" id="station-bar" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"></div>
-
-<main>
-  <div id="board" class="grid"></div>
-  <div id="empty-msg" class="empty" style="display:none;" data-i18n>No orders waiting for delivery.</div>
-
-  <div class="delivered-title" data-i18n>Recently delivered</div>
-  <div id="delivered-list" class="delivered-list"></div>
+<div id="office-banner"></div>
+<main class="kds-wrap">
+  <div class="board" id="board"></div>
+  <div class="empty" id="empty" hidden><b data-i18n>Nothing to prepare</b><span data-i18n>New orders appear here as soon as they're paid.</span></div>
+  <section class="panel"><div class="panel-head"><h2 data-i18n>Recently delivered</h2></div><div class="recent" id="recent"></div></section>
 </main>
 
-<div id="register-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); align-items:center; justify-content:center; z-index:10001; padding:16px;">
-  <div class="modal">
-    <h3 data-i18n>Which register / location are you at?</h3>
-    <p data-i18n>This device will remember your choice — you won't be asked again unless you change it.</p>
-    <div id="register-picker-list"></div>
-  </div>
-</div>
-<div id="pin-overlay">
-  <div class="modal">
-    <h3 data-i18n>Enter PIN</h3>
-    <p data-i18n>Your name and the Delivery PIN to open this screen.</p>
-    <input type="text" id="operator-name-input" placeholder="Your name" data-i18n-ph style="margin-bottom:8px;" autofocus>
-    <input type="password" id="pin-input" inputmode="numeric" maxlength="8">
-    <div class="row">
-      <button class="cancel" onclick="location.href='index.html'" data-i18n>Cancel</button>
-      <button class="ok" onclick="checkPin()" data-i18n>Enter</button>
-    </div>
-    <p style="margin:14px 0 0; cursor:pointer; text-decoration:underline;" onclick="cambiarPinEntrega()" data-i18n>⚙️ Change Delivery PIN (admin)</p>
-  </div>
-</div>
-
-<div id="toast"></div>
+<div class="lock" id="lock" hidden><div class="lock-card" id="lock-card"></div></div>
+<dialog class="dialog wide" id="dlg"></dialog>
+<div class="toast" id="toast" role="status"></div>
 
 <script src="/vendor/supabase.js"></script>
 <script src="/js/pos-utils.js"></script>
@@ -136,274 +62,204 @@
 <script src="/js/pos-core.js"></script>
 <script>
   const sb = posCore.sb;
-  const REGISTER_TYPE = "product";
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  const WARN_AFTER = 300, BAD_AFTER = 600;   // segundos: amarillo a los 5 min, rojo a los 10
+  const STATIONS = ["all", "coffee", "kitchen", "bar", "collection"];
+  let reg = null, operator = "", pending = [], recent = [];
+  let station = (() => { try { return localStorage.getItem("pos_kds_station") || "all"; } catch (_) { return "all"; } })();
+  const stationOf = (it) => it.station || "bar";
+  const pin = () => sessionStorage.getItem("pos_despacho_pin_" + reg.id) || "";
+  const stationLabel = (s) => s === "all" ? t("All stations") : posCore.label("station", s);
 
-  // Umbrales del timer (segundos) — ajusta si tu operación es más rápida/lenta.
-  const WARN_AFTER = 120;   // amarillo
-  const DANGER_AFTER = 300; // rojo
+  function toast(text) { const el = $("toast"); el.textContent = text; el.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove("show"), 2400); }
+  const fail = (p, e) => toast(t(p) + ": " + posCore.errorText(e));
 
-  let register = null;
-  let operatorName = "";
-  let pendingOrders = [];
-  let deliveredRecent = [];
-  let tickInterval = null;
-
-  function showToast(msg){
-    const el = document.getElementById("toast");
-    el.textContent = msg; el.style.display = "block";
-    clearTimeout(showToast._t);
-    showToast._t = setTimeout(() => el.style.display = "none", 2200);
-  }
-  function showError(prefix, error){ showToast(t(prefix) + ": " + posCore.errorText(error)); }
-
-  async function resolveRegister(type){
-    const { data: registers, error } = await sb.from("registers").select("id,name,type,active,created_at,location_id,locations(name)").eq("org_id", posCore.orgId).eq("type", type).eq("active", true).order("created_at");
-    if (error || !registers || registers.length === 0) return null;
-    if (registers.length === 1) return registers[0];
-
-    const savedId = localStorage.getItem("pos_register_" + type);
-    const saved = registers.find(r => r.id === savedId);
-    if (saved) return saved;
-
-    return new Promise(resolve => {
-      const overlay = document.getElementById("register-picker-overlay");
-      const list = document.getElementById("register-picker-list");
-      list.innerHTML = registers.map(r =>
-        '<button class="ok" style="display:block; width:100%; margin-bottom:8px; padding:11px; border-radius:9px; border:none; cursor:pointer;" data-id="' + r.id + '">' + posCore.esc((r.locations ? r.locations.name + " — " : "") + r.name) + '</button>'
-      ).join("");
-      overlay.style.display = "flex";
-      list.querySelectorAll("button").forEach(btn => {
-        btn.onclick = () => {
-          localStorage.setItem("pos_register_" + type, btn.dataset.id);
-          overlay.style.display = "none";
-          resolve(registers.find(r => r.id === btn.dataset.id));
-        };
-      });
+  async function resolveRegister() {
+    const { data: regs } = await sb.from("registers").select("id, name, location_id, locations(name)").eq("org_id", posCore.orgId).eq("type", "product").eq("active", true).order("created_at");
+    if (!regs || !regs.length) { $("lock").hidden = false; $("lock-card").innerHTML = "<h1>" + E(t("Delivery")) + '</h1><p class="muted">' + E(t("This business doesn't have a register yet.")) + '</p><a class="btn" href="/index.html">' + E(t("Back to the office")) + "</a>"; return null; }
+    let saved = null; try { saved = localStorage.getItem("pos_register_product"); } catch (_) { /* sin storage */ }
+    const s = regs.find((r) => r.id === saved);
+    if (regs.length === 1 || s) return s || regs[0];
+    return new Promise((resolve) => {
+      $("lock").hidden = false;
+      $("lock-card").innerHTML = "<h1>" + E(t("Which register's orders?")) + '</h1><div class="list">' + regs.map((r) => '<button class="btn btn-lg btn-block" type="button" data-id="' + E(r.id) + '" style="margin-bottom:8px;">' + E((r.locations ? r.locations.name + " · " : "") + r.name) + "</button>").join("") + "</div>";
+      $("lock-card").querySelectorAll("[data-id]").forEach((b) => b.onclick = () => { try { localStorage.setItem("pos_register_product", b.dataset.id); } catch (_) { /* sin storage */ } resolve(regs.find((r) => r.id === b.dataset.id)); });
     });
   }
 
-  function cambiarUbicacion(){
-    localStorage.removeItem("pos_register_" + REGISTER_TYPE);
-    location.reload();
+  function showLock() {
+    $("lock").hidden = false;
+    let code = "";
+    $("lock-card").innerHTML = '<div class="stack-sm"><span class="muted">' + E(posCore.org.name) + "</span><h1>" + E(t("Delivery")) + '</h1><span class="muted">' + E((reg.locations ? reg.locations.name + " · " : "") + reg.name) + "</span></div>" +
+      '<input class="input" id="lock-name" placeholder="' + E(t("Your name")) + '" autocomplete="off" value="' + E(sessionStorage.getItem("pos_despacho_operator_" + reg.id) || "") + '">' +
+      '<p class="muted">' + E(t("Enter the Delivery PIN.")) + '</p><div class="pin-dots" id="pin-dots"></div><div class="keypad">' +
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => '<button type="button" data-k="' + d + '">' + d + "</button>").join("") +
+      '<button type="button" class="wide" data-k="del">⌫</button><button type="button" data-k="0">0</button><button type="button" class="wide" data-k="ok">' + E(t("Enter")) + "</button></div>" +
+      '<div class="msg error" id="lock-msg" hidden></div><a class="btn btn-ghost btn-sm" href="/index.html">' + E(t("Back to the office")) + "</a>";
+    const dots = () => { $("pin-dots").innerHTML = Array.from({ length: Math.max(4, code.length) }, (_, i) => '<i class="' + (i < code.length ? "on" : "") + '"></i>').join(""); };
+    dots();
+    const submit = async () => {
+      const name = $("lock-name").value.trim(), m = $("lock-msg");
+      if (!name) { m.textContent = t("Type your name."); m.hidden = false; return; }
+      const { data: ok, error } = await sb.rpc("verify_despacho_pin", { p_register_id: reg.id, p_pin: code });
+      if (error || !ok) { m.textContent = error ? posCore.errorText(error) : posCore.errorText({ message: "pin.incorrect" }); m.hidden = false; code = ""; dots(); return; }
+      sessionStorage.setItem("pos_despacho_pin_" + reg.id, code); sessionStorage.setItem("pos_despacho_operator_" + reg.id, name);
+      operator = name; $("lock").hidden = true; start();
+    };
+    $("lock-card").querySelectorAll("[data-k]").forEach((b) => b.onclick = () => {
+      const k = b.dataset.k;
+      if (k === "del") code = code.slice(0, -1); else if (k === "ok") return submit(); else if (code.length < 8) code += k;
+      $("lock-msg").hidden = true; dots();
+    });
+    document.onkeydown = (e) => {
+      if ($("lock").hidden) return;
+      if (document.activeElement === $("lock-name")) { if (e.key === "Enter") submit(); return; }
+      if (/^[0-9]$/.test(e.key) && code.length < 8) { code += e.key; dots(); } else if (e.key === "Backspace") { code = code.slice(0, -1); dots(); } else if (e.key === "Enter") submit();
+    };
   }
 
-  async function init(){
-    register = await resolveRegister(REGISTER_TYPE);
-    if (!register){ showToast(t("Your organisation doesn't have a product register yet.")); return; }
-
-    const { data: evs } = await sb.from("events").select("name").eq("org_id", posCore.orgId).eq("active", true).order("created_at");
-    const ev = (evs && evs.length)
-      ? (evs.length === 1 ? t("Active event: {name}", { name: evs[0].name }) : t("Active events: {names}", { names: evs.map(e=>e.name).join(", ") }))
-      : t("No active event.");
-    document.getElementById("event-label").textContent = ev;
-
-    const savedPin = sessionStorage.getItem("pos_despacho_pin_" + register.id);
-    const savedName = sessionStorage.getItem("pos_despacho_operator_" + register.id);
-    if (savedPin && savedName){
-      const { data: ok } = await sb.rpc("verify_despacho_pin", { p_register_id: register.id, p_pin: savedPin });
-      if (ok) {
-        operatorName = savedName;
-        document.getElementById("pin-overlay").style.display = "none";
-        await afterUnlock();
-      }
+  async function init() {
+    reg = await resolveRegister();
+    if (!reg) return;
+    $("mark").textContent = (posCore.org.name || "·").charAt(0).toUpperCase();
+    $("place").textContent = (reg.locations ? reg.locations.name + " · " : "") + reg.name;
+    const savedPin = pin(), savedName = sessionStorage.getItem("pos_despacho_operator_" + reg.id);
+    if (savedPin && savedName) {
+      const { data: ok } = await sb.rpc("verify_despacho_pin", { p_register_id: reg.id, p_pin: savedPin });
+      if (ok) { operator = savedName; return start(); }
     }
+    showLock();
   }
 
-  function myDespachoPin(){ return sessionStorage.getItem("pos_despacho_pin_" + register.id) || ""; }
-
-  async function checkPin(){
-    if (!register) return;
-    const name = document.getElementById("operator-name-input").value.trim();
-    const val = document.getElementById("pin-input").value;
-    if (!name) { showToast(t("Type your name.")); return; }
-    const { data: ok } = await sb.rpc("verify_despacho_pin", { p_register_id: register.id, p_pin: val });
-    if (ok){
-      operatorName = name;
-      sessionStorage.setItem("pos_despacho_pin_" + register.id, val);
-      sessionStorage.setItem("pos_despacho_operator_" + register.id, name);
-      document.getElementById("pin-overlay").style.display = "none";
-      afterUnlock();
-    } else showToast(posCore.errorText({ message: "pin.incorrect" }));
+  let started = false;
+  async function start() {
+    $("place").textContent = (reg.locations ? reg.locations.name + " · " : "") + reg.name + " · " + operator;
+    if (started) return;
+    started = true;
+    renderStations();
+    await refresh();
+    sb.channel("kds-" + reg.id).on("postgres_changes", { event: "*", schema: "pos", table: "orders", filter: "register_id=eq." + reg.id }, () => refresh())
+      .subscribe((s) => { if (s === "SUBSCRIBED") refresh(); });
+    setInterval(refresh, 30000);
+    setInterval(render, 1000);
+    window.addEventListener("online", refresh);
   }
 
-  // PIN de Entrega: lo cambia una cuenta owner/admin (verificado en la base).
-  async function cambiarPinEntrega(){
-    if (!register) return;
-    if (!posCore.isAdmin()) { showToast(t("Only an owner or admin account can change the Delivery PIN.")); return; }
-    const nuevoPin = prompt(t("New Delivery PIN (4 to 8 digits):"));
-    if (!nuevoPin) return;
-    const { error } = await sb.rpc("update_register", { p_register_id: register.id, p_name: null, p_pin: null, p_despacho_pin: nuevoPin });
-    if (error) { showError("Could not change the PIN", error); return; }
-    showToast(t("Delivery PIN updated."));
-  }
-
-  async function afterUnlock(){
-    document.getElementById("event-label").textContent += " · " + t("Receiving: {name}", { name: operatorName });
-    renderStationBar();
-    await loadPending();
-    await loadDeliveredRecent();
-    render();
-    subscribeRealtime();
-    tickInterval = setInterval(render, 1000);
-  }
-
-  async function loadPending(){
-    const { data } = await sb.from("orders").select("*, events(name)").eq("register_id", register.id).eq("status","pending_delivery").order("paid_at");
-    pendingOrders = data || [];
-  }
-
-  async function loadDeliveredRecent(){
-    const { data } = await sb.from("orders").select("*").eq("register_id", register.id).eq("status","delivered").order("delivered_at",{ ascending:false }).limit(6);
-    deliveredRecent = data || [];
-  }
-
-  // Realtime: al (re)conectar se recarga todo — así un corte de red no hace
-  // perder pedidos que llegaron mientras tanto. Además, una recarga de
-  // respaldo cada 30 s por si el canal queda caído sin avisar. La lista se
-  // reemplaza completa en cada render, así que nada se duplica.
-  async function refreshAll(){ await loadPending(); await loadDeliveredRecent(); render(); }
-
-  function subscribeRealtime(){
-    sb.channel("orders-despacho")
-      .on("postgres_changes", { event:"*", schema:"pos", table:"orders", filter:"register_id=eq." + register.id },
-        () => refreshAll())
-      .subscribe((status) => { if (status === "SUBSCRIBED") refreshAll(); });
-    setInterval(refreshAll, 30000);
-    window.addEventListener("online", refreshAll);
-  }
-
-  // Estación de esta pantalla (se recuerda por dispositivo): "all" ve todo
-  // y cierra pedidos; una estación ve y marca solo sus productos.
-  const STATIONS = ["all", "bar", "kitchen", "coffee", "collection"];
-  let station = (() => { try { return localStorage.getItem("pos_kds_station") || "all"; } catch (_) { return "all"; } })();
-  const stationOf = (it) => it.station || "bar";
-
-  function renderStationBar(){
-    const bar = document.getElementById("station-bar");
-    bar.innerHTML = '<span style="font-size:13px; color:#9AA7B2; margin-right:4px;">' + posCore.esc(t("This screen shows:")) + '</span>' +
-      STATIONS.map(st => '<button class="search-toggle" style="width:auto; padding:8px 12px;' + (st === station ? ' background:#A8E020; color:#1A2333; font-weight:700;' : '') + '" onclick="setStation(\'' + st + '\')">' +
-        posCore.esc(st === "all" ? t("All stations") : posCore.label("station", st)) + '</button>').join("");
-  }
-
-  function setStation(st){
-    station = st;
-    try { localStorage.setItem("pos_kds_station", st); } catch (_) { /* sin storage */ }
-    renderStationBar();
+  async function refresh() {
+    const [{ data: p }, { data: r }] = await Promise.all([
+      sb.from("orders").select("*, events(name)").eq("register_id", reg.id).eq("status", "pending_delivery").order("paid_at"),
+      sb.from("orders").select("id, ticket_num, customer_name, paid_at, delivered_at").eq("register_id", reg.id).eq("status", "delivered").order("delivered_at", { ascending: false }).limit(8),
+    ]);
+    pending = p || []; recent = r || [];
     render();
   }
 
-  async function marcarEstacion(orderId){
-    const { error } = await sb.rpc("despacho_mark_station", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_station: station, p_by: operatorName || null });
-    if (error) { showError("Could not mark it", error); return; }
-    showToast(t("{station}: ready.", { station: posCore.label("station", station) }));
-    await refreshAll();
+  function renderStations() {
+    $("stations").innerHTML = STATIONS.map((s) => '<button type="button" data-s="' + s + '" aria-pressed="' + String(s === station) + '">' + E(stationLabel(s)) + "</button>").join("");
+    $("stations").querySelectorAll("button").forEach((b) => b.onclick = () => { station = b.dataset.s; try { localStorage.setItem("pos_kds_station", station); } catch (_) { /* sin storage */ } renderStations(); render(); });
   }
 
-  function fmt(seconds){
-    const m = Math.floor(seconds/60), s = seconds%60;
-    return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
-  }
+  const fmt = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  const typeLabel = (o) => o.order_type === "takeaway" ? t("Takeaway") : o.order_type === "here" ? t("Eat in") : o.order_type === "delivery" ? t("Delivery") : "";
 
-  function render(){
-    const board = document.getElementById("board");
-    const empty = document.getElementById("empty-msg");
-    const visible = station === "all" ? pendingOrders
-      : pendingOrders.filter(o => o.items.some(it => stationOf(it) === station && !it.delivered));
-    if (visible.length === 0){
-      board.innerHTML = ""; empty.style.display = "block";
-    } else {
-      empty.style.display = "none";
-      const multiEvent = new Set(visible.map(o => o.event_id)).size > 1;
-      board.innerHTML = visible.map(o => {
-        const elapsed = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime())/1000));
-        const cls = elapsed >= DANGER_AFTER ? "danger" : elapsed >= WARN_AFTER ? "warn" : "";
-        const doneCount = o.items.filter(it => it.delivered).length;
-        const allDone = doneCount === o.items.length;
-        const eventTag = multiEvent && o.events ? '<div class="event-tag">' + posCore.esc(o.events.name) + '</div>' : '';
-        const itemsHtml = o.items.map((it, idx) => {
-          if (station !== "all" && stationOf(it) !== station) return "";
-          const done = !!it.delivered;
-          return '<div class="item-line ' + (done ? "done" : "") + '" onclick="toggleItem(\'' + o.id + '\',' + idx + ')">' +
-            '<span class="check">' + (done ? "✔" : "") + '</span>' +
-            '<span>' + it.qty + 'x ' + posCore.esc(it.name) + (station === "all" && stationOf(it) !== "none" ? ' <small style="color:#7C8996;">· ' + posCore.esc(posCore.label("station", stationOf(it))) + '</small>' : '') + '</span></div>';
-        }).join("");
-        return '<div class="order">' +
-          eventTag +
-          '<div class="row1"><span class="tnum">' + (o.is_test ? '🧪 ' : '') + '#' + o.ticket_num + (o.customer_name ? ' · ' + posCore.esc(o.customer_name) : '') + '</span><span class="timer ' + cls + '">' + fmt(elapsed) + '</span></div>' +
-          '<div class="progress">' + posCore.esc(t("{done} of {total} delivered — tap a product to mark it", { done: doneCount, total: o.items.length })) + '</div>' +
-          '<div class="items">' + itemsHtml + '</div>' +
-          (o.obs ? '<div class="obs">' + posCore.esc(o.obs) + '</div>' : '') +
-          '<div class="meta"><span>' + posCore.fmtTime(o.paid_at) + '</span><span>' + posCore.esc(posCore.label("payment", o.payment_method)) + '</span></div>' +
-          (station === "all"
-            ? '<button class="btn-deliver ' + (allDone ? "ready" : "") + '" onclick="confirmarEntrega(\'' + o.id + '\')">' + posCore.esc(allDone ? t("✔ Close order") : t("Mark all as delivered")) + '</button>'
-            : '<button class="btn-deliver ready" onclick="marcarEstacion(\'' + o.id + '\')">' + posCore.esc(t("✔ {station} ready", { station: posCore.label("station", station) })) + '</button>') +
-          '</div>';
+  function render() {
+    const visible = station === "all" ? pending : pending.filter((o) => o.items.some((it) => stationOf(it) === station && !it.delivered));
+    $("empty").hidden = visible.length > 0;
+    const multiEvent = new Set(visible.map((o) => o.event_id)).size > 1;
+    $("board").innerHTML = visible.map((o) => {
+      const secs = Math.max(0, Math.floor((Date.now() - new Date(o.paid_at).getTime()) / 1000));
+      const cls = secs >= BAD_AFTER ? "bad" : secs >= WARN_AFTER ? "warn" : "";
+      const lines = o.items.map((it, i) => {
+        if (station !== "all" && stationOf(it) !== station) return "";
+        return '<button type="button" class="kline' + (it.delivered ? " done" : "") + '" data-o="' + E(o.id) + '" data-i="' + i + '"><span class="ck">' + (it.delivered ? "✓" : "") + "</span><span>" +
+          '<span class="q">' + it.qty + "× " + E(it.name) + "</span>" +
+          (it.modifiers && it.modifiers.length ? '<div class="mods">' + E(it.modifiers.map((m) => m.name).join(" · ")) + "</div>" : "") +
+          (it.note ? '<div class="note">“' + E(it.note) + "”</div>" : "") +
+          (station === "all" && stationOf(it) !== "none" ? '<div class="st">' + E(posCore.label("station", stationOf(it))) + "</div>" : "") + "</span></button>";
       }).join("");
-    }
-
-    document.getElementById("delivered-list").innerHTML = deliveredRecent.map(o => {
-      const secs = Math.round((new Date(o.delivered_at) - new Date(o.paid_at))/1000);
-      return '<div>' + posCore.esc(t("#{n} — delivered in {time}", { n: o.ticket_num, time: fmt(secs) })) + '</div>';
-    }).join("") || '<div style="color:#4A5563;">' + posCore.esc(t("No deliveries recorded yet.")) + '</div>';
+      const all = o.items.every((it) => it.delivered);
+      return '<div class="kcard ' + cls + '"><div class="kh"><span class="num">' + (o.is_test ? "🧪 " : "") + "#" + o.ticket_num + '</span><span class="timer">' + fmt(secs) + "</span></div>" +
+        '<div class="kmeta">' + [o.customer_name ? "<b>" + E(o.customer_name) + "</b>" : "", typeLabel(o) ? '<span class="pill">' + E(typeLabel(o)) + "</span>" : "", o.table_label ? '<span class="pill">' + E(t("Table {n}", { n: o.table_label })) + "</span>" : "",
+          multiEvent && o.events ? E(o.events.name) : "", E(posCore.fmtTime(o.paid_at))].filter(Boolean).join(" ") + "</div>" + lines +
+        (o.obs ? '<div class="kmeta note">' + E(o.obs) + "</div>" : "") +
+        '<div class="kfoot">' + (station === "all"
+          ? '<button class="btn ' + (all ? "btn-primary" : "") + '" type="button" data-close="' + E(o.id) + '">' + E(all ? t("Close order") : t("Mark all as delivered")) + "</button>"
+          : '<button class="btn btn-primary" type="button" data-station="' + E(o.id) + '">' + E(t("{station} ready", { station: posCore.label("station", station) })) + "</button>") + "</div></div>";
+    }).join("");
+    $("board").querySelectorAll(".kline").forEach((b) => b.onclick = () => toggleItem(b.dataset.o, Number(b.dataset.i)));
+    $("board").querySelectorAll("[data-close]").forEach((b) => b.onclick = () => closeOrder(b.dataset.close, b));
+    $("board").querySelectorAll("[data-station]").forEach((b) => b.onclick = () => markStation(b.dataset.station, b));
+    $("recent").innerHTML = recent.length ? recent.map((o) => '<span class="pill">#' + o.ticket_num + (o.customer_name ? " · " + E(o.customer_name) : "") + " · " +
+      E(t("in {time}", { time: fmt(Math.max(0, Math.round((new Date(o.delivered_at) - new Date(o.paid_at)) / 1000))) })) + "</span>").join("") : '<span class="muted">' + E(t("No deliveries recorded yet.")) + "</span>";
   }
 
-  async function toggleItem(orderId, idx){
-    const { error } = await sb.rpc("despacho_toggle_item", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: orderId, p_item_index: idx });
-    if (error) showError("Could not mark it", error);
-    await refreshAll();
+  async function toggleItem(id, idx) {
+    const { error } = await sb.rpc("despacho_toggle_item", { p_register_id: reg.id, p_despacho_pin: pin(), p_order_id: id, p_item_index: idx });
+    if (error) fail("Could not mark it", error);
+    refresh();
+  }
+  async function closeOrder(id, btn) {
+    btn.disabled = true;
+    const { error } = await sb.rpc("despacho_confirm_all", { p_register_id: reg.id, p_despacho_pin: pin(), p_order_id: id, p_delivered_by: operator || null });
+    if (error) { btn.disabled = false; return fail("Could not close the order", error); }
+    toast(t("Order delivered.")); refresh();
+  }
+  async function markStation(id, btn) {
+    btn.disabled = true;
+    const { error } = await sb.rpc("despacho_mark_station", { p_register_id: reg.id, p_despacho_pin: pin(), p_order_id: id, p_station: station, p_by: operator || null });
+    if (error) { btn.disabled = false; return fail("Could not mark it", error); }
+    toast(t("{station}: ready.", { station: posCore.label("station", station) })); refresh();
   }
 
-  async function confirmarEntrega(id){
-    const { error } = await sb.rpc("despacho_confirm_all", { p_register_id: register.id, p_despacho_pin: myDespachoPin(), p_order_id: id, p_delivered_by: operatorName || null });
-    if (error) { showError("Could not close the order", error); return; }
-    showToast(t("Order delivered."));
-    await refreshAll();
+  function dlg(title, body) {
+    const d = $("dlg");
+    d.innerHTML = '<div class="dialog-body"><div class="dialog-head"><h2>' + E(title) + '</h2><button class="x-btn" type="button" data-x aria-label="Close">×</button></div>' + body + "</div>";
+    d.querySelector("[data-x]").onclick = () => d.close();
+    d.showModal();
+    return d;
   }
 
-  function toggleSearch(){
-    const p = document.getElementById("search-panel");
-    p.style.display = p.style.display === "none" ? "block" : "none";
-    if (p.style.display === "block") document.getElementById("search-input").focus();
+  function openFind() {
+    const d = dlg(t("Find a sale"), '<div class="row"><input class="input grow" id="q" placeholder="' + E(t("Order number or customer name")) + '"><button class="btn btn-primary" type="button" id="go">' + E(t("Search")) + '</button></div><div class="orders-list" id="res"></div>');
+    const go = async () => {
+      const q = d.querySelector("#q").value.trim();
+      let query = sb.from("orders").select("*, events(name)").eq("register_id", reg.id).order("paid_at", { ascending: false }).limit(20);
+      if (q) query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
+      const { data } = await query;
+      const res = d.querySelector("#res");
+      res.innerHTML = (data || []).length ? data.map((o) => '<div class="ocard"><div class="h"><span>#' + o.ticket_num + " · " + E(o.customer_name || t("(no name)")) + "</span><span>" + E(posCore.label("status", o.status)) + "</span></div>" +
+        '<div class="it">' + E(o.items.map((it) => (it.delivered ? "✓ " : "") + it.qty + "× " + it.name).join(", ")) + '</div><div class="muted" style="font-size:13px;">' + E(posCore.fmtDayTime(o.paid_at)) + "</div>" +
+        '<div class="acts">' + (o.status !== "pending_delivery" ? '<button class="btn btn-sm" type="button" data-reopen="' + E(o.id) + '">' + E(t("Reopen")) + "</button>" : "") +
+        (o.status !== "voided" && !(Number(o.refunded_total) > 0) ? '<button class="btn btn-sm btn-danger" type="button" data-void="' + E(o.id) + '">' + E(t("Void")) + "</button>" : "") + "</div></div>").join("")
+        : '<p class="muted">' + E(t("No results.")) + "</p>";
+      res.querySelectorAll("[data-reopen]").forEach((b) => b.onclick = async () => {
+        const { error } = await sb.rpc("reopen_order", { p_register_id: reg.id, p_pin: pin(), p_order_id: b.dataset.reopen });
+        if (error) return fail("Could not reopen", error);
+        toast(t("Order reopened.")); go(); refresh();
+      });
+      res.querySelectorAll("[data-void]").forEach((b) => b.onclick = async () => {
+        if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = t("Tap again to confirm"); return; }
+        const { error } = await sb.rpc("void_order", { p_register_id: reg.id, p_pin: pin(), p_order_id: b.dataset.void });
+        if (error) return fail("Could not void", error);
+        toast(t("Order voided.")); go(); refresh();
+      });
+    };
+    d.querySelector("#go").onclick = go;
+    d.querySelector("#q").onkeydown = (e) => { if (e.key === "Enter") go(); };
+    d.querySelector("#q").focus();
+    go();
   }
 
-  async function buscarTicket(){
-    const q = document.getElementById("search-input").value.trim();
-    const results = document.getElementById("search-results");
-    if (!q) { results.innerHTML = ""; return; }
-    let query = sb.from("orders").select("*, events(name)").eq("register_id", register.id).order("paid_at", { ascending:false }).limit(20);
-    query = /^\d+$/.test(q) ? query.eq("ticket_num", Number(q)) : query.ilike("customer_name", "%" + q + "%");
-    const { data, error } = await query;
-    if (error || !data || data.length === 0) { results.innerHTML = "<p style='color:#7C8996; font-size:13px;'>" + posCore.esc(t("No results.")) + "</p>"; return; }
-    results.innerHTML = data.map(renderSearchRow).join("");
+  function openMenu() {
+    const d = dlg(t("Delivery"), '<div class="list"><div class="list-item"><div class="grow"><b>' + E(reg.name) + '</b><div class="muted">' + E(operator) + "</div></div>" +
+      '<button class="btn btn-sm" type="button" id="m-lock">' + E(t("Switch person")) + '</button></div></div><div class="row"><button class="btn" type="button" id="m-change">' + E(t("Change register")) + '</button><a class="btn" href="/index.html">' + E(t("Back to the office")) + "</a></div>");
+    d.querySelector("#m-lock").onclick = () => { sessionStorage.removeItem("pos_despacho_pin_" + reg.id); d.close(); showLock(); };
+    d.querySelector("#m-change").onclick = () => { try { localStorage.removeItem("pos_register_product"); } catch (_) { /* sin storage */ } location.reload(); };
   }
 
-  function renderSearchRow(o){
-    const itemsTxt = posCore.esc(o.items.map(it => (it.delivered ? "✔ " : "") + it.qty + "x " + it.name).join(", "));
-    const timeTxt = posCore.fmtDayTime(o.paid_at);
-    const evTxt = o.events ? posCore.esc(o.events.name) : "";
-    return '<div class="search-row">' +
-      '<div><b>#' + o.ticket_num + '</b> — ' + posCore.esc(o.customer_name || t("(no name)")) +
-        '<div class="meta">' + evTxt + ' · ' + timeTxt + ' · ' + posCore.esc(posCore.label("status", o.status)) + ' · ' + posCore.money(o.total) + ' · ' + itemsTxt + '</div></div>' +
-      '<div class="search-actions">' +
-        (o.status !== "pending_delivery" ? '<button class="reopen" onclick="reabrirPedido(\'' + o.id + '\')">' + posCore.esc(t("Reopen")) + '</button>' : '') +
-        (o.status !== "voided" ? '<button class="void" onclick="anularPedidoBuscado(\'' + o.id + '\')">' + posCore.esc(t("Void")) + '</button>' : '') +
-      '</div></div>';
-  }
-
-  async function reabrirPedido(id){
-    const { error } = await sb.rpc("reopen_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
-    if (error) { showError("Could not reopen", error); return; }
-    showToast(t("Order reopened."));
-    buscarTicket();
-  }
-
-  async function anularPedidoBuscado(id){
-    const { error } = await sb.rpc("void_order", { p_register_id: register.id, p_pin: myDespachoPin(), p_order_id: id });
-    if (error) { showError("Could not void", error); return; }
-    showToast(t("Order voided."));
-    buscarTicket();
-  }
-
+  $("find-btn").onclick = openFind;
+  $("menu-btn").onclick = openMenu;
   posCore.ready.then(init);
 </script>
 </body>

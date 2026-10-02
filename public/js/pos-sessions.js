@@ -14,22 +14,22 @@
 
   const style = document.createElement("style");
   style.textContent =
-    ".pos-session{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#FFFFFF;border:1px solid #E2E6EA;border-radius:12px;padding:10px 14px;margin:12px 18px 0;font-size:13.5px}" +
-    ".pos-session.closed{background:#FFF8E8;border-color:#F0D9A0}" +
+    ".pos-session{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:12px 18px 0;color:var(--ink);font-size:13.5px}" +
+    ".pos-session.closed{background:var(--warn-soft);border-color:transparent}" +
     ".pos-session .acts{display:flex;gap:6px;flex-wrap:wrap}" +
-    ".pos-session button{border:1px solid #E2E6EA;background:#F4F6F8;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;min-height:38px;font-family:inherit}" +
-    ".pos-session button.primary{background:#A8E020;border-color:#A8E020;font-weight:700}" +
+    ".pos-session button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;min-height:38px;font-family:inherit}" +
+    ".pos-session button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}" +
     "@media (min-width:1140px){.pos-session{max-width:1064px;margin-left:auto;margin-right:auto}}" +
-    "#session-overlay{position:fixed;inset:0;background:rgba(10,13,18,.6);display:flex;align-items:center;justify-content:center;z-index:10002;padding:16px}" +
-    "#session-overlay .box{background:#fff;border-radius:14px;padding:20px;max-width:420px;width:100%;max-height:92vh;overflow:auto;font-family:Inter,Arial,sans-serif}" +
-    "#session-overlay h3{font-family:Sora,sans-serif;margin:0 0 6px;font-size:17px}" +
-    "#session-overlay p{font-size:13px;color:#62707D;margin:0 0 10px}" +
-    "#session-overlay input,#session-overlay select{width:100%;padding:11px;font-size:17px;border:1px solid #E2E6EA;border-radius:9px;margin-bottom:8px;font-family:inherit}" +
+    "#session-overlay{position:fixed;inset:0;background:rgba(10,15,13,.45);display:flex;align-items:center;justify-content:center;z-index:10002;padding:16px}" +
+    "#session-overlay .box{background:var(--surface);color:var(--ink);border-radius:14px;padding:20px;max-width:420px;width:100%;max-height:92vh;overflow:auto;font-family:var(--f-body)}" +
+    "#session-overlay h3{font-family:var(--f-display);margin:0 0 6px;font-size:17px}" +
+    "#session-overlay p{font-size:13px;color:var(--muted);margin:0 0 10px}" +
+    "#session-overlay input,#session-overlay select{width:100%;padding:11px;font-size:17px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:9px;margin-bottom:8px;font-family:inherit}" +
     "#session-overlay table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}" +
-    "#session-overlay td{padding:5px 2px;border-bottom:1px solid #E2E6EA}#session-overlay td:last-child{text-align:right;font-variant-numeric:tabular-nums}" +
-    "#session-overlay .var{font-family:Sora,sans-serif;font-weight:800;font-size:20px;margin:8px 0}" +
+    "#session-overlay td{padding:5px 2px;border-bottom:1px solid var(--line)}#session-overlay td:last-child{text-align:right;font-variant-numeric:tabular-nums}" +
+    "#session-overlay .var{font-family:var(--f-display);font-weight:800;font-size:20px;margin:8px 0}" +
     "#session-overlay .row{display:flex;gap:8px;margin-top:10px}#session-overlay .row button{flex:1;min-height:46px;border:0;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}" +
-    "#session-overlay .cancel{background:#F4F6F8}#session-overlay .ok{background:#A8E020}";
+    "#session-overlay .cancel{background:var(--sunken);color:var(--ink)}#session-overlay .ok{background:var(--accent);color:var(--accent-ink)}";
   document.head.appendChild(style);
 
   function overlay(html) {
@@ -156,7 +156,7 @@
 
   function showZ(s) {
     const v = Number(s.cash_variance);
-    const el = overlay("<h3>" + E(t("Register closed")) + '</h3><div class="var" style="color:' + (v === 0 ? "#1E7A3D" : "#A3271D") + '">' +
+    const el = overlay("<h3>" + E(t("Register closed")) + '</h3><div class="var" style="color:' + (v === 0 ? "var(--ok)" : "var(--bad)") + '">' +
       E(v === 0 ? t("Cash matches exactly.") : t("Difference: {amount}", { amount: (v > 0 ? "+" : "") + M(v) })) + "</div>" +
       "<table>" + zRows(s).map(([a, b]) => a === "—" ? '<tr><td colspan="2"></td></tr>' : "<tr><td>" + E(a) + "</td><td>" + E(b) + "</td></tr>").join("") + "</table>" +
       '<div class="row"><button class="cancel">' + E(t("Done")) + '</button><button class="ok">' + E(t("Print Z report")) + "</button></div>");

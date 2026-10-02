@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "inventory" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
+<link rel="stylesheet" href="/css/ui.css">
+<style>
+  .stock-row{display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:12px; align-items:center; padding:12px 4px; border-top:1px solid var(--line);}
+  .stock-row:first-of-type{border-top:0;}
+  .stock-row .qty{font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap;}
+  .stock-row .acts{display:flex; gap:6px;}
+  .count-row{display:grid; grid-template-columns:minmax(0,1fr) 140px 60px; gap:10px; align-items:center; padding:8px 4px; border-top:1px solid var(--line);}
+  .count-row .input{min-height:40px; padding:8px 10px; text-align:right;}
+  @media (max-width: 600px){ .stock-row{grid-template-columns:minmax(0,1fr) auto;} .stock-row .acts{grid-column:1 / -1;} }
+</style>
+</head>
+<body>
+<main class="main-inner">
+  <div class="page-head">
+    <div><h1 data-i18n>Inventory</h1><p data-i18n>Stock is kept per location. Sales, refunds, waste and counts update it on their own.</p></div>
+    <select class="select" id="loc" style="width:auto; min-width:200px;" aria-label="Location" hidden></select>
+  </div>
+  <div class="tabs" role="tablist" id="tabs">
+    <button type="button" role="tab" data-tab="stock" data-i18n>Stock</button>
+    <button type="button" role="tab" data-tab="items" data-i18n>Ingredients</button>
+    <button type="button" role="tab" data-tab="count" data-i18n>Count</button>
+    <button type="button" role="tab" data-tab="history" data-i18n>History</button>
+  </div>
+  <section class="panel" id="view"></section>
+</main>
+
+<dialog class="dialog" id="dlg"><form class="dialog-body" id="dlg-form" novalidate></form></dialog>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
+<script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
+<script>
+  const sb = posCore.sb;
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  const UNITS = ["ml", "l", "g", "kg", "units"];
+  const WASTE = ["spillage", "breakage", "expired", "staff", "prep_error", "other"];
+  const S = { tab: "stock", loc: null, locs: [], products: [], items: [], pl: [], levels: [] };
+  const LOC_KEY = "pos_inventory_location";
+  const fmtQty = (v) => Number(v).toLocaleString(posCore.org.locale || "en-NZ", { maximumFractionDigits: 3 });
+  const unitLabel = (u) => u === "units" ? t("units") : u;
+  const num = (v) => { const s = String(v ?? "").trim().replace(",", "."); if (s === "") return null; const n = Number(s); return Number.isFinite(n) ? n : NaN; };
+
+  async function load() {
+    const org = posCore.orgId;
+    const [l, p, i, pl, lv] = await Promise.all([
+      sb.from("locations").select("id, name").eq("org_id", org).eq("active", true).order("created_at"),
+      sb.from("products").select("id, name, track_stock, kind").eq("org_id", org).eq("active", true).eq("track_stock", true).order("name"),
+      sb.from("stock_items").select("*").eq("org_id", org).eq("active", true).order("name"),
+      sb.from("product_locations").select("*").eq("org_id", org),
+      sb.from("stock_levels").select("*").eq("org_id", org),
+    ]);
+    const err = [l, p, i, pl, lv].find((x) => x.error);
+    if (err) { $("view").innerHTML = '<div class="msg error">' + E(posCore.errorText(err.error)) + "</div>"; return; }
+    S.locs = l.data; S.products = p.data; S.items = i.data; S.pl = pl.data; S.levels = lv.data;
+    if (!S.locs.length) { $("view").innerHTML = '<div class="empty"><b>' + E(t("No locations yet")) + '</b><a class="btn" href="/locales.html">' + E(t("Go to Locations and registers")) + "</a></div>"; return; }
+    let saved = null; try { saved = localStorage.getItem(LOC_KEY); } catch (_) { /* sin storage */ }
+    if (!S.loc || !S.locs.some((x) => x.id === S.loc)) S.loc = S.locs.some((x) => x.id === saved) ? saved : S.locs[0].id;
+    $("loc").innerHTML = S.locs.map((x) => '<option value="' + E(x.id) + '"' + (x.id === S.loc ? " selected" : "") + ">" + E(x.name) + "</option>").join("");
+    $("loc").hidden = S.locs.length < 2;
+    render();
+  }
+
+  function levelOf(kind, id) {
+    if (kind === "product") { const r = S.pl.find((x) => x.product_id === id && x.location_id === S.loc); return r ? { qty: r.stock_qty, base: r.initial_stock } : { qty: null, base: null }; }
+    const r = S.levels.find((x) => x.stock_item_id === id && x.location_id === S.loc); return r ? { qty: r.qty, base: r.initial_qty } : { qty: null, base: null };
+  }
+  function status(qty, base) {
+    if (qty === null || qty === undefined) return { cls: "", label: t("Not loaded"), pct: 0 };
+    const pct = base > 0 ? Math.max(0, Math.min(1, qty / base)) : (qty > 0 ? 1 : 0);
+    if (qty <= 0) return { cls: "bad", label: t("Out"), pct };
+    if (pct <= 0.1) return { cls: "bad", label: t("Critical"), pct };
+    if (pct <= 0.25) return { cls: "warn", label: t("Low"), pct };
+    return { cls: "ok", label: t("OK"), pct };
+  }
+
+  function render() {
+    document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === S.tab)));
+    ({ stock: renderStock, items: renderItems, count: renderCount, history: renderHistory })[S.tab]();
+  }
+
+  // ---------------------------------------------------------------------
+  // Stock
+  // ---------------------------------------------------------------------
+  function stockRow(kind, x) {
+    const lv = levelOf(kind, x.id), st = status(lv.qty, lv.base);
+    const unit = kind === "product" ? t("units") : unitLabel(x.unit);
+    return '<div class="stock-row"><div style="min-width:0;"><div class="name" style="font-weight:600;">' + E(x.name) + '</div><div class="row" style="gap:8px; margin-top:4px;">' +
+      '<span class="meter ' + (st.cls === "ok" ? "" : st.cls) + '"><i style="width:' + Math.round(st.pct * 100) + '%"></i></span>' +
+      '<span class="pill ' + st.cls + '">' + E(st.label) + "</span></div></div>" +
+      '<div class="qty"><b>' + (lv.qty === null ? "—" : E(fmtQty(lv.qty))) + "</b> " + E(unit) + "</div>" +
+      '<div class="acts"><button class="btn btn-sm" type="button" data-receive="' + kind + ":" + E(x.id) + '">' + E(t("Receive")) + "</button>" +
+      '<button class="btn btn-sm btn-ghost" type="button" data-waste="' + kind + ":" + E(x.id) + '"' + (lv.qty === null ? " disabled" : "") + ">" + E(t("Waste")) + "</button></div></div>";
+  }
+  function renderStock() {
+    let html = "";
+    if (!S.products.length && !S.items.length) {
+      html = '<div class="empty"><b>' + E(t("Nothing to track yet")) + "</b><span>" +
+        E(t("Add ingredients (milk, coffee beans, bread…) in the Ingredients tab, or turn on \"Count units\" on a product.")) + "</span></div>";
+    }
+    if (S.items.length) html += '<div class="group-title">' + E(t("Ingredients")) + "</div>" + S.items.map((x) => stockRow("item", x)).join("");
+    if (S.products.length) html += '<div class="group-title">' + E(t("Products counted by unit")) + "</div>" + S.products.map((x) => stockRow("product", x)).join("");
+    $("view").innerHTML = html;
+    $("view").querySelectorAll("[data-receive]").forEach((b) => b.onclick = () => { const [k, id] = b.dataset.receive.split(":"); receive(k, id); });
+    $("view").querySelectorAll("[data-waste]").forEach((b) => b.onclick = () => { const [k, id] = b.dataset.waste.split(":"); waste(k, id); });
+  }
+
+  let saving = false;
+  function openDialog(title, body, onSave, saveLabel) {
+    const f = $("dlg-form");
+    f.innerHTML = '<div class="dialog-head"><h2>' + E(title) + '</h2><button class="x-btn" type="button" data-close aria-label="Close">×</button></div>' + body +
+      '<div class="msg error" id="dlg-msg" hidden></div><div class="dialog-actions"><button class="btn" type="button" data-close>' + E(t("Cancel")) + '</button>' +
+      '<button class="btn btn-primary" type="submit" id="dlg-save">' + E(saveLabel || t("Save")) + "</button></div>";
+    f.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => $("dlg").close());
+    f.onsubmit = async (e) => {
+      e.preventDefault(); if (saving) return; saving = true; $("dlg-save").disabled = true; msg("");
+      try { if (await onSave()) { $("dlg").close(); await load(); } } catch (err) { msg(posCore.errorText(err)); }
+      finally { saving = false; $("dlg-save").disabled = false; }
+    };
+    $("dlg").showModal();
+    const first = f.querySelector("input, select"); if (first) first.focus();
+    return f;
+  }
+  function msg(text) { const m = $("dlg-msg"); m.textContent = text; m.hidden = !text; }
+  async function rpc(fn, args) { const { data, error } = await sb.rpc(fn, args); if (error) throw error; return data; }
+  const findX = (kind, id) => kind === "product" ? S.products.find((p) => p.id === id) : S.items.find((x) => x.id === id);
+  const locName = () => (S.locs.find((l) => l.id === S.loc) || {}).name || "";
+
+  function receive(kind, id) {
+    const x = findX(kind, id), lv = levelOf(kind, id), unit = kind === "product" ? t("units") : unitLabel(x.unit);
+    const cont = kind === "item" && x.container_size ? x : null;
+    openDialog(t("Receive {name}", { name: x.name }),
+      '<p class="muted">' + E(t("{place} · now {qty} {unit}", { place: locName(), qty: lv.qty === null ? "0" : fmtQty(lv.qty), unit })) + "</p>" +
+      '<div class="seg" role="group" id="r-mode"><button type="button" data-m="add" aria-pressed="true">' + E(t("Add to stock")) + '</button><button type="button" data-m="set" aria-pressed="false">' + E(t("Set exact amount")) + "</button></div>" +
+      (cont ? '<div class="field"><label for="r-cont">' + E(t("Number of containers ({label} of {size} {unit})", { label: cont.container_label || t("container"), size: fmtQty(cont.container_size), unit })) + '</label><input class="input" id="r-cont" inputmode="decimal"></div>' : "") +
+      '<div class="field"><label for="r-qty">' + E(t("Quantity ({unit})", { unit })) + '</label><input class="input" id="r-qty" inputmode="decimal"></div>' +
+      '<div class="field"><label for="r-note">' + E(t("Note (optional)")) + '</label><input class="input" id="r-note" maxlength="120" placeholder="' + E(t("e.g. supplier invoice 1234")) + '"></div>' +
+      '<p class="hint">' + E(t("The amount after receiving becomes the reference for the \"low stock\" warning.")) + "</p>",
+      async () => {
+        const mode = $("r-mode").querySelector('[aria-pressed="true"]').dataset.m, q = num($("r-qty").value);
+        if (q === null || Number.isNaN(q) || (mode === "add" ? q <= 0 : q < 0)) { msg(t("Enter a valid quantity.")); return false; }
+        await rpc("inventory_receive", { p_location_id: S.loc, p_kind: kind, p_id: id, p_qty: q, p_mode: mode, p_note: $("r-note").value.trim() || null, p_by: posCore.user.email });
+        posOffice.toast(t("Stock updated."));
+        return true;
+      }, t("Save"));
+    const seg = $("r-mode");
+    seg.querySelectorAll("button").forEach((b) => b.onclick = () => seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))));
+    if (cont) $("r-cont").oninput = () => { const n = num($("r-cont").value); $("r-qty").value = n > 0 ? String(Math.round(n * cont.container_size * 1000) / 1000) : ""; };
+  }
+
+  function waste(kind, id) {
+    const x = findX(kind, id), unit = kind === "product" ? t("units") : unitLabel(x.unit);
+    openDialog(t("Waste: {name}", { name: x.name }),
+      '<p class="muted">' + E(t("Removes stock without a sale. It's recorded with the reason.")) + "</p>" +
+      '<div class="field"><label for="w-qty">' + E(t("Quantity ({unit})", { unit })) + '</label><input class="input" id="w-qty" inputmode="decimal"></div>' +
+      '<div class="field"><span class="label">' + E(t("Reason")) + '</span><div class="choice-grid" id="w-reason">' +
+        WASTE.map((r, i) => '<button type="button" class="choice" data-v="' + r + '" aria-pressed="' + String(i === 0) + '">' + E(posCore.label("waste_reason", r)) + "</button>").join("") + "</div></div>" +
+      '<div class="field"><label for="w-note">' + E(t("Note (optional)")) + '</label><input class="input" id="w-note" maxlength="120"></div>',
+      async () => {
+        const q = num($("w-qty").value);
+        if (!(q > 0)) { msg(t("Enter a valid quantity.")); return false; }
+        const reason = $("w-reason").querySelector('[aria-pressed="true"]').dataset.v;
+        await rpc("inventory_waste", { p_location_id: S.loc, p_kind: kind, p_id: id, p_qty: q, p_reason: reason, p_note: $("w-note").value.trim() || null, p_by: posCore.user.email });
+        posOffice.toast(t("Waste recorded."));
+        return true;
+      }, t("Record waste"));
+    const box = $("w-reason");
+    box.querySelectorAll(".choice").forEach((c) => c.onclick = () => box.querySelectorAll(".choice").forEach((x) => x.setAttribute("aria-pressed", String(x === c))));
+  }
+
+  // ---------------------------------------------------------------------
+  // Insumos
+  // ---------------------------------------------------------------------
+  function renderItems() {
+    let html = '<div class="row-between"><p class="hint">' + E(t("Ingredients are shared by all locations; each location has its own stock.")) + '</p><button class="btn btn-primary btn-sm" type="button" id="add-item">' + E(t("Add ingredient")) + "</button></div>";
+    if (!S.items.length) html += '<div class="empty"><b>' + E(t("No ingredients yet")) + "</b><span>" + E(t("Example: milk (ml), coffee beans (g), bread (units).")) + "</span></div>";
+    html += S.items.map((x) => '<div class="item-row" data-id="' + E(x.id) + '"><div style="min-width:0;"><div class="name">' + E(x.name) + '</div><div class="meta">' +
+      E([unitLabel(x.unit), x.container_size ? t("{label} of {size} {unit}", { label: x.container_label || t("container"), size: fmtQty(x.container_size), unit: unitLabel(x.unit) }) : "",
+         x.unit_cost !== null ? t("cost {cost} per {unit}", { cost: posCore.money(x.unit_cost), unit: unitLabel(x.unit) }) : ""].filter(Boolean).join(" · ")) + "</div></div></div>").join("");
+    $("view").innerHTML = html;
+    $("add-item").onclick = () => editItem(null);
+    $("view").querySelectorAll(".item-row").forEach((r) => r.onclick = () => editItem(S.items.find((x) => x.id === r.dataset.id)));
+  }
+
+  function editItem(x) {
+    const isNew = !x;
+    x = x || { name: "", unit: "ml", container_size: null, container_label: "", unit_cost: null };
+    const f = openDialog(isNew ? t("New ingredient") : x.name,
+      '<div class="field"><label for="i-name">' + E(t("Name")) + '</label><input class="input" id="i-name" maxlength="80" value="' + E(x.name) + '" placeholder="' + E(t("e.g. Whole milk")) + '"></div>' +
+      '<div class="field"><span class="label">' + E(t("Unit")) + '</span><div class="choice-grid" id="i-unit">' +
+        UNITS.map((u) => '<button type="button" class="choice" data-v="' + u + '" aria-pressed="' + String(x.unit === u) + '">' + E(unitLabel(u)) + "</button>").join("") + "</div></div>" +
+      '<div class="fields"><div class="field"><label for="i-csize">' + E(t("Comes in (optional)")) + '</label><input class="input" id="i-csize" inputmode="decimal" placeholder="' + E(t("e.g. 2000")) + '" value="' + E(x.container_size ? fmtQty(x.container_size) : "") + '"></div>' +
+      '<div class="field"><label for="i-clabel">' + E(t("Container name")) + '</label><input class="input" id="i-clabel" maxlength="30" placeholder="' + E(t("e.g. bottle")) + '" value="' + E(x.container_label || "") + '"></div></div>' +
+      '<div class="field"><label for="i-cost"><span>' + E(t("Cost per unit (optional)")) + '</span> <span class="hint">' + E(t("Used to show the margin of each product.")) + '</span></label><input class="input" id="i-cost" inputmode="decimal" value="' + E(x.unit_cost !== null ? String(Number(x.unit_cost)) : "") + '"></div>' +
+      (isNew ? "" : '<div><button class="btn btn-danger btn-sm" type="button" id="i-del">' + E(t("Remove ingredient")) + "</button></div>"),
+      async () => {
+        const name = $("i-name").value.trim(), unit = ($("i-unit").querySelector('[aria-pressed="true"]') || {}).dataset?.v;
+        const cs = num($("i-csize").value), cost = num($("i-cost").value);
+        if (!name) { msg(t("Type a name.")); return false; }
+        if (!unit) { msg(t("Choose a unit.")); return false; }
+        if ((cs !== null && (Number.isNaN(cs) || cs <= 0)) || (cost !== null && (Number.isNaN(cost) || cost < 0))) { msg(t("Enter a valid quantity.")); return false; }
+        await rpc("inventory_save_item", { p_org_id: posCore.orgId, p_id: x.id || null, p_name: name, p_unit: unit, p_container_size: cs, p_container_label: $("i-clabel").value.trim() || null, p_unit_cost: cost });
+        posOffice.toast(isNew ? t("Ingredient added.") : t("Saved."));
+        return true;
+      });
+    const box = $("i-unit");
+    box.querySelectorAll(".choice").forEach((c) => c.onclick = () => box.querySelectorAll(".choice").forEach((y) => y.setAttribute("aria-pressed", String(y === c))));
+    if (!isNew) $("i-del").onclick = async () => {
+      const b = $("i-del");
+      if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = t("Tap again to confirm"); return; }
+      try { await rpc("inventory_remove_item", { p_org_id: posCore.orgId, p_id: x.id }); $("dlg").close(); posOffice.toast(t("Ingredient removed.")); load(); }
+      catch (err) { msg(posCore.errorText(err)); }
+    };
+    return f;
+  }
+
+  // ---------------------------------------------------------------------
+  // Conteo (a ciegas: lo esperado se muestra después de guardar)
+  // ---------------------------------------------------------------------
+  async function renderCount() {
+    const rows = [...S.items.map((x) => ({ kind: "item", x, unit: unitLabel(x.unit) })), ...S.products.map((x) => ({ kind: "product", x, unit: t("units") }))];
+    if (!rows.length) { $("view").innerHTML = '<div class="empty"><b>' + E(t("Nothing to count yet")) + "</b></div>"; return; }
+    let html = '<p class="muted">' + E(t("Count what's physically there at {place}. Leave blank what you didn't count. You'll see the differences after saving.", { place: locName() })) + "</p>" +
+      '<div class="field"><label for="c-name">' + E(t("Name of this count (optional)")) + '</label><input class="input" id="c-name" maxlength="60" placeholder="' + E(t("e.g. Monday close")) + '"></div>' +
+      rows.map((r) => '<div class="count-row" data-kind="' + r.kind + '" data-id="' + E(r.x.id) + '"><span>' + E(r.x.name) + '</span><input class="input c-qty" inputmode="decimal" aria-label="' + E(r.x.name) + '"><span class="muted">' + E(r.unit) + "</span></div>").join("") +
+      '<div class="row" style="margin-top:14px;"><button class="btn btn-primary" type="button" id="c-save">' + E(t("Save count")) + '</button></div><div id="c-result"></div>' +
+      '<div class="form-section" style="margin-top:18px;"><h3>' + E(t("Recent counts")) + '</h3><div id="c-recent" class="list"></div></div>';
+    $("view").innerHTML = html;
+    let busy = false;
+    $("c-save").onclick = async () => {
+      if (busy) return;
+      const lines = [];
+      for (const row of $("view").querySelectorAll(".count-row")) {
+        const q = num(row.querySelector(".c-qty").value);
+        if (q === null) continue;
+        if (Number.isNaN(q) || q < 0) { posOffice.toast(t("Enter a valid quantity.")); return; }
+        lines.push({ kind: row.dataset.kind, id: row.dataset.id, counted: q });
+      }
+      if (!lines.length) { posOffice.toast(t("Count at least one item.")); return; }
+      busy = true; $("c-save").disabled = true;
+      const { data, error } = await sb.rpc("inventory_count", { p_location_id: S.loc, p_lines: lines, p_name: $("c-name").value.trim() || null, p_by: posCore.user.email, p_client_transaction_id: crypto.randomUUID() });
+      busy = false; $("c-save").disabled = false;
+      if (error) { posOffice.toast(posCore.errorText(error)); return; }
+      posOffice.toast(t("Count saved. Stock now matches what you counted."));
+      await load();
+      S.tab = "count"; render();
+      $("c-result").innerHTML = countTable(data);
+    };
+    const { data: recent } = await sb.from("stock_counts").select("*").eq("location_id", S.loc).order("created_at", { ascending: false }).limit(10);
+    $("c-recent").innerHTML = (recent || []).length ? recent.map((c) => '<details class="list-item" style="display:block;"><summary><b>' + E(c.name || t("Count")) + "</b> · " +
+      E(posCore.fmtDayTime(c.created_at)) + " · " + E(t("{n} items, {v} with a difference", { n: c.items_counted, v: c.items_with_variance })) + (c.operator_name ? " · " + E(c.operator_name) : "") + "</summary>" + countTable(c) + "</details>").join("")
+      : '<p class="muted">' + E(t("No counts yet.")) + "</p>";
+  }
+  function countTable(c) {
+    return '<div class="table-wrap"><table class="table"><thead><tr><th>' + E(t("Item")) + '</th><th class="num">' + E(t("Expected")) + '</th><th class="num">' + E(t("Counted")) + '</th><th class="num">' + E(t("Difference")) + "</th></tr></thead><tbody>" +
+      c.lines.map((l) => { const v = Number(l.variance); return "<tr><td>" + E(l.name) + '</td><td class="num">' + E(fmtQty(l.expected)) + '</td><td class="num">' + E(fmtQty(l.counted)) + '</td><td class="num ' + (v < 0 ? "down" : v > 0 ? "up" : "") + '">' + (v > 0 ? "+" : "") + E(fmtQty(v)) + " " + E(l.unit ? unitLabel(l.unit) : t("units")) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+  }
+
+  // ---------------------------------------------------------------------
+  // Historial
+  // ---------------------------------------------------------------------
+  async function renderHistory() {
+    $("view").innerHTML = '<p class="muted">' + E(t("Loading…")) + "</p>";
+    const { data, error } = await sb.from("inventory_movements").select("*").eq("location_id", S.loc).order("created_at", { ascending: false }).limit(150);
+    if (error) { $("view").innerHTML = '<div class="msg error">' + E(posCore.errorText(error)) + "</div>"; return; }
+    if (!data.length) { $("view").innerHTML = '<div class="empty"><b>' + E(t("No movements yet")) + "</b></div>"; return; }
+    const { data: allProducts } = await sb.from("products").select("id, name").eq("org_id", posCore.orgId);
+    const { data: allItems } = await sb.from("stock_items").select("id, name, unit").eq("org_id", posCore.orgId);
+    const nameOf = (m) => m.product_id ? ((allProducts || []).find((p) => p.id === m.product_id) || {}).name : ((allItems || []).find((x) => x.id === m.stock_item_id) || {}).name;
+    const unitOf = (m) => m.product_id ? t("units") : unitLabel(((allItems || []).find((x) => x.id === m.stock_item_id) || {}).unit || "");
+    $("view").innerHTML = '<div class="table-wrap"><table class="table"><thead><tr><th>' + E(t("Date")) + "</th><th>" + E(t("Item")) + "</th><th>" + E(t("Movement")) + '</th><th class="num">' + E(t("Change")) + '</th><th class="num">' + E(t("After")) + "</th><th>" + E(t("Who")) + "</th></tr></thead><tbody>" +
+      data.map((m) => { const c = Number(m.qty_change); return "<tr><td>" + E(posCore.fmtDayTime(m.created_at)) + "</td><td>" + E(nameOf(m) || "—") + "</td><td>" + E(posCore.label("movement", m.type)) +
+        (m.reason ? ' <span class="muted">· ' + E(posCore.label("waste_reason", m.reason)) + "</span>" : "") + (m.note ? ' <span class="muted">· ' + E(m.note) + "</span>" : "") + '</td><td class="num ' + (c < 0 ? "down" : "up") + '">' + (c > 0 ? "+" : "") + E(fmtQty(c)) + " " + E(unitOf(m)) +
+        '</td><td class="num">' + E(fmtQty(m.qty_after)) + "</td><td>" + E(m.created_by || "—") + "</td></tr>"; }).join("") + "</tbody></table></div>";
+  }
+
+  document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; render(); });
+  $("loc").onchange = () => { S.loc = $("loc").value; try { localStorage.setItem(LOC_KEY, S.loc); } catch (_) { /* sin storage */ } render(); };
+
+  posCore.ready.then(() => {
+    if (!posOffice.require(["owner", "admin", "manager"])) return;
+    const h = location.hash.slice(1);
+    if (["stock", "items", "count", "history"].includes(h)) S.tab = h;
+    load();
+  });
+</script>
+</body>
+</html>

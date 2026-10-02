@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "activity" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
+<link rel="stylesheet" href="/css/ui.css">
+</head>
+<body>
+<main class="main-inner">
+  <div class="page-head">
+    <div><h1 data-i18n>Activity</h1><p data-i18n>Sensitive actions: voids, refunds, complimentary sales, price and recipe changes, stock and PIN changes. Nobody can edit or delete these entries.</p></div>
+    <select class="select" id="filter" style="width:auto;" aria-label="Filter">
+      <option value="" data-i18n>Everything</option>
+      <option value="order" data-i18n>Sales and refunds</option>
+      <option value="menu" data-i18n>Products and prices</option>
+      <option value="stock" data-i18n>Stock</option>
+      <option value="team" data-i18n>Team, PINs and settings</option>
+    </select>
+  </div>
+  <section class="panel"><div class="table-wrap"><table class="table" id="log"></table></div>
+    <div><button class="btn btn-sm" type="button" id="more" hidden data-i18n>Show more</button></div></section>
+</main>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
+<script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
+<script>
+  const sb = posCore.sb;
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  const GROUPS = {
+    order: ["order.", "payment.", "session.", "cash.", "ticket."],
+    menu: ["menu.", "recipe.", "promotion."],
+    stock: ["stock."],
+    team: ["member.", "supervisor_pin.", "register.", "org.", "test_data."],
+  };
+  let limit = 100;
+
+  function summary(a) {
+    const d = a.details || {};
+    const parts = [];
+    if (d.ticket) parts.push("#" + d.ticket);
+    if (d.amount !== undefined) parts.push(posCore.money(d.amount) + (d.method ? " " + posCore.label("payment", d.method) : ""));
+    if (d.reason) parts.push(posCore.label(a.action === "stock.waste" ? "waste_reason" : "reason", d.reason));
+    if (d.total !== undefined && d.amount === undefined) parts.push(posCore.money(d.total));
+    if (d.reference_value !== undefined) parts.push(posCore.money(d.reference_value));
+    if (d.old_price !== undefined && d.old_price !== d.new_price) parts.push(posCore.money(d.old_price) + " → " + posCore.money(d.new_price));
+    if (d.old_name && d.old_name !== d.new_name) parts.push(d.old_name + " → " + d.new_name);
+    if (d.name) parts.push(d.name);
+    if (d.qty_change !== undefined) parts.push((d.qty_change > 0 ? "+" : "") + d.qty_change);
+    if (d.pin_changed) parts.push(t("PIN changed"));
+    if (d.delivery_pin_changed) parts.push(t("Delivery PIN changed"));
+    if (d.new_role && d.new_role !== d.old_role) parts.push(posCore.label("role", d.old_role) + " → " + posCore.label("role", d.new_role));
+    if (d.is_test) parts.push("🧪");
+    return parts.join(" · ");
+  }
+
+  async function load() {
+    const f = $("filter").value;
+    let q = sb.from("audit_log").select("created_at, action, details, operator_name").eq("org_id", posCore.orgId).order("created_at", { ascending: false }).limit(limit + 1);
+    if (f) q = q.or(GROUPS[f].map((p) => "action.like." + p + "*").join(","));
+    const { data, error } = await q;
+    if (error) { $("log").innerHTML = '<tr><td class="msg error">' + E(posCore.errorText(error)) + "</td></tr>"; return; }
+    $("more").hidden = data.length <= limit;
+    const rows = data.slice(0, limit);
+    $("log").innerHTML = rows.length
+      ? "<thead><tr><th>" + E(t("Date")) + "</th><th>" + E(t("Action")) + "</th><th>" + E(t("Details")) + "</th><th>" + E(t("Who")) + "</th></tr></thead><tbody>" +
+        rows.map((a) => '<tr><td class="num" style="white-space:nowrap;">' + E(posCore.fmtDayTime(a.created_at)) + "</td><td>" + E(posCore.label("audit", a.action)) + "</td><td>" + E(summary(a)) + "</td><td>" + E(a.operator_name || "—") + "</td></tr>").join("") + "</tbody>"
+      : '<tr><td class="muted">' + E(t("No entries yet.")) + "</td></tr>";
+  }
+  $("filter").onchange = () => { limit = 100; load(); };
+  $("more").onclick = () => { limit += 100; load(); };
+  posCore.ready.then(() => { if (posOffice.require(["owner", "admin", "manager"])) load(); });
+</script>
+</body>
+</html>

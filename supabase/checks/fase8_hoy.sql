@@ -14,7 +14,7 @@ begin
   v_o := pos.today_overview(v_org);
   v_start := (v_o->>'day_start')::timestamptz;
   select coalesce(sum(total), 0), count(*) into v_exp, v_n from pos.orders
-    where org_id = v_org and not is_test and status <> 'voided' and paid_at >= v_start;
+    where org_id = v_org and not is_test and status <> 'voided' and payment_method <> 'complimentary' and paid_at >= v_start;
   v_exp := v_exp - coalesce((select sum(amount) from pos.refunds where org_id = v_org and not is_test and created_at >= v_start), 0);
   if (v_o->>'sales')::numeric <> v_exp or (v_o->>'orders')::int <> v_n then
     raise exception 'FALLA H1: ventas % (esperado %), pedidos % (esperado %)', v_o->>'sales', v_exp, v_o->>'orders', v_n;
@@ -99,6 +99,32 @@ begin
     if sqlerrm <> 'register.session_open' then raise exception 'FALLA H6: error inesperado (sesión) %', sqlerrm; end if;
   end;
   raise notice 'OK H6: límites al reactivar';
+end $$;
+
+-- H7. Sin productos ni insumos duplicados (doble toque en "Agregar").
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+do $$
+declare v_reg uuid := (select v from t2 where k = 'reg')::uuid; v_id uuid;
+begin
+  perform pos.catalog_save_product((select org_a from t_ids), null, 'Long Black', 4.50);
+  begin
+    perform pos.catalog_save_product((select org_a from t_ids), null, '  long black ', 4.50);
+    raise exception 'FALLA H7: creó un producto duplicado';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+    if sqlerrm <> 'menu.duplicate_name' then raise exception 'FALLA H7: error inesperado %', sqlerrm; end if;
+  end;
+  -- Un producto quitado (inactivo) no bloquea volver a crearlo.
+  v_id := (select id from pos.products where org_id = (select org_a from t_ids) and name = 'Long Black' and active);
+  perform pos.catalog_remove_product((select org_a from t_ids), v_id);
+  perform pos.catalog_save_product((select org_a from t_ids), null, 'Long Black', 4.80);
+  perform pos.inventory_save_item((select org_a from t_ids), null, 'Oat milk', 'ml', 1000, 'carton');
+  begin
+    perform pos.inventory_save_item((select org_a from t_ids), null, 'OAT MILK', 'ml', 1000, 'carton');
+    raise exception 'FALLA H7: creó un insumo duplicado';
+  exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
+    if sqlerrm <> 'ingredient.duplicate_name' then raise exception 'FALLA H7: error inesperado (insumo) %', sqlerrm; end if;
+  end;
+  raise notice 'OK H7: sin duplicados';
 end $$;
 
 select 'FASE 8 (HOY): TODAS LAS VERIFICACIONES PASARON' as resultado_fase8;

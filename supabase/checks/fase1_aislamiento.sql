@@ -55,8 +55,8 @@ begin
     v_loc  := (pos.create_location(v_org, 'Local ' || v_slug)).id;
     v_reg  := (pos.create_register(v_loc, 'Barra ' || v_slug, 'product', '1234', '5678')).id;
     v_ev   := (pos.create_event(v_reg, '1234', 'Evento ' || v_slug, current_date)).id;
-    v_item := (pos.add_menu_item(v_reg, '1234', 'Piscola', 10, 1)).id;
-    perform pos.restock_item(v_reg, '1234', v_item, 'reset', 20);
+    v_item := (pos.catalog_save_product(v_org, null, 'Piscola', 10, p_track_stock => true)).id;
+    perform pos.inventory_receive(v_loc, 'product', v_item, 20, 'set');
     -- Vender de verdad exige una sesión de caja abierta (fase 4).
     if exists (select 1 from pg_proc where proname = 'open_register_session') then
       perform pos.open_register_session(v_reg, '1234', 100, 'Tester');
@@ -82,8 +82,8 @@ set local role authenticated;
 do $$
 declare v_org_a uuid := (select org_a from t_ids); v_tbl text; v_foreign int; v_own int;
 begin
-  foreach v_tbl in array array['locations','registers','events','menu_items','orders',
-                               'ticket_counters','stock_movements','memberships'] loop
+  foreach v_tbl in array array['locations','registers','events','products','product_locations','orders',
+                               'ticket_counters','inventory_movements','memberships'] loop
     execute format('select count(*) filter (where org_id <> $1), count(*) filter (where org_id = $1) from pos.%I', v_tbl)
       into v_foreign, v_own using v_org_a;
     if v_foreign <> 0 then raise exception 'FALLA: A ve % filas de otra org en pos.%', v_foreign, v_tbl; end if;
@@ -136,8 +136,8 @@ begin
   exception when insufficient_privilege then null;
   end;
   begin
-    delete from pos.menu_items;
-    raise exception 'FALLA: authenticated puede hacer DELETE directo en menu_items';
+    delete from pos.products;
+    raise exception 'FALLA: authenticated puede hacer DELETE directo en products';
   exception when insufficient_privilege then null;
   end;
   raise notice 'OK 3: escrituras directas bloqueadas';
@@ -153,7 +153,7 @@ create temp table t_b on commit drop as
 select r.id as reg_b, r.org_id as org_b, e.id as ev_b, m.id as item_b, o.id as order_b, l.id as loc_b
 from pos.registers r
 join pos.events e on e.org_id = r.org_id
-join pos.menu_items m on m.register_id = r.id
+join pos.products m on m.org_id = r.org_id
 join pos.orders o on o.register_id = r.id
 join pos.locations l on l.id = r.location_id
 where r.org_id = (select org_b from t_ids);
@@ -173,8 +173,21 @@ begin
     format('select pos.verify_supervisor_pin(%L, ''8765'')', b.reg_b),
     format('select pos.void_order(%L, ''1234'', %L)', b.reg_b, b.order_b),
     format('select pos.reopen_order(%L, ''1234'', %L)', b.reg_b, b.order_b),
-    format('select pos.add_menu_item(%L, ''1234'', ''Hack'', 1, 1)', b.reg_b),
-    format('select pos.restock_item(%L, ''1234'', %L, ''reset'', 0)', b.reg_b, b.item_b),
+    format('select pos.catalog_save_product(%L, null, ''Hack'', 1)', b.org_b),
+    format('select pos.catalog_save_product(%L, %L, ''Hack'', 1)', b.org_b, b.item_b),
+    format('select pos.catalog_remove_product(%L, %L)', b.org_b, b.item_b),
+    format('select pos.catalog_save_category(%L, null, ''Hack'')', b.org_b),
+    format('select pos.catalog_save_modifier_group(%L, null, ''Hack'', 0, 1, ''[{"name":"x"}]''::jsonb)', b.org_b),
+    format('select pos.catalog_set_product_location(%L, %L, %L, false)', b.org_b, b.item_b, b.loc_b),
+    format('select pos.inventory_receive(%L, ''product'', %L, 0, ''set'')', b.loc_b, b.item_b),
+    format('select pos.inventory_waste(%L, ''product'', %L, 1, ''other'')', b.loc_b, b.item_b),
+    format('select pos.inventory_count(%L, %L::jsonb)', b.loc_b, jsonb_build_array(jsonb_build_object('kind', 'product', 'id', b.item_b, 'counted', 0))),
+    format('select pos.inventory_save_item(%L, null, ''Hack'', ''ml'')', b.org_b),
+    format('select pos.register_catalog(%L)', b.reg_b),
+    format('select pos.set_sold_out(%L, ''1234'', %L, true)', b.reg_b, b.item_b),
+    format('select pos.register_waste(%L, ''1234'', ''product'', %L, 1, ''other'')', b.reg_b, b.item_b),
+    format('select pos.set_business_type(%L, ''bar'', true)', b.org_b),
+    format('select pos.sales_report(%L, current_date, current_date)', b.org_b),
     format('select pos.close_event(%L, ''1234'', %L)', b.reg_b, b.ev_b),
     format('select pos.despacho_confirm_all(%L, ''5678'', %L, ''x'')', b.reg_b, b.order_b),
     format('select pos.create_order(%L, ''1234'', %L, %L::jsonb, ''cash'', 10, 0, null, null, null)',
@@ -262,9 +275,11 @@ begin
     raise exception 'FALLA: anular/reabrir desde Entrega bloqueó el PIN de caja';
   end if;
   -- Y el stock quedó igual que al principio: 20 - 2 vendidos = 18.
-  if (select stock_qty from pos.menu_items where register_id = v_reg_a) <> 18 then
+  if (select pl.stock_qty from pos.product_locations pl join pos.products p on p.id = pl.product_id
+      where p.org_id = (select org_a from t_ids) and p.name = 'Piscola') <> 18 then
     raise exception 'FALLA: stock descuadrado tras anular/reabrir (%), esperado 18',
-      (select stock_qty from pos.menu_items where register_id = v_reg_a);
+      (select pl.stock_qty from pos.product_locations pl join pos.products p on p.id = pl.product_id
+       where p.org_id = (select org_a from t_ids) and p.name = 'Piscola');
   end if;
   raise notice 'OK 7: PIN de Entrega en anular/reabrir no bloquea la caja, stock cuadra';
 end $$;
@@ -277,7 +292,7 @@ declare v_reg_a uuid; v_ev uuid; v_item uuid; v_o pos.orders;
 begin
   select id into v_reg_a from pos.registers where org_id = (select org_a from t_ids);
   select id into v_ev from pos.events where org_id = (select org_a from t_ids);
-  select id into v_item from pos.menu_items where register_id = v_reg_a;
+  select id into v_item from pos.products where org_id = (select org_a from t_ids) and name = 'Piscola';
   v_o := pos.create_order(v_reg_a, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
                           'complimentary', 0, 0, null, null, null, '9999');
   if v_o.id is not null then raise exception 'FALLA: cortesía con PIN de supervisor incorrecto'; end if;
@@ -297,19 +312,20 @@ declare v_reg uuid; v_ev uuid; v_item uuid; v_tx uuid := gen_random_uuid();
 begin
   select id into v_reg from pos.registers where org_id = (select org_a from t_ids);
   select id into v_ev from pos.events where org_id = (select org_a from t_ids);
-  select id, stock_qty into v_item, v_stock_before from pos.menu_items where register_id = v_reg and name = 'Piscola';
-  select count(*) into v_movs_before from pos.stock_movements where menu_item_id = v_item and type = 'sale';
+  select p.id, pl.stock_qty into v_item, v_stock_before from pos.products p join pos.product_locations pl on pl.product_id = p.id
+    where p.org_id = (select org_a from t_ids) and p.name = 'Piscola';
+  select count(*) into v_movs_before from pos.inventory_movements where product_id = v_item and type = 'sale';
   v_o1 := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
                            'cash', 10, 0, 'Reintento', null, null, null, false, v_tx);
   v_o2 := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 1)),
                            'cash', 10, 0, 'Reintento', null, null, null, false, v_tx);
   if v_o1.id is null or v_o1.id <> v_o2.id then raise exception 'FALLA: el reintento creó un segundo pedido'; end if;
   if (select count(*) from pos.orders where client_transaction_id = v_tx) <> 1 then raise exception 'FALLA: hay más de un pedido con el mismo intento'; end if;
-  if (select stock_qty from pos.menu_items where id = v_item) <> v_stock_before - 1 then
+  if (select stock_qty from pos.product_locations where product_id = v_item) <> v_stock_before - 1 then
     raise exception 'FALLA: el reintento descontó stock dos veces';
   end if;
   -- (no se filtra por created_at: dentro de una transacción now() es siempre el mismo)
-  select count(*) - v_movs_before into v_movs from pos.stock_movements where menu_item_id = v_item and type = 'sale';
+  select count(*) - v_movs_before into v_movs from pos.inventory_movements where product_id = v_item and type = 'sale';
   if v_movs <> 1 then raise exception 'FALLA: % movimientos de venta para un solo cobro', v_movs; end if;
   raise notice 'OK 8b: idempotencia (un pedido, un descuento)';
 end $$;
@@ -346,7 +362,7 @@ declare v_reg uuid; v_ev uuid; v_item uuid; v_o pos.orders; v_items jsonb; v_sql
 begin
   select id into v_reg from pos.registers where org_id = (select org_a from t_ids);
   select id into v_ev from pos.events where org_id = (select org_a from t_ids);
-  v_item := (pos.add_menu_item(v_reg, '1234', 'Café', 4.50, 2)).id;
+  v_item := (pos.catalog_save_product((select org_a from t_ids), null, 'Café', 4.50)).id;
   v_items := jsonb_build_array(jsonb_build_object('id', v_item, 'qty', 3));
 
   v_o := pos.create_order(v_reg, '1234', v_ev, v_items, 'cash', 13.50, 0, null, null, null);

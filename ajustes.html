@@ -33,6 +33,20 @@
     </section>
 
     <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Type of business</h2></div>
+      <form id="f-type" novalidate>
+        <div class="field"><label for="bt" data-i18n>What kind of business is it?</label>
+          <select class="select" id="bt">
+            <option value="cafe" data-i18n>Cafe</option><option value="restaurant" data-i18n>Restaurant</option><option value="bar" data-i18n>Bar with snacks</option>
+            <option value="food_truck" data-i18n>Food truck</option><option value="gelato" data-i18n>Gelato shop</option><option value="events" data-i18n>Events</option><option value="other" data-i18n>Something else</option>
+          </select></div>
+        <label class="switch"><input type="checkbox" id="ft-order-type"><span data-i18n>Ask "eat in or takeaway" at the register</span></label>
+        <label class="switch"><input type="checkbox" id="ft-events"><span data-i18n>Work with events (each sale belongs to an event)</span></label>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" data-i18n>Save</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
       <div class="panel-head"><h2 data-i18n>Legal and contact details</h2></div>
       <p class="hint" data-i18n>Used for your subscription invoices and tax invoices. NZBN and postcode are optional.</p>
       <form id="f-details" novalidate>
@@ -122,11 +136,15 @@
 
   async function load() {
     const { data } = await sb.from("organizations")
-      .select("name, language, tax_rate, tax_number, tax_name, legal_name, nzbn, address_line, city, postcode, contact_name, contact_phone")
+      .select("name, language, tax_rate, tax_number, tax_name, legal_name, nzbn, address_line, city, postcode, contact_name, contact_phone, business_type, features")
       .eq("id", posCore.orgId).maybeSingle();
     if (!data) return;
     org = data;
     $("b-name").value = org.name || ""; $("b-lang").value = org.language || "en";
+    $("bt").value = org.business_type || "cafe";
+    const ft = org.features || {};
+    $("ft-order-type").checked = ft.order_type !== false;
+    $("ft-events").checked = org.business_type === "events" || ft.events === true;
     const set = (id, val) => { $(id).value = val || ""; };
     set("d-legal-name", org.legal_name); set("d-nzbn", org.nzbn); set("d-address", org.address_line); set("d-city", org.city);
     set("d-postcode", org.postcode); set("d-contact-name", org.contact_name); set("d-contact-phone", org.contact_phone);
@@ -148,6 +166,15 @@
     if (!v("b-name")) { posOffice.toast(t("Type a name.")); return; }
     const { error } = await sb.rpc("update_organization", { p_org_id: posCore.orgId, p_name: v("b-name"), p_language: $("b-lang").value });
     if (error) return fail(error);
+    posOffice.toast(t("Saved."));
+  };
+
+  $("f-type").onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.rpc("set_business_type", { p_org_id: posCore.orgId, p_type: $("bt").value, p_seed: false });
+    if (error) return fail(error);
+    const { error: e2 } = await sb.rpc("set_features", { p_org_id: posCore.orgId, p_features: { order_type: $("ft-order-type").checked, events: $("ft-events").checked } });
+    if (e2) return fail(e2);
     posOffice.toast(t("Saved."));
   };
 

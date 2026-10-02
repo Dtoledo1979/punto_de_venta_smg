@@ -64,6 +64,7 @@
     "record_payment_attempt", "refund_order", "record_waste", "record_stocktake",
     "open_register_session", "record_cash_movement", "close_register_session",
     "set_item_station", "despacho_mark_station",
+    "set_sold_out", "register_waste",
   ]);
   const rawRpc = sb.rpc.bind(sb);
   sb.rpc = function (fn, args, opts) {

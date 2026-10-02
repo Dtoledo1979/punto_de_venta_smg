@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 
 // Sitio multi-página: cada .html de la raíz es una pantalla del POS.
-const pages = ["index", "login", "onboarding", "pos-productos", "pos-tickets", "despacho", "insumos", "dashboard", "locales", "equipo", "ajustes"];
+const pages = ["index", "login", "onboarding", "pos-productos", "pos-tickets", "despacho", "insumos", "dashboard", "locales", "equipo", "ajustes", "productos", "inventario", "actividad"];
 
 export default defineConfig({
   build: {

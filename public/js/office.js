@@ -23,18 +23,18 @@
     products: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     inventory: '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
     team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18 14.8c1.8.8 3 2.5 3.5 5.2"/>',
+    activity: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     locations: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',
   };
-  // Hasta las fases B y D, Productos, Inventario y Ventas abren las
-  // pantallas existentes.
   const NAV = [
     { key: "today", href: "/index.html", label: T("Today"), roles: null },
     { key: "sales", href: "/dashboard.html", label: T("Sales"), roles: ["owner", "admin", "manager"] },
-    { key: "products", href: "/insumos.html#productos", label: T("Products"), roles: ["owner", "admin", "manager"] },
-    { key: "inventory", href: "/insumos.html#insumos", label: T("Inventory"), roles: ["owner", "admin", "manager"] },
+    { key: "products", href: "/productos.html", label: T("Products"), roles: ["owner", "admin", "manager"] },
+    { key: "inventory", href: "/inventario.html", label: T("Inventory"), roles: ["owner", "admin", "manager"] },
     { key: "team", href: "/equipo.html", label: T("Team"), roles: ["owner", "admin"] },
     { key: "locations", href: "/locales.html", label: T("Locations and registers"), roles: ["owner", "admin"] },
+    { key: "activity", href: "/actividad.html", label: T("Activity"), roles: ["owner", "admin", "manager"] },
     { key: "settings", href: "/ajustes.html", label: T("Settings"), roles: ["owner", "admin"] },
   ];
   const icon = (k) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[k] + "</svg>";

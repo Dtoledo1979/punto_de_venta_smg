@@ -175,11 +175,13 @@ begin
   -- Datos "inmutables" en la org D: una venta real con pago, auditoría y sesión.
   perform set_config('request.jwt.claims', '{"sub":"dddddddd-0000-0000-0000-00000000000d","role":"authenticated"}', true);
   perform pos.open_register_session((select v from t2 where k = 'reg_d')::uuid, '1357', 0);
-  perform pos.add_menu_item((select v from t2 where k = 'reg_d')::uuid, '1357', 'Tea', 3, 1);
+  perform pos.catalog_save_product(v_org, null, 'Tea', 3, p_track_stock => true);
+  perform pos.inventory_receive((select location_id from pos.registers where id = (select v from t2 where k = 'reg_d')::uuid), 'product',
+                                (select id from pos.products where org_id = v_org and name = 'Tea'), 10, 'set');
   perform pos.create_event((select v from t2 where k = 'reg_d')::uuid, '1357', 'D event', current_date);
   perform pos.create_order((select v from t2 where k = 'reg_d')::uuid, '1357',
     (select id from pos.events where org_id = v_org limit 1),
-    jsonb_build_array(jsonb_build_object('id', (select id from pos.menu_items where register_id = (select v from t2 where k = 'reg_d')::uuid limit 1), 'qty', 1)),
+    jsonb_build_array(jsonb_build_object('id', (select id from pos.products where org_id = v_org and name = 'Tea'), 'qty', 1)),
     'cash', 3, 0, 'x', null, null);
   select count(*) into v_a_orders from pos.orders where org_id = (select org_a from t_ids);
 

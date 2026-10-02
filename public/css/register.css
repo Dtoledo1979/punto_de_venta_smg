@@ -1,0 +1,132 @@
+/* =====================================================================
+   Caja (pantalla de venta): categorías | productos | pedido.
+   Usa los tokens de ui.css. Pensada para tablet; en el teléfono el
+   pedido es una hoja que sube desde abajo.
+   ===================================================================== */
+html, body{height:100%;}
+body{overflow:hidden;}
+.reg{display:grid; grid-template-rows:auto auto 1fr; height:100vh; height:100dvh;}
+.reg-top{display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--surface); border-bottom:1px solid var(--line); min-width:0;}
+.reg-top .who{display:flex; align-items:center; gap:10px; min-width:0; flex:1;}
+.reg-top .who .mark{width:32px; height:32px; border-radius:9px; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font:700 15px var(--f-display); flex:none;}
+.reg-top .who b{font:700 16px var(--f-display); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.reg-top .who span{color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.top-btn{border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:20px; padding:7px 12px; font:600 13.5px var(--f-body); cursor:pointer; min-height:38px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;}
+.top-btn:hover{background:var(--hover);}
+.top-btn .badge{background:var(--accent); color:var(--accent-ink); border-radius:10px; padding:0 7px; font-size:12px; min-width:20px; text-align:center;}
+.top-btn.test-on{background:var(--bad-soft); color:var(--bad); border-color:transparent;}
+.test-banner{background:var(--bad); color:#fff; text-align:center; font-weight:700; font-size:13px; padding:6px 12px;}
+#session-slot .pos-session{margin:8px 14px 0;}
+
+.reg-body{display:grid; grid-template-columns:180px minmax(0,1fr) 360px; min-height:0;}
+.cats{background:var(--surface); border-right:1px solid var(--line); overflow-y:auto; padding:10px 8px; display:flex; flex-direction:column; gap:4px;}
+.cats button{border:0; background:transparent; color:var(--muted); text-align:left; padding:12px 12px; border-radius:var(--r-sm); font:600 15px var(--f-body); cursor:pointer; display:flex; align-items:center; gap:10px; min-height:46px;}
+.cats button .sw{width:10px; height:10px; border-radius:3px; flex:none;}
+.cats button[aria-pressed="true"]{background:var(--sunken); color:var(--ink);}
+.cats button:hover{color:var(--ink);}
+
+.grid-wrap{overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; min-width:0;}
+.grid-wrap .search{min-height:42px;}
+.tiles{display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px;}
+.tile{position:relative; border:0; border-radius:var(--r); padding:12px; min-height:96px; text-align:left; cursor:pointer; color:var(--ink);
+  background:color-mix(in srgb, var(--tile, var(--sunken)) 34%, var(--surface)); display:flex; flex-direction:column; justify-content:space-between; gap:6px;
+  font:600 15px/1.25 var(--f-body); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--tile, var(--line)) 55%, transparent); transition:transform .06s;}
+.tile:active{transform:scale(.97);}
+.tile .p{font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; font-size:14px;}
+.tile .tags{display:flex; gap:4px; flex-wrap:wrap;}
+.tile .tag{font-size:11.5px; font-weight:700; padding:1px 7px; border-radius:10px; background:var(--surface); color:var(--muted);}
+.tile .tag.warn{color:var(--warn);} .tile .tag.bad{color:var(--bad);} .tile .tag.ok{color:var(--ok);}
+.tile.out{opacity:.5;}
+.tile .opt-dot{position:absolute; top:10px; right:10px; width:8px; height:8px; border-radius:50%; background:color-mix(in srgb, var(--tile, var(--muted)) 80%, var(--ink));}
+
+.order{background:var(--surface); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0;}
+.order-head{padding:12px 14px; border-bottom:1px solid var(--line); display:grid; gap:10px;}
+.order-head .seg{display:grid;}
+.order-head .input{min-height:42px;}
+.lines{flex:1; overflow-y:auto; padding:4px 14px;}
+.line{display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed var(--line);}
+.line .qty{display:flex; align-items:center; gap:2px;}
+.line .qty button{width:32px; height:32px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:17px; cursor:pointer; line-height:1;}
+.line .qty span{min-width:24px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums;}
+.line .nm{cursor:pointer; min-width:0;}
+.line .nm b{font-weight:600;}
+.line .nm small{display:block; color:var(--muted); font-size:12.5px;}
+.line .amt{font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap;}
+.line .amt s{color:var(--faint); font-size:12px; display:block;}
+.order-foot{border-top:1px solid var(--line); padding:12px 14px 14px; display:grid; gap:8px;}
+.order-foot .tot{display:flex; justify-content:space-between; font-variant-numeric:tabular-nums; font-size:13.5px; color:var(--muted);}
+.order-foot .tot.big{font-size:22px; color:var(--ink); font-weight:700; font-family:var(--f-display);}
+.charge{min-height:58px; font-size:18px; border-radius:var(--r);}
+.order-empty{color:var(--muted); text-align:center; padding:32px 10px;}
+.order-bar{display:none;}
+
+/* Hoja de opciones y diálogos de la caja */
+.opt-group{display:grid; gap:8px;}
+.opt-group h3 .rule{font-weight:500; color:var(--muted); font-size:13px; margin-left:6px;}
+.opt-group.missing h3{color:var(--bad);}
+.opt-group .choice-grid .choice{min-height:46px; padding:10px 16px; font-size:15px;}
+.stepper{display:inline-flex; align-items:center; gap:4px;}
+.stepper button{width:44px; height:44px; border-radius:10px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-size:20px; cursor:pointer;}
+.stepper span{min-width:36px; text-align:center; font:700 18px var(--f-display);}
+.pay-total{font:700 40px/1.1 var(--f-display); text-align:center; font-variant-numeric:tabular-nums;}
+.pay-methods{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;}
+.pay-methods .btn{min-height:64px; font-size:17px;}
+.quick-cash{display:flex; gap:8px; flex-wrap:wrap;}
+.quick-cash .btn{flex:1; min-width:70px;}
+.change-box{text-align:center; font-size:18px; padding:12px; border-radius:var(--r-sm); background:var(--sunken);}
+.change-box b{font:700 26px var(--f-display); display:block;}
+.done-num{font:700 64px/1 var(--f-display); text-align:center; letter-spacing:-.02em;}
+
+/* Bloqueo con PIN */
+.lock{position:fixed; inset:0; z-index:300; background:var(--bg); display:grid; place-items:center; padding:16px; overflow:auto;}
+.lock-card{width:100%; max-width:380px; display:grid; gap:14px; text-align:center;}
+.lock-card h1{font-size:24px;}
+.pin-dots{display:flex; justify-content:center; gap:12px; min-height:18px;}
+.pin-dots i{width:14px; height:14px; border-radius:50%; border:2px solid var(--line-strong);}
+.pin-dots i.on{background:var(--ink); border-color:var(--ink);}
+.keypad{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;}
+.keypad button{min-height:64px; border-radius:var(--r); border:1px solid var(--line); background:var(--surface); color:var(--ink); font:600 24px var(--f-display); cursor:pointer;}
+.keypad button:active{background:var(--sunken);}
+.keypad button.wide{font-size:15px; font-family:var(--f-body);}
+
+/* Pedidos (lateral) */
+.orders-list{display:grid; gap:10px;}
+.ocard{border:1px solid var(--line); border-radius:var(--r-sm); padding:10px 12px; display:grid; gap:6px;}
+.ocard .h{display:flex; justify-content:space-between; gap:8px; font-weight:700;}
+.ocard .mins{font-variant-numeric:tabular-nums; font-weight:600;}
+.ocard .mins.warn{color:var(--warn);} .ocard .mins.bad{color:var(--bad);}
+.ocard .it{font-size:14px;} .ocard .it.done{color:var(--faint); text-decoration:line-through;}
+.ocard .acts{display:flex; gap:6px; flex-wrap:wrap;}
+
+@media (max-width: 1100px){ .reg-body{grid-template-columns:150px minmax(0,1fr) 320px;} }
+@media (max-width: 860px){
+  .reg-body{grid-template-columns:1fr; grid-template-rows:auto 1fr;}
+  .cats{flex-direction:row; overflow-x:auto; border-right:0; border-bottom:1px solid var(--line); padding:8px;}
+  .cats button{white-space:nowrap; min-height:40px; padding:8px 12px;}
+  .order{position:fixed; inset:auto 0 0 0; height:86dvh; border-left:0; border-top:1px solid var(--line); border-radius:18px 18px 0 0; box-shadow:var(--shadow);
+    transform:translateY(105%); transition:transform .2s; z-index:150;}
+  .reg.order-open .order{transform:none;}
+  .order-bar{display:flex; position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); z-index:140; min-height:56px; font-size:16px;}
+  .grid-wrap{padding-bottom:90px;}
+  .reg-top .hide-sm{display:none;}
+  .tiles{grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));}
+}
+
+/* Boletas */
+#receipt-area{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #receipt-area, #receipt-area *{visibility:visible;}
+  #receipt-area{display:block !important; position:absolute; top:0; left:0; width:100%;}
+  .receipt-copy{width:100%; font-family:Arial,Helvetica,sans-serif; color:#000;}
+  .receipt-copy h3{text-align:center; margin:0; font-size:19px; font-weight:800; letter-spacing:.5px;}
+  .receipt-copy h4{text-align:center; margin:2px 0 8px; font-size:15px; font-weight:700;}
+  .receipt-copy .line{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; font-size:15px; padding:2px 0;}
+  .receipt-copy .line.total{font-size:17px; font-weight:800; border-top:2px solid #000; margin-top:4px; padding-top:6px;}
+  .receipt-copy .iname{flex:1 1 auto; min-width:0; overflow-wrap:break-word;}
+  .receipt-copy .iprice{flex:0 0 auto; white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .receipt-copy .mods{font-size:13px; padding-left:18px;}
+  .receipt-copy .obs{font-size:13.5px; margin:6px 0; overflow-wrap:break-word;}
+  .receipt-copy .big{font-size:28px; font-weight:800; text-align:center; margin:4px 0;}
+  .receipt-copy hr{border:none; border-top:1px dashed #000; margin:6px 0;}
+}

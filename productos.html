@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Products</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "products" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<style>html.pos-auth-pending body{visibility:hidden}</style>
+<link rel="stylesheet" href="/css/ui.css">
+<style>
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .toolbar .input{width:auto; flex:1; min-width:200px; min-height:40px; padding:8px 12px;}
+  .recipe-row{grid-template-columns:minmax(0, 1fr) 110px 56px 40px;}
+  .loc-row{grid-template-columns:minmax(0, 1fr) auto 130px;}
+  .opt-row{grid-template-columns:minmax(0, 1fr) 110px auto 40px;}
+  .opt-block{border:1px solid var(--line); border-radius:var(--r-sm); padding:10px; display:grid; gap:8px;}
+  .promo-row{grid-template-columns:minmax(0,1fr) auto;}
+  @media (max-width: 560px){
+    .recipe-row{grid-template-columns:minmax(0, 1fr) 90px 40px;} .recipe-row .unit{display:none;}
+    .opt-row{grid-template-columns:minmax(0, 1fr) 90px 40px;} .opt-row .switch{grid-column:1 / -1;}
+  }
+</style>
+</head>
+<body>
+<main class="main-inner">
+  <div class="page-head">
+    <div><h1 data-i18n>Products</h1><p data-i18n>Your menu, shared by all your locations. Each location can change prices or hide products.</p></div>
+    <button class="btn btn-primary" type="button" id="add-btn" data-i18n>Add product</button>
+  </div>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button type="button" role="tab" data-tab="products" data-i18n>Menu</button>
+    <button type="button" role="tab" data-tab="tickets" id="tab-tickets" hidden data-i18n>Ticket types</button>
+    <button type="button" role="tab" data-tab="categories" data-i18n>Categories</button>
+    <button type="button" role="tab" data-tab="options" data-i18n>Options</button>
+    <button type="button" role="tab" data-tab="promotions" data-i18n>Promotions</button>
+  </div>
+
+  <section class="panel" id="view"></section>
+</main>
+
+<dialog class="dialog wide" id="dlg"><form class="dialog-body" id="dlg-form" novalidate></form></dialog>
+
+<script src="/vendor/supabase.js"></script>
+<script src="/js/pos-utils.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/i18n-es.js"></script>
+<script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
+<script>
+  const sb = posCore.sb;
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  const money = (v) => posCore.money(Number(v));
+  const PALETTE = ["#C8A27C", "#E3B778", "#E9C46A", "#B9D8C2", "#8FB8DE", "#B5A8D6", "#E8A7B5", "#B56576", "#9AA5B1"];
+  const STATIONS = ["none", "coffee", "kitchen", "bar", "collection"];
+  const S = { tab: "products", q: "", cats: [], products: [], groups: [], options: [], pmg: [], pl: [], items: [], recipes: [], modRecipes: [], promos: [], locs: [], org: null };
+
+  // ---------------------------------------------------------------------
+  // Datos
+  // ---------------------------------------------------------------------
+  async function load() {
+    const org = posCore.orgId;
+    const q = (t, sel, f) => { let x = sb.from(t).select(sel).eq("org_id", org); return f ? f(x) : x; };
+    const r = await Promise.all([
+      q("categories", "*", (x) => x.eq("active", true).order("sort_order")),
+      q("products", "*", (x) => x.eq("active", true).order("sort_order")),
+      q("modifier_groups", "*", (x) => x.eq("active", true).order("sort_order")),
+      q("modifiers", "*", (x) => x.eq("active", true).order("sort_order")),
+      q("product_modifier_groups", "*", (x) => x.order("sort_order")),
+      q("product_locations", "*"),
+      q("stock_items", "*", (x) => x.eq("active", true).order("name")),
+      q("product_recipes", "*"),
+      q("modifier_recipes", "*"),
+      q("product_promotions", "*", (x) => x.order("created_at")),
+      q("locations", "id, name, active", (x) => x.order("created_at")),
+      sb.from("organizations").select("business_type, features").eq("id", org).maybeSingle(),
+      q("registers", "type", (x) => x.eq("type", "ticket").limit(1)),
+    ]);
+    const err = r.find((x) => x.error);
+    if (err) { $("view").innerHTML = '<div class="msg error">' + E(posCore.errorText(err.error)) + "</div>"; return; }
+    [S.cats, S.products, S.groups, S.options, S.pmg, S.pl, S.items, S.recipes, S.modRecipes, S.promos, S.locs] = r.slice(0, 11).map((x) => x.data || []);
+    S.org = r[11].data || {};
+    $("tab-tickets").hidden = !(S.org.business_type === "events" || (r[12].data || []).length);
+    render();
+  }
+
+  const catById = (id) => S.cats.find((c) => c.id === id);
+  const groupById = (id) => S.groups.find((g) => g.id === id);
+  const optionsOf = (gid) => S.options.filter((o) => o.group_id === gid);
+  const groupsOf = (pid) => S.pmg.filter((x) => x.product_id === pid).sort((a, b) => a.sort_order - b.sort_order).map((x) => groupById(x.group_id)).filter(Boolean);
+  const stationLabel = (s) => s === "none" ? t("No preparation") : s === "collection" ? t("Pickup counter") : posCore.label("station", s);
+  function groupRule(g) {
+    return g.min_select > 0
+      ? (g.max_select === 1 ? t("Required · choose 1") : t("Required · choose up to {n}", { n: g.max_select }))
+      : (g.max_select === 1 ? t("Optional · choose 1") : t("Optional · up to {n}", { n: g.max_select }));
+  }
+  function delta(v) { const n = Number(v); return n === 0 ? "" : (n > 0 ? " +" : " −") + posCore.money(Math.abs(n)); }
+
+  // ---------------------------------------------------------------------
+  // Vistas
+  // ---------------------------------------------------------------------
+  function render() {
+    document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === S.tab)));
+    const labels = { products: t("Add product"), tickets: t("Add ticket type"), categories: t("Add category"), options: t("Add option group"), promotions: t("Add promotion") };
+    $("add-btn").textContent = labels[S.tab];
+    ({ products: () => renderProducts("product"), tickets: () => renderProducts("ticket"), categories: renderCategories, options: renderOptions, promotions: renderPromotions })[S.tab]();
+  }
+
+  function availabilityChip(p) {
+    if (S.locs.length < 2) return "";
+    const off = S.locs.filter((l) => { const row = S.pl.find((x) => x.product_id === p.id && x.location_id === l.id); return row && row.available === false; });
+    const priced = S.pl.filter((x) => x.product_id === p.id && x.price !== null && x.available);
+    let html = "";
+    if (off.length) html += '<span class="pill warn">' + E(off.length === S.locs.length ? t("Hidden everywhere") : t("Not at {places}", { places: off.map((l) => l.name).join(", ") })) + "</span> ";
+    if (priced.length) html += '<span class="pill">' + E(t("Own price in {n} location(s)", { n: priced.length })) + "</span>";
+    return html;
+  }
+
+  function renderProducts(kind) {
+    const q = S.q.toLowerCase();
+    const list = S.products.filter((p) => p.kind === kind && (!q || p.name.toLowerCase().includes(q)));
+    let html = '<div class="toolbar"><input class="input" id="search" type="search" placeholder="' + E(t("Search product")) + '" value="' + E(S.q) + '"></div>';
+    if (!S.products.some((p) => p.kind === kind)) {
+      html += '<div class="empty"><b>' + E(kind === "ticket" ? t("No ticket types yet") : t("Your menu is empty")) + "</b><span>" +
+        E(kind === "ticket" ? t("Add the ticket types you sell at the box office.") : t("Add your first product, or start from an example menu and edit it.")) + "</span>" +
+        (kind === "product" && !S.cats.length ? '<button class="btn" type="button" id="seed-btn">' + E(t("Load an example menu")) + "</button>" : "") + "</div>";
+      $("view").innerHTML = html; wireSearch();
+      const seed = $("seed-btn"); if (seed) seed.onclick = loadExample;
+      return;
+    }
+    const groups = kind === "ticket" ? [{ id: "_", name: "" }] : [...S.cats, { id: null, name: t("No category") }];
+    for (const c of groups) {
+      const rows = kind === "ticket" ? list : list.filter((p) => (p.category_id || null) === c.id);
+      if (!rows.length) continue;
+      if (c.name) html += '<div class="group-title">' + E(c.name) + "</div>";
+      html += rows.map((p) => {
+        const gs = groupsOf(p.id);
+        const meta = [stationLabel(p.station), gs.length ? t("{n} option groups", { n: gs.length }) : "", p.track_stock ? t("Stock counted") : "",
+                      S.recipes.some((x) => x.product_id === p.id) ? t("Recipe") : ""].filter(Boolean).join(" · ");
+        const color = p.color || (catById(p.category_id) || {}).color || "";
+        return '<div class="item-row" data-id="' + E(p.id) + '"><span class="dotc" style="' + (color ? "background:" + E(color) : "") + '"></span>' +
+          '<div style="min-width:0;"><div class="name">' + E(p.name) + '</div><div class="meta">' + E(meta) + "</div><div>" + availabilityChip(p) + "</div></div>" +
+          '<div class="right"><b>' + E(money(p.price)) + "</b></div></div>";
+      }).join("");
+    }
+    if (!list.length) html += '<div class="empty"><span>' + E(t("No products match your search.")) + "</span></div>";
+    $("view").innerHTML = html;
+    wireSearch();
+    $("view").querySelectorAll(".item-row").forEach((r) => r.onclick = () => editProduct(S.products.find((p) => p.id === r.dataset.id)));
+  }
+  function wireSearch() {
+    const s = $("search"); if (!s) return;
+    s.oninput = () => { S.q = s.value; const pos = s.selectionStart; render(); const n = $("search"); n.focus(); n.setSelectionRange(pos, pos); };
+  }
+
+  function renderCategories() {
+    if (!S.cats.length) {
+      $("view").innerHTML = '<div class="empty"><b>' + E(t("No categories yet")) + "</b><span>" + E(t("Categories group your products on the register (e.g. Coffee, Food, Drinks).")) + "</span></div>";
+      return;
+    }
+    $("view").innerHTML = '<p class="hint">' + E(t("The register shows categories in this order.")) + "</p>" + S.cats.map((c, i) =>
+      '<div class="item-row" data-id="' + E(c.id) + '"><span class="dotc" style="' + (c.color ? "background:" + E(c.color) : "") + '"></span>' +
+      '<div><div class="name">' + E(c.name) + '</div><div class="meta">' + E(t("{n} products", { n: S.products.filter((p) => p.category_id === c.id).length })) + "</div></div>" +
+      '<div class="right row"><button class="icon-btn" type="button" data-move="-1" aria-label="Up"' + (i === 0 ? " disabled" : "") + ">↑</button>" +
+      '<button class="icon-btn" type="button" data-move="1" aria-label="Down"' + (i === S.cats.length - 1 ? " disabled" : "") + ">↓</button></div></div>").join("");
+    $("view").querySelectorAll(".item-row").forEach((r) => r.onclick = (e) => {
+      const mv = e.target.closest("[data-move]");
+      if (mv) { e.stopPropagation(); moveCategory(r.dataset.id, Number(mv.dataset.move)); return; }
+      editCategory(catById(r.dataset.id));
+    });
+  }
+
+  function renderOptions() {
+    if (!S.groups.length) {
+      $("view").innerHTML = '<div class="empty"><b>' + E(t("No option groups yet")) + "</b><span>" + E(t("Options are choices like size, milk or flavours. Create a group once and use it on many products.")) + "</span></div>";
+      return;
+    }
+    $("view").innerHTML = S.groups.map((g) => {
+      const used = S.pmg.filter((x) => x.group_id === g.id).length;
+      return '<div class="item-row" data-id="' + E(g.id) + '"><div style="min-width:0;"><div class="name">' + E(g.name) + '</div><div class="meta">' + E(groupRule(g)) + " · " +
+        E(optionsOf(g.id).map((o) => o.name + delta(o.price_delta)).join(", ")) + "</div></div>" +
+        '<div class="right meta">' + E(t("Used by {n} products", { n: used })) + "</div></div>";
+    }).join("");
+    $("view").querySelectorAll(".item-row").forEach((r) => r.onclick = () => editGroup(groupById(r.dataset.id)));
+  }
+
+  function renderPromotions() {
+    if (!S.promos.length) {
+      $("view").innerHTML = '<div class="empty"><b>' + E(t("No promotions yet")) + "</b><span>" + E(t("Example: 3 donuts for $12. The register applies it on its own.")) + "</span></div>";
+      return;
+    }
+    const now = Date.now();
+    $("view").innerHTML = S.promos.map((p) => {
+      const prod = S.products.find((x) => x.id === p.product_id);
+      const loc = S.locs.find((l) => l.id === p.location_id);
+      const live = p.active && (!p.starts_at || new Date(p.starts_at) <= now) && (!p.ends_at || new Date(p.ends_at) >= now);
+      const when = [p.starts_at ? t("from {date}", { date: posCore.fmtDate(p.starts_at) }) : "", p.ends_at ? t("until {date}", { date: posCore.fmtDate(p.ends_at) }) : ""].filter(Boolean).join(" ");
+      return '<div class="item-row" data-id="' + E(p.id) + '"><div style="min-width:0;"><div class="name">' + E(p.name || (prod ? prod.name : "—")) + '</div><div class="meta">' +
+        E(t("{qty} × {product} for {price}", { qty: p.bundle_qty, product: prod ? prod.name : "—", price: money(p.bundle_price) })) +
+        " · " + E(loc ? loc.name : t("All locations")) + (when ? " · " + E(when) : "") + "</div></div>" +
+        '<div class="right">' + (live ? '<span class="pill ok"><span class="dot"></span>' + E(t("Active")) + "</span>" : '<span class="pill">' + E(t("Inactive")) + "</span>") + "</div></div>";
+    }).join("");
+    $("view").querySelectorAll(".item-row").forEach((r) => r.onclick = () => editPromotion(S.promos.find((p) => p.id === r.dataset.id)));
+  }
+
+  // ---------------------------------------------------------------------
+  // Diálogo genérico
+  // ---------------------------------------------------------------------
+  let saving = false;
+  function openDialog(title, bodyHtml, { onSave, onDelete, deleteLabel, saveLabel } = {}) {
+    const f = $("dlg-form");
+    f.innerHTML = '<div class="dialog-head"><h2>' + E(title) + '</h2><button class="x-btn" type="button" data-close aria-label="Close">×</button></div>' + bodyHtml +
+      '<div class="msg error" id="dlg-msg" hidden></div>' +
+      '<div class="dialog-foot">' + (onDelete ? '<button class="btn btn-danger" type="button" id="dlg-del">' + E(deleteLabel || t("Delete")) + "</button>" : "") +
+      '<span class="grow"></span><button class="btn" type="button" data-close>' + E(t("Cancel")) + '</button><button class="btn btn-primary" type="submit" id="dlg-save">' + E(saveLabel || t("Save")) + "</button></div>";
+    f.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => $("dlg").close());
+    // Un solo envío a la vez: un doble toque no puede crear dos productos.
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      if (saving) return;
+      saving = true; $("dlg-save").disabled = true; showMsg("");
+      try { if (await onSave()) { $("dlg").close(); await load(); } }
+      catch (err) { showMsg(posCore.errorText(err)); }
+      finally { saving = false; const b = $("dlg-save"); if (b) b.disabled = false; }
+    };
+    if (onDelete) $("dlg-del").onclick = async () => {
+      const b = $("dlg-del");
+      if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = t("Tap again to confirm"); return; }
+      if (saving) return; saving = true; b.disabled = true;
+      try { if (await onDelete()) { $("dlg").close(); await load(); } } catch (err) { showMsg(posCore.errorText(err)); }
+      finally { saving = false; b.disabled = false; }
+    };
+    $("dlg").showModal();
+    const first = f.querySelector("input:not([type=checkbox]):not([type=search]), select");
+    if (first) first.focus();
+    return f;
+  }
+  function showMsg(text) { const m = $("dlg-msg"); if (!m) return; m.textContent = text; m.hidden = !text; }
+  async function rpc(fn, args) { const { data, error } = await sb.rpc(fn, args); if (error) throw error; return data; }
+  function swatchesHtml(id, current, withNone) {
+    return '<div class="swatches" id="' + id + '">' + (withNone ? '<button type="button" class="swatch none" data-c="" aria-pressed="' + String(!current) + '" title="' + E(t("Category colour")) + '"></button>' : "") +
+      PALETTE.map((c) => '<button type="button" class="swatch" data-c="' + c + '" style="background:' + c + '" aria-pressed="' + String((current || "").toUpperCase() === c) + '"></button>').join("") + "</div>";
+  }
+  function wireSwatches(id) {
+    const box = $(id);
+    box.querySelectorAll(".swatch").forEach((s) => s.onclick = () => box.querySelectorAll(".swatch").forEach((x) => x.setAttribute("aria-pressed", String(x === s))));
+    return () => { const on = box.querySelector('[aria-pressed="true"]'); return on ? on.dataset.c || null : null; };
+  }
+  function wireChoices(id) {
+    const box = $(id);
+    box.querySelectorAll(".choice").forEach((c) => c.onclick = () => box.querySelectorAll(".choice").forEach((x) => x.setAttribute("aria-pressed", String(x === c))));
+    return () => (box.querySelector('[aria-pressed="true"]') || {}).dataset?.v;
+  }
+  const num = (v) => { const s = String(v ?? "").trim().replace(",", "."); if (s === "") return null; const n = Number(s); return Number.isFinite(n) ? n : NaN; };
+
+  // Filas de receta (insumo + cantidad), reutilizadas por productos y opciones.
+  function recipeRowsHtml(id, lines, allowNegative) {
+    return '<div class="edit-rows" id="' + id + '">' + lines.map((l) => recipeRow(l, allowNegative)).join("") + "</div>" +
+      '<div><button class="btn btn-sm" type="button" data-add-recipe="' + id + '">' + E(t("Add ingredient")) + "</button>" +
+      (S.items.length ? "" : ' <span class="hint">' + E(t("Create ingredients in Inventory first.")) + "</span>") + "</div>";
+  }
+  function recipeRow(l, allowNegative) {
+    const it = S.items.find((x) => x.id === (l && l.stock_item_id));
+    return '<div class="edit-row recipe-row"><select class="select r-item"><option value="">' + E(t("Choose ingredient")) + "</option>" +
+      S.items.map((x) => '<option value="' + E(x.id) + '"' + (l && l.stock_item_id === x.id ? " selected" : "") + ">" + E(x.name) + "</option>").join("") + "</select>" +
+      '<input class="input r-qty" inputmode="decimal" placeholder="' + E(allowNegative ? t("e.g. 200 or −200") : t("Quantity")) + '" value="' + E(l ? String(Number(l.qty_per_unit)) : "") + '">' +
+      '<span class="unit muted">' + E(it ? it.unit : "") + '</span><button class="icon-btn r-del" type="button" aria-label="Remove">×</button></div>';
+  }
+  function wireRecipeRows(id, allowNegative) {
+    const box = $(id);
+    const wireRow = (row) => {
+      row.querySelector(".r-del").onclick = () => row.remove();
+      row.querySelector(".r-item").onchange = (e) => { const it = S.items.find((x) => x.id === e.target.value); row.querySelector(".unit").textContent = it ? it.unit : ""; };
+    };
+    box.querySelectorAll(".recipe-row").forEach(wireRow);
+    document.querySelector('[data-add-recipe="' + id + '"]').onclick = () => {
+      box.insertAdjacentHTML("beforeend", recipeRow(null, allowNegative));
+      wireRow(box.lastElementChild);
+    };
+    return () => {
+      const out = [];
+      for (const row of box.querySelectorAll(".recipe-row")) {
+        const sid = row.querySelector(".r-item").value, q = num(row.querySelector(".r-qty").value);
+        if (!sid && q === null) continue;
+        if (!sid || q === null || Number.isNaN(q) || q === 0 || (!allowNegative && q < 0)) throw { message: "recipe.invalid_qty" };
+        out.push({ stock_item_id: sid, qty: q });
+      }
+      return out;
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Producto
+  // ---------------------------------------------------------------------
+  function editProduct(p, kind) {
+    kind = p ? p.kind : (kind || "product");
+    const isNew = !p;
+    p = p || { name: "", price: "", category_id: null, color: null, station: kind === "ticket" ? "none" : "none", track_stock: false };
+    const myGroups = p.id ? groupsOf(p.id).map((g) => g.id) : [];
+    const recipe = p.id ? S.recipes.filter((r) => r.product_id === p.id) : [];
+    let html = '<div class="fields"><div class="field"><label for="p-name" data-i18n>Name</label><input class="input" id="p-name" maxlength="80" value="' + E(p.name) + '" required></div>' +
+      '<div class="field"><label for="p-price"><span>' + E(t("Price")) + '</span> <span class="hint">' + E(t("Includes GST.")) + '</span></label><input class="input" id="p-price" inputmode="decimal" value="' + E(p.price === "" ? "" : Number(p.price).toFixed(2)) + '" required></div></div>';
+    if (kind === "product") {
+      html += '<div class="field"><label for="p-cat">' + E(t("Category")) + '</label><select class="select" id="p-cat"><option value="">' + E(t("No category")) + "</option>" +
+        S.cats.map((c) => '<option value="' + E(c.id) + '"' + (p.category_id === c.id ? " selected" : "") + ">" + E(c.name) + "</option>").join("") + "</select></div>" +
+        '<div class="field"><span class="label">' + E(t("Where is it prepared?")) + '</span><div class="choice-grid" id="p-station">' +
+        STATIONS.map((s) => '<button type="button" class="choice" data-v="' + s + '" aria-pressed="' + String(p.station === s) + '">' + E(stationLabel(s)) + "</button>").join("") +
+        '</div><span class="hint">' + E(t("It shows on that station's screen. \"No preparation\" is handed over when charged.")) + "</span></div>";
+    }
+    html += '<div class="field"><span class="label">' + E(t("Colour on the register")) + "</span>" + swatchesHtml("p-color", p.color, kind === "product") + "</div>";
+    if (kind === "product") {
+      html += '<div class="form-section"><h3>' + E(t("Options")) + '</h3><p class="hint">' + E(t("Choices the customer makes, like size or milk.")) + "</p>" +
+        (S.groups.length ? '<div class="edit-rows" id="p-groups">' + S.groups.map((g) =>
+          '<label class="check-row' + (myGroups.includes(g.id) ? " on" : "") + '"><input type="checkbox" value="' + E(g.id) + '"' + (myGroups.includes(g.id) ? " checked" : "") + '><span><b>' + E(g.name) + "</b> <span class=\"muted\">· " +
+          E(optionsOf(g.id).map((o) => o.name + delta(o.price_delta)).join(", ")) + "</span></span></label>").join("") + "</div>"
+          : '<p class="muted">' + E(t("No option groups yet. Create them in the Options tab.")) + "</p>") + "</div>";
+    }
+    html += '<div class="form-section"><h3>' + E(t("Stock")) + "</h3>" +
+      '<label class="switch"><input type="checkbox" id="p-track"' + (p.track_stock ? " checked" : "") + "><span>" + E(t("Count units of this product")) + "</span></label>" +
+      '<p class="hint">' + E(t("For things you buy ready to sell (bottles, cans, cakes). For things made to order, add a recipe instead.")) + "</p>";
+    if (kind === "product") html += '<div class="field"><span class="label">' + E(t("Recipe (per unit sold)")) + "</span>" + recipeRowsHtml("p-recipe", recipe, false) + '<p class="hint" id="p-cost"></p></div>';
+    html += "</div>";
+    if (S.locs.length > 1 && !isNew) {
+      html += '<div class="form-section"><h3>' + E(t("By location")) + '</h3><p class="hint">' + E(t("Leave the price empty to use the general price.")) + '</p><div class="edit-rows">' +
+        S.locs.map((l) => {
+          const row = S.pl.find((x) => x.product_id === p.id && x.location_id === l.id) || {};
+          return '<div class="edit-row loc-row" data-loc="' + E(l.id) + '"><span>' + E(l.name) + '</span><label class="switch"><input type="checkbox" class="l-av"' + (row.available === false ? "" : " checked") + '><span class="hint">' + E(t("Sold here")) + "</span></label>" +
+            '<input class="input l-price" inputmode="decimal" placeholder="' + E(money(p.price)) + '" value="' + E(row.price !== undefined && row.price !== null ? Number(row.price).toFixed(2) : "") + '"></div>';
+        }).join("") + "</div></div>";
+    }
+    const f = openDialog(isNew ? (kind === "ticket" ? t("New ticket type") : t("New product")) : p.name, html, {
+      onDelete: isNew ? null : async () => { await rpc("catalog_remove_product", { p_org_id: posCore.orgId, p_id: p.id }); posOffice.toast(t("Product removed.")); return true; },
+      deleteLabel: t("Remove product"),
+      onSave: async () => {
+        const name = $("p-name").value.trim(), price = num($("p-price").value);
+        if (!name) { showMsg(t("Type a name.")); return false; }
+        if (price === null || Number.isNaN(price) || price < 0) { showMsg(t("Enter a valid price.")); return false; }
+        const recipeLines = kind === "product" ? getRecipe() : [];
+        const groupIds = kind === "product" && $("p-groups") ? [...$("p-groups").querySelectorAll("input:checked")].map((i) => i.value) : [];
+        const saved = await rpc("catalog_save_product", {
+          p_org_id: posCore.orgId, p_id: p.id || null, p_name: name, p_price: posUtils.roundMoney(price),
+          p_category_id: kind === "product" ? ($("p-cat").value || null) : null, p_color: getColor(),
+          p_station: kind === "product" ? (getStation() || "none") : "none", p_kind: kind,
+          p_track_stock: $("p-track").checked, p_modifier_group_ids: groupIds,
+        });
+        if (kind === "product") {
+          const before = JSON.stringify(recipe.map((r) => [r.stock_item_id, Number(r.qty_per_unit)]).sort());
+          const after = JSON.stringify(recipeLines.map((r) => [r.stock_item_id, Number(r.qty)]).sort());
+          if (before !== after) await rpc("catalog_set_recipe", { p_org_id: posCore.orgId, p_product_id: saved.id, p_lines: recipeLines });
+        }
+        for (const row of f.querySelectorAll(".loc-row")) {
+          const av = row.querySelector(".l-av").checked, pr = num(row.querySelector(".l-price").value);
+          if (pr !== null && (Number.isNaN(pr) || pr < 0)) { showMsg(t("Enter a valid price.")); return false; }
+          const cur = S.pl.find((x) => x.product_id === saved.id && x.location_id === row.dataset.loc) || {};
+          const curPrice = cur.price === undefined || cur.price === null ? null : Number(cur.price);
+          if ((cur.available === false) === av || curPrice !== (pr === null ? null : posUtils.roundMoney(pr))) {
+            await rpc("catalog_set_product_location", { p_org_id: posCore.orgId, p_product_id: saved.id, p_location_id: row.dataset.loc, p_available: av, p_price: pr === null ? null : posUtils.roundMoney(pr) });
+          }
+        }
+        posOffice.toast(isNew ? t("Product added.") : t("Saved."));
+        return true;
+      },
+    });
+    posI18n.translateDom(f);
+    const getColor = wireSwatches("p-color");
+    const getStation = kind === "product" ? wireChoices("p-station") : () => "none";
+    const getRecipe = kind === "product" ? wireRecipeRows("p-recipe", false) : () => [];
+    if ($("p-groups")) $("p-groups").querySelectorAll("input").forEach((i) => i.onchange = () => i.closest(".check-row").classList.toggle("on", i.checked));
+    // Costo y margen en vivo (si los insumos tienen costo cargado).
+    const costBox = $("p-cost");
+    const updateCost = () => {
+      if (!costBox) return;
+      let cost = 0, known = true, any = false;
+      try {
+        for (const l of getRecipe()) { any = true; const it = S.items.find((x) => x.id === l.stock_item_id); if (!it || it.unit_cost === null) known = false; else cost += Number(it.unit_cost) * l.qty; }
+      } catch (_) { costBox.textContent = ""; return; }
+      const price = num($("p-price").value);
+      if (!any || !known || !(price > 0)) { costBox.textContent = any && !known ? t("Add a cost to the ingredients to see the margin.") : ""; return; }
+      const net = price / (1 + Number(posCore.org.tax_rate || 0));
+      costBox.textContent = t("Cost {cost} · margin {pct}% (price without GST {net})", { cost: money(cost), pct: Math.round((1 - cost / net) * 100), net: money(net) });
+    };
+    f.addEventListener("input", updateCost); f.addEventListener("change", updateCost); updateCost();
+  }
+
+  // ---------------------------------------------------------------------
+  // Categoría
+  // ---------------------------------------------------------------------
+  function editCategory(c) {
+    const isNew = !c;
+    c = c || { name: "", color: PALETTE[S.cats.length % PALETTE.length] };
+    openDialog(isNew ? t("New category") : c.name,
+      '<div class="field"><label for="c-name">' + E(t("Name")) + '</label><input class="input" id="c-name" maxlength="60" value="' + E(c.name) + '"></div>' +
+      '<div class="field"><span class="label">' + E(t("Colour")) + "</span>" + swatchesHtml("c-color", c.color, false) + "</div>", {
+      onDelete: isNew ? null : async () => { await rpc("catalog_remove_category", { p_org_id: posCore.orgId, p_id: c.id }); posOffice.toast(t("Category removed. Its products are now without category.")); return true; },
+      deleteLabel: t("Remove category"),
+      onSave: async () => {
+        const name = $("c-name").value.trim();
+        if (!name) { showMsg(t("Type a name.")); return false; }
+        await rpc("catalog_save_category", { p_org_id: posCore.orgId, p_id: c.id || null, p_name: name, p_color: getColor() });
+        posOffice.toast(t("Saved."));
+        return true;
+      },
+    });
+    const getColor = wireSwatches("c-color");
+  }
+  async function moveCategory(id, dir) {
+    const ids = S.cats.map((c) => c.id), i = ids.indexOf(id), j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const { error } = await sb.rpc("catalog_reorder", { p_org_id: posCore.orgId, p_what: "categories", p_ids: ids });
+    if (error) { posOffice.toast(posCore.errorText(error)); return; }
+    load();
+  }
+
+  // ---------------------------------------------------------------------
+  // Grupo de opciones
+  // ---------------------------------------------------------------------
+  function optionBlock(o) {
+    o = o || { name: "", price_delta: 0, is_default: false };
+    const rec = o.id ? S.modRecipes.filter((r) => r.modifier_id === o.id) : [];
+    const rid = "or-" + Math.random().toString(36).slice(2);
+    return '<div class="opt-block" data-id="' + E(o.id || "") + '"><div class="edit-row opt-row">' +
+      '<input class="input o-name" maxlength="60" placeholder="' + E(t("Option name (e.g. Oat)")) + '" value="' + E(o.name) + '">' +
+      '<input class="input o-price" inputmode="decimal" placeholder="' + E(t("+ price")) + '" value="' + E(Number(o.price_delta) ? Number(o.price_delta).toFixed(2) : "") + '">' +
+      '<label class="switch"><input type="checkbox" class="o-def"' + (o.is_default ? " checked" : "") + '><span class="hint">' + E(t("Pre-selected")) + "</span></label>" +
+      '<button class="icon-btn o-del" type="button" aria-label="Remove">×</button></div>' +
+      '<details' + (rec.length ? " open" : "") + '><summary class="hint">' + E(t("Ingredients this option adds or replaces")) + "</summary>" + recipeRowsHtml(rid, rec, true) + "</details></div>";
+  }
+  function editGroup(g) {
+    const isNew = !g;
+    g = g || { name: "", min_select: 0, max_select: 1 };
+    const opts = g.id ? optionsOf(g.id) : [];
+    const f = openDialog(isNew ? t("New option group") : g.name,
+      '<div class="field"><label for="g-name">' + E(t("Name")) + '</label><input class="input" id="g-name" maxlength="60" placeholder="' + E(t("e.g. Size, Milk, Flavours")) + '" value="' + E(g.name) + '"></div>' +
+      '<div class="fields"><label class="switch"><input type="checkbox" id="g-req"' + (g.min_select > 0 ? " checked" : "") + "><span>" + E(t("The customer must choose")) + "</span></label>" +
+      '<div class="field"><label for="g-max">' + E(t("How many can they choose?")) + '</label><input class="input" id="g-max" type="number" min="1" max="20" value="' + E(String(g.max_select)) + '"></div></div>' +
+      '<div class="form-section"><h3>' + E(t("Choices")) + '</h3><div class="edit-rows" id="g-opts">' + (opts.length ? opts.map(optionBlock).join("") : optionBlock() + optionBlock()) + "</div>" +
+      '<div><button class="btn btn-sm" type="button" id="g-add">' + E(t("Add choice")) + "</button></div></div>", {
+      onDelete: isNew ? null : async () => { await rpc("catalog_remove_modifier_group", { p_org_id: posCore.orgId, p_id: g.id }); posOffice.toast(t("Option group removed.")); return true; },
+      deleteLabel: t("Remove group"),
+      onSave: async () => {
+        const name = $("g-name").value.trim(), max = Math.max(1, Math.floor(Number($("g-max").value) || 1));
+        if (!name) { showMsg(t("Type a name.")); return false; }
+        const blocks = [...f.querySelectorAll(".opt-block")];
+        const options = [], recipes = [];
+        for (const b of blocks) {
+          const oname = b.querySelector(".o-name").value.trim(), pd = num(b.querySelector(".o-price").value);
+          if (!oname) continue;
+          if (pd !== null && Number.isNaN(pd)) { showMsg(t("Enter a valid price.")); return false; }
+          options.push({ id: b.dataset.id || null, name: oname, price_delta: pd === null ? 0 : posUtils.roundMoney(pd), is_default: b.querySelector(".o-def").checked });
+          recipes.push({ id: b.dataset.id || null, name: oname, lines: b._getRecipe() });
+        }
+        if (!options.length) { showMsg(t("Add at least one choice.")); return false; }
+        if (max === 1 && options.filter((o) => o.is_default).length > 1) { showMsg(t("Only one choice can be pre-selected when the customer chooses one.")); return false; }
+        const saved = await rpc("catalog_save_modifier_group", { p_org_id: posCore.orgId, p_id: g.id || null, p_name: name,
+          p_min_select: $("g-req").checked ? 1 : 0, p_max_select: max, p_options: options });
+        // Recetas de las opciones (se ubican por nombre en el grupo guardado).
+        const { data: fresh } = await sb.from("modifiers").select("id, name").eq("group_id", saved.id).eq("active", true);
+        for (const r of recipes) {
+          const m = (fresh || []).find((x) => x.name === r.name);
+          if (!m) continue;
+          const before = JSON.stringify(S.modRecipes.filter((x) => x.modifier_id === m.id).map((x) => [x.stock_item_id, Number(x.qty_per_unit)]).sort());
+          const after = JSON.stringify(r.lines.map((x) => [x.stock_item_id, Number(x.qty)]).sort());
+          if (before !== after) await rpc("catalog_set_modifier_recipe", { p_org_id: posCore.orgId, p_modifier_id: m.id, p_lines: r.lines });
+        }
+        posOffice.toast(t("Saved."));
+        return true;
+      },
+    });
+    const wireBlock = (b) => {
+      b.querySelector(".o-del").onclick = () => b.remove();
+      b._getRecipe = wireRecipeRows(b.querySelector(".edit-rows").id, true);
+    };
+    f.querySelectorAll(".opt-block").forEach(wireBlock);
+    $("g-add").onclick = () => { $("g-opts").insertAdjacentHTML("beforeend", optionBlock()); wireBlock($("g-opts").lastElementChild); $("g-opts").lastElementChild.querySelector(".o-name").focus(); };
+  }
+
+  // ---------------------------------------------------------------------
+  // Promoción
+  // ---------------------------------------------------------------------
+  function editPromotion(p) {
+    const isNew = !p;
+    p = p || { product_id: "", bundle_qty: 3, bundle_price: "", location_id: null, starts_at: null, ends_at: null, active: true, name: "" };
+    const d = (v) => v ? new Date(v).toISOString().slice(0, 10) : "";
+    openDialog(isNew ? t("New promotion") : (p.name || t("Promotion")),
+      '<div class="field"><label for="pr-product">' + E(t("Product")) + '</label><select class="select" id="pr-product"><option value="">' + E(t("Choose product")) + "</option>" +
+        S.products.map((x) => '<option value="' + E(x.id) + '"' + (x.id === p.product_id ? " selected" : "") + ">" + E(x.name) + " · " + E(money(x.price)) + "</option>").join("") + "</select></div>" +
+      '<div class="fields"><div class="field"><label for="pr-qty">' + E(t("Quantity")) + '</label><input class="input" id="pr-qty" type="number" min="2" value="' + E(String(p.bundle_qty)) + '"></div>' +
+      '<div class="field"><label for="pr-price">' + E(t("Price for all of them")) + '</label><input class="input" id="pr-price" inputmode="decimal" value="' + E(p.bundle_price === "" ? "" : Number(p.bundle_price).toFixed(2)) + '"></div></div>' +
+      '<p class="hint" id="pr-preview"></p>' +
+      '<div class="field"><label for="pr-name">' + E(t("Name on the receipt (optional)")) + '</label><input class="input" id="pr-name" maxlength="60" value="' + E(p.name || "") + '"></div>' +
+      (S.locs.length > 1 ? '<div class="field"><label for="pr-loc">' + E(t("Where")) + '</label><select class="select" id="pr-loc"><option value="">' + E(t("All locations")) + "</option>" +
+        S.locs.map((l) => '<option value="' + E(l.id) + '"' + (l.id === p.location_id ? " selected" : "") + ">" + E(l.name) + "</option>").join("") + "</select></div>" : "") +
+      '<div class="fields"><div class="field"><label for="pr-from">' + E(t("Starts (optional)")) + '</label><input class="input" id="pr-from" type="date" value="' + d(p.starts_at) + '"></div>' +
+      '<div class="field"><label for="pr-to">' + E(t("Ends (optional)")) + '</label><input class="input" id="pr-to" type="date" value="' + d(p.ends_at) + '"></div></div>' +
+      '<label class="switch"><input type="checkbox" id="pr-active"' + (p.active ? " checked" : "") + "><span>" + E(t("Active")) + "</span></label>", {
+      onDelete: isNew ? null : async () => { await rpc("catalog_remove_promotion", { p_org_id: posCore.orgId, p_id: p.id }); posOffice.toast(t("Promotion removed.")); return true; },
+      deleteLabel: t("Remove promotion"),
+      onSave: async () => {
+        const qty = Math.floor(Number($("pr-qty").value)), price = num($("pr-price").value);
+        if (!$("pr-product").value) { showMsg(t("Choose a product.")); return false; }
+        if (!(qty >= 2) || price === null || Number.isNaN(price) || price < 0) { showMsg(t("Enter a quantity of 2 or more and a valid price.")); return false; }
+        const from = $("pr-from").value, to = $("pr-to").value;
+        await rpc("catalog_save_promotion", { p_org_id: posCore.orgId, p_id: p.id || null, p_product_id: $("pr-product").value, p_bundle_qty: qty,
+          p_bundle_price: posUtils.roundMoney(price), p_name: $("pr-name").value.trim() || null, p_location_id: $("pr-loc") ? ($("pr-loc").value || null) : null,
+          p_starts_at: from ? new Date(from + "T00:00:00").toISOString() : null, p_ends_at: to ? new Date(to + "T23:59:59").toISOString() : null, p_active: $("pr-active").checked });
+        posOffice.toast(t("Saved."));
+        return true;
+      },
+    });
+    const preview = () => {
+      const prod = S.products.find((x) => x.id === $("pr-product").value), qty = Math.floor(Number($("pr-qty").value)), price = num($("pr-price").value);
+      $("pr-preview").textContent = prod && qty >= 2 && price >= 0 ? t("Normally {normal}. Customers save {save}.", { normal: money(prod.price * qty), save: money(prod.price * qty - price) }) : "";
+    };
+    ["pr-product", "pr-qty", "pr-price"].forEach((id) => $(id).addEventListener("input", preview)); preview();
+  }
+
+  async function loadExample() {
+    const { error } = await sb.rpc("set_business_type", { p_org_id: posCore.orgId, p_type: S.org.business_type || "cafe", p_seed: true });
+    if (error) { posOffice.toast(posCore.errorText(error)); return; }
+    posOffice.toast(t("Example menu loaded. Edit prices and names to match yours."));
+    load();
+  }
+
+  document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; S.q = ""; render(); });
+  $("add-btn").onclick = () => ({ products: () => editProduct(null, "product"), tickets: () => editProduct(null, "ticket"), categories: () => editCategory(null),
+    options: () => editGroup(null), promotions: () => editPromotion(null) })[S.tab]();
+
+  posCore.ready.then(() => {
+    if (!posOffice.require(["owner", "admin", "manager"])) return;
+    const h = location.hash.slice(1);
+    if (["products", "tickets", "categories", "options", "promotions"].includes(h)) S.tab = h;
+    load();
+  });
+</script>
+</body>
+</html>

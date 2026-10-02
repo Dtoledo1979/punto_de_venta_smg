@@ -10,6 +10,10 @@
 <style>
   #f{display:grid; gap:22px;}
   .form-section h2{font-size:16px; font-family:var(--f-body);}
+  .btypes{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px;}
+  .btype{border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:12px; text-align:left; cursor:pointer; display:grid; gap:4px; font:inherit;}
+  .btype b{font-size:15px;} .btype span{font-size:13px; color:var(--muted);}
+  .btype[aria-pressed="true"]{border:2px solid var(--accent); padding:11px; background:var(--accent-soft);}
 </style>
 </head>
 <body>
@@ -22,6 +26,21 @@
       <p class="muted" data-i18n>A few details to set up your business. You can change all of this later. You can configure everything and use test mode right away; real sales start once your subscription payment is confirmed.</p>
     </div>
     <form id="f" novalidate>
+      <div class="form-section">
+        <h2 data-i18n>What kind of business is it?</h2>
+        <p class="hint" data-i18n>We set up the register for it: categories, options and screens. You can change everything later.</p>
+        <div class="btypes" id="btypes">
+          <button type="button" class="btype" data-v="cafe" aria-pressed="true"><b data-i18n>Cafe</b><span data-i18n>Counter, takeaway, milk and sizes.</span></button>
+          <button type="button" class="btype" data-v="restaurant" aria-pressed="false"><b data-i18n>Restaurant</b><span data-i18n>Starters, mains, kitchen and bar.</span></button>
+          <button type="button" class="btype" data-v="bar" aria-pressed="false"><b data-i18n>Bar with snacks</b><span data-i18n>Drinks at the bar, food from the kitchen.</span></button>
+          <button type="button" class="btype" data-v="food_truck" aria-pressed="false"><b data-i18n>Food truck</b><span data-i18n>Small menu, fast, order numbers.</span></button>
+          <button type="button" class="btype" data-v="gelato" aria-pressed="false"><b data-i18n>Gelato shop</b><span data-i18n>Scoops, cup or cone, flavours.</span></button>
+          <button type="button" class="btype" data-v="events" aria-pressed="false"><b data-i18n>Events</b><span data-i18n>Events with tickets and a delivery screen.</span></button>
+          <button type="button" class="btype" data-v="other" aria-pressed="false"><b data-i18n>Something else</b><span data-i18n>Start with an empty menu.</span></button>
+        </div>
+        <label class="switch" id="seed-wrap"><input type="checkbox" id="seed" checked><span data-i18n>Start with an example menu (you edit prices and names after)</span></label>
+      </div>
+
       <div class="form-section">
         <h2 data-i18n>Business</h2>
         <div class="field"><label for="name" data-i18n>Business name</label><input class="input" id="name" required></div>
@@ -98,7 +117,14 @@
   const PIN = /^[0-9]{4,8}$/;
   // Si falla un paso a mitad del alta, el reintento sigue desde ahí (no
   // vuelve a crear el negocio: el nombre corto ya estaría tomado).
-  let createdOrg = null, createdLoc = null;
+  let createdOrg = null, createdLoc = null, businessType = "cafe";
+  document.querySelectorAll("#btypes .btype").forEach((b) => b.onclick = () => {
+    businessType = b.dataset.v;
+    document.querySelectorAll("#btypes .btype").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    const empty = businessType === "events" || businessType === "other";
+    $("seed-wrap").hidden = empty;
+    $("type").value = businessType === "events" ? "ticket" : "product";
+  });
 
   function setMsg(text){ const m = $("msg"); m.textContent = text; m.hidden = !text; }
   const slugify = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
@@ -131,6 +157,9 @@
       if (error) return stop(error);
       createdOrg = org;
       try { localStorage.setItem("pos_org_id", org.id); } catch (_) { /* sin storage */ }
+      const seed = $("seed").checked && businessType !== "events" && businessType !== "other";
+      const { error: eType } = await sb.rpc("set_business_type", { p_org_id: org.id, p_type: businessType, p_seed: seed });
+      if (eType) return stop(eType);
     }
     if (!createdLoc) {
       const { data: loc, error } = await sb.rpc("create_location", { p_org_id: createdOrg.id, p_name: v("location") });

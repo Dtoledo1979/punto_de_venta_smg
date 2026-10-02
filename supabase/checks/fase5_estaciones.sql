@@ -12,13 +12,10 @@ do $$
 declare v_reg uuid := (select v from t2 where k = 'reg'); v_ev uuid := (select v from t2 where k = 'ev');
         v_beer uuid; v_burger uuid; v_coffee uuid; v_water uuid; v_o pos.orders; v_items jsonb;
 begin
-  v_beer   := (pos.add_menu_item(v_reg, '1234', 'Beer', 9.00, 20)).id;
-  v_burger := (pos.add_menu_item(v_reg, '1234', 'Burger', 18.00, 21)).id;
-  v_coffee := (pos.add_menu_item(v_reg, '1234', 'Flat white', 5.50, 22)).id;
-  v_water  := (pos.add_menu_item(v_reg, '1234', 'Water bottle', 3.00, 23)).id;
-  perform pos.set_item_station(v_reg, '1234', v_burger, 'kitchen');
-  perform pos.set_item_station(v_reg, '1234', v_coffee, 'coffee');
-  perform pos.set_item_station(v_reg, '1234', v_water, 'none');
+  v_beer   := (pos.catalog_save_product((select org_a from t_ids), null, 'Beer', 9.00, p_station => 'bar')).id;
+  v_burger := (pos.catalog_save_product((select org_a from t_ids), null, 'Burger', 18.00, p_station => 'kitchen')).id;
+  v_coffee := (pos.catalog_save_product((select org_a from t_ids), null, 'Flat white', 5.50, p_station => 'coffee')).id;
+  v_water  := (pos.catalog_save_product((select org_a from t_ids), null, 'Water bottle', 3.00, p_station => 'none')).id;
 
   -- K1. Cada línea lleva su estación; "none" queda entregada al cobrar.
   v_o := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(
@@ -45,14 +42,14 @@ begin
   if (select status from pos.orders where id = v_o.id) <> 'pending_delivery' then raise exception 'FALLA K2: el pedido se cerró solo'; end if;
 
   -- K3. Cambiar la estación de un producto no mueve pedidos ya hechos.
-  perform pos.set_item_station(v_reg, '1234', v_beer, 'kitchen');
+  perform pos.catalog_save_product((select org_a from t_ids), v_beer, 'Beer', 9.00, p_station => 'kitchen');
   if (select e->>'station' from pos.orders o, jsonb_array_elements(o.items) e where o.id = v_o.id and e->>'name' = 'Beer') <> 'bar' then
     raise exception 'FALLA K3: el cambio de estación alteró un pedido pasado';
   end if;
 
   -- K4. Validaciones y PIN.
   begin
-    perform pos.set_item_station(v_reg, '1234', v_beer, 'garage');
+    perform pos.catalog_save_product((select org_a from t_ids), v_beer, 'Beer', 9.00, p_station => 'garage');
     raise exception 'FALLA K4: aceptó una estación inválida';
   exception when raise_exception then if sqlerrm like 'FALLA%' then raise; end if;
   end;

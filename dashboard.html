@@ -3,90 +3,79 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard</title>
-<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%" }; document.documentElement.classList.add("pos-auth-pending");</script>
+<title>Sales</title>
+<script>window.POS_ENV = { supabaseUrl: "%VITE_SUPABASE_URL%", supabaseAnonKey: "%VITE_SUPABASE_ANON_KEY%", officePage: "sales" }; document.documentElement.classList.add("pos-auth-pending");</script>
 <style>html.pos-auth-pending body{visibility:hidden}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/ui.css">
 <style>
-  :root{
-    --bg:#0E1116; --surface:#FFFFFF; --surface-dark:#151B23; --surface-dark-2:#171C24; --surface-alt:#F4F6F8;
-    --text-primary:#12161C; --text-muted:#62707D;
-    --primary:#A8E020; --primary-hover:#96CB1D; --primary-active:#87B518; --primary-ink:#1A2333;
-    --danger:#E4483A; --danger-bg:#FBE6E4; --warning:#D98B00; --warning-bg:#FBEBD3; --success:#2FA35A; --success-bg:#E3F5EA;
-    --border:#E2E6EA; --border-dark:#232B36;
-    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-card:16px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; background:var(--bg); color:#fff; font-family:'Inter',Arial,sans-serif; min-height:100vh;}
-
-  .app-nav{background:var(--bg); border-bottom:1px solid var(--border-dark); display:flex; align-items:center; justify-content:space-between; padding:0 20px; height:56px;}
-  .app-nav .brand{display:flex; align-items:center; gap:9px; font-family:'Sora',sans-serif; font-weight:700; font-size:14px; color:#fff;}
-  .app-nav .brand svg path{fill:var(--primary);}
-  .app-nav .links a{color:#9AA7B2; text-decoration:none; font-size:13px; font-weight:500; padding:9px 12px; border-radius:var(--r-md); min-height:36px; display:inline-flex; align-items:center;}
-  .app-nav .links a:hover{color:#fff; background:#1A2028;}
-
-  main{max-width:960px; margin:0 auto; padding:24px 20px 60px;}
-  .event-head{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:22px;}
-  .event-head h1{font-family:'Sora',sans-serif; font-size:24px; margin:0 0 4px;}
-  .event-head .sub{display:flex; align-items:center; gap:8px; font-size:13px; color:#9AA7B2;}
-  .live-dot{width:7px; height:7px; border-radius:50%; background:var(--primary); display:inline-block;}
-  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; border:none; border-radius:var(--r-md); padding:10px 16px; min-height:40px; cursor:pointer;}
-  .btn-secondary{background:var(--surface-dark); color:#fff; border:1px solid var(--border-dark);}
-  .btn-secondary:hover{background:#1A2028;}
-
-  .metrics{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-bottom:28px;}
-  .metric-card{background:var(--surface-dark); border:1px solid var(--border-dark); border-radius:var(--r-card); padding:16px;}
-  .metric-card .label{font-size:11px; color:#7C8996; text-transform:uppercase; letter-spacing:.5px; font-weight:600;}
-  .metric-card .value{font-family:'Sora',sans-serif; font-weight:800; font-size:26px; margin-top:6px;}
-  .metric-card.warn .value{color:var(--warning);}
-
-  .tiles{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px;}
-  .tile{background:var(--surface); color:var(--text-primary); border-radius:var(--r-card); padding:22px; text-decoration:none; display:block; min-height:120px; position:relative; transition:transform .1s;}
-  .tile:active{transform:scale(.98);}
-  .tile h2{font-family:'Sora',sans-serif; font-size:17px; margin:0 0 6px;}
-  .tile p{font-size:12.5px; color:var(--text-muted); margin:0; line-height:1.4;}
-  .tile .go{position:absolute; right:18px; bottom:18px; font-size:18px; color:var(--text-muted);}
-  .tile.primary{background:var(--primary); color:var(--primary-ink);}
-  .tile.primary p{color:#31401C;}
-  .tile.primary .go{color:var(--primary-ink);}
-
-  .loading-txt{color:#7C8996; font-size:13px;}
+  .filters{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .filters .select, .filters .input{width:auto; min-height:38px; padding:7px 10px; font-size:14px;}
+  .chart svg{width:100%; height:auto; display:block;}
+  .chart .bar-rect{fill:var(--accent);}
+  .chart .bar-rect:hover{fill:var(--accent-hover);}
+  .chart text{fill:var(--muted); font:11px var(--f-body);}
+  .chart .grid{stroke:var(--line);}
+  .sales-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; align-items:start;}
+  .table td.n, .table th.n{text-align:right; font-variant-numeric:tabular-nums;}
+  .sub-kpi{display:flex; gap:18px; flex-wrap:wrap; font-size:13.5px; color:var(--muted);}
+  .sub-kpi b{color:var(--ink); font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
-
-<div class="app-nav">
-  <div class="brand">
-    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 1l2.9 7.1L22 11l-7.1 2.9L12 21l-2.9-7.1L2 11l7.1-2.9L12 1z"/></svg>
-    <span id="org-word"></span>
+<main class="main-inner">
+  <div class="page-head">
+    <div><h1 data-i18n>Sales</h1><p id="range-label"></p></div>
+    <button class="btn" type="button" id="export" data-i18n>Export CSV</button>
   </div>
-  <div class="links"><a href="index.html" data-i18n>Change event</a></div>
-</div>
 
-<main>
-  <div class="event-head">
-    <div>
-      <h1 id="event-name" data-i18n>Loading…</h1>
-      <div class="sub"><span class="live-dot"></span> <span id="event-date"></span></div>
+  <div class="filters">
+    <div class="seg" role="group" aria-label="Period" id="period">
+      <button type="button" data-p="today" data-i18n>Today</button>
+      <button type="button" data-p="yesterday" data-i18n>Yesterday</button>
+      <button type="button" data-p="7" data-i18n>7 days</button>
+      <button type="button" data-p="30" data-i18n>30 days</button>
+      <button type="button" data-p="custom" data-i18n>Custom</button>
     </div>
-    <button class="btn btn-secondary" onclick="location.href='index.html'" data-i18n>Change event</button>
+    <span class="row" id="custom-range" hidden>
+      <input class="input" type="date" id="from" aria-label="From"> <span class="muted">–</span> <input class="input" type="date" id="to" aria-label="To">
+    </span>
+    <select class="select" id="loc-filter" hidden aria-label="Location"></select>
+    <select class="select" id="event-filter" hidden aria-label="Event"></select>
   </div>
 
-  <div class="metrics" id="metrics">
-    <div class="metric-card"><div class="label" data-i18n>Net sales</div><div class="value loading-txt">—</div></div>
-    <div class="metric-card"><div class="label" data-i18n>Orders</div><div class="value loading-txt">—</div></div>
-    <div class="metric-card"><div class="label" data-i18n>Waiting</div><div class="value loading-txt">—</div></div>
-    <div class="metric-card"><div class="label" data-i18n>Low stock</div><div class="value loading-txt">—</div></div>
+  <div class="msg error" id="err" hidden></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="sub-kpi" id="sub-kpis"></div>
+
+  <section class="panel">
+    <div class="panel-head"><h2 id="chart-title"></h2></div>
+    <div class="chart" id="chart"></div>
+  </section>
+
+  <div class="sales-grid">
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>Payment methods</h2></div>
+      <div class="bars" id="payments"></div>
+    </section>
+    <section class="panel" id="loc-panel" hidden>
+      <div class="panel-head"><h2 data-i18n>By location</h2></div>
+      <div class="bars" id="by-location"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>By register</h2></div>
+      <div class="bars" id="by-register"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2 data-i18n>By team member</h2></div>
+      <div class="table-wrap"><table class="table" id="by-staff"></table></div>
+    </section>
   </div>
 
-  <div class="tiles">
-    <a class="tile primary" href="pos-productos.html"><h2 data-i18n>Product sales</h2><p data-i18n>Bar / food register.</p><span class="go">→</span></a>
-    <a class="tile" href="pos-tickets.html"><h2 data-i18n>Ticket sales</h2><p data-i18n>Box office, self-fulfilling.</p><span class="go">→</span></a>
-    <a class="tile" href="despacho.html"><h2 data-i18n>Delivery</h2><p data-i18n>Confirm delivered orders.</p><span class="go">→</span></a>
-    <a class="tile" href="insumos.html"><h2 data-i18n>Inventory</h2><p data-i18n>Products, ingredients, recipes, promos.</p><span class="go">→</span></a>
-    <a class="tile" href="pos-productos.html#summary"><h2 data-i18n>Reports</h2><p data-i18n>Sales summary and CSV.</p><span class="go">→</span></a>
-  </div>
+  <section class="panel">
+    <div class="panel-head"><h2 data-i18n>Products</h2><input class="input" id="prod-search" placeholder="Search product" data-i18n-ph style="width:auto; min-height:36px; padding:6px 10px; font-size:14px;"></div>
+    <div class="table-wrap"><table class="table" id="by-product"></table></div>
+  </section>
+  <p class="faint" style="font-size:12.5px;" data-i18n>Sales exclude voided orders, test-mode sales and complimentary sales. Net sales = sales minus refunds in the period. Prices include GST.</p>
 </main>
 
 <script src="/vendor/supabase.js"></script>
@@ -94,43 +83,181 @@
 <script src="/js/i18n.js"></script>
 <script src="/js/i18n-es.js"></script>
 <script src="/js/pos-core.js"></script>
+<script src="/js/office.js"></script>
 <script>
   const sb = posCore.sb;
+  const E = posUtils.escapeHtml;
+  const $ = (id) => document.getElementById(id);
+  const money = (v) => posCore.money(Number(v));
+  const state = { period: "today", from: null, to: null, location: null, event: null };
+  let report = null;
 
-  const eventId = sessionStorage.getItem("pos_selected_event_id");
-
-  async function load(){
-    document.getElementById("org-word").textContent = posCore.org.name.toUpperCase();
-    if (!eventId) { location.href = "index.html"; return; }
-    const { data: ev } = await sb.from("events").select("*").eq("org_id", posCore.orgId).eq("id", eventId).maybeSingle();
-    if (!ev) { location.href = "index.html"; return; }
-    document.getElementById("event-name").textContent = ev.name;
-    document.getElementById("event-date").textContent = ev.event_date
-      ? t("LIVE · {date}", { date: posCore.fmtDate(ev.event_date + "T12:00:00") })
-      : t("LIVE");
-
-    const { data: orders } = await sb.from("orders").select("total,status,payment_method,refunded_total").eq("org_id", posCore.orgId).eq("event_id", eventId).neq("status","voided").eq("is_test", false);
-    const list = orders || [];
-    // Ventas netas: lo cobrado menos lo reembolsado (las cortesías no son ventas).
-    const ventas = posUtils.sumMoney(list.filter(o => o.payment_method !== "complimentary").flatMap(o => [o.total, -o.refunded_total]));
-    const pendientes = list.filter(o => o.status === "pending_delivery").length;
-
-    const { data: menuItems } = await sb.from("menu_items").select("stock_qty,initial_stock,track_stock").eq("org_id", posCore.orgId).eq("active", true).eq("track_stock", true);
-    const { data: ingredients } = await sb.from("ingredients").select("stock_qty,initial_stock").eq("org_id", posCore.orgId).eq("active", true).not("stock_qty","is",null);
-    const lowStock = [...(menuItems||[]), ...(ingredients||[])].filter(i => i.initial_stock > 0 && (i.stock_qty / i.initial_stock) <= 0.25).length;
-
-    const cards = document.querySelectorAll("#metrics .metric-card .value");
-    cards[0].textContent = posCore.money(ventas);
-    cards[0].classList.remove("loading-txt");
-    cards[1].textContent = list.length;
-    cards[1].classList.remove("loading-txt");
-    cards[2].textContent = pendientes;
-    cards[2].classList.remove("loading-txt");
-    cards[3].textContent = lowStock;
-    cards[3].classList.remove("loading-txt");
-    if (lowStock > 0) cards[3].closest(".metric-card").classList.add("warn");
+  // Fechas en la zona horaria del negocio (YYYY-MM-DD).
+  function localDate(offsetDays) {
+    const d = new Date(Date.now() + (offsetDays || 0) * 86400000);
+    return new Intl.DateTimeFormat("en-CA", { timeZone: posCore.org.timezone || "Pacific/Auckland" }).format(d);
   }
-  posCore.ready.then(load);
+  function addDays(iso, n) { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function fmtDay(iso, opts) {
+    const loc = posI18n.lang === "es" ? "es-NZ" : (posCore.org.locale || "en-NZ");
+    return new Intl.DateTimeFormat(loc, { ...opts, timeZone: "UTC" }).format(new Date(iso + "T12:00:00Z"));
+  }
+
+  function rangeFor(p) {
+    const today = localDate(0);
+    if (p === "today") return [today, today];
+    if (p === "yesterday") { const y = addDays(today, -1); return [y, y]; }
+    if (p === "7") return [addDays(today, -6), today];
+    if (p === "30") return [addDays(today, -29), today];
+    return [$("from").value || today, $("to").value || today];
+  }
+
+  function delta(now, before) {
+    if (!before) return '<span class="k-delta">' + E(t("No sales in the previous period")) + "</span>";
+    const pct = Math.round(((now - before) / Math.abs(before)) * 100);
+    return '<span class="k-delta ' + (pct > 0 ? "up" : pct < 0 ? "down" : "") + '">' + E(t("{pct}% vs. previous period", { pct: (pct > 0 ? "+" : "") + pct })) + "</span>";
+  }
+
+  function barsHtml(rows, val, lab, fmt) {
+    const max = Math.max(0, ...rows.map(val));
+    if (!rows.length || max <= 0) return '<div class="empty"><span>' + E(t("No sales in this period.")) + "</span></div>";
+    return rows.map((r) => {
+      const v = val(r), w = Math.max(2, Math.round((v / max) * 100));
+      return '<div class="bar"><span class="b-label" title="' + E(lab(r)) + '">' + E(lab(r)) + '</span><span class="b-track"><span class="b-fill" style="width:' + w + '%"></span></span><span class="b-value">' + E(fmt(v)) + "</span></div>";
+    }).join("");
+  }
+
+  // Gráfico de columnas en SVG (por hora si es un solo día, por día si no).
+  function chart(points) {
+    const W = 760, H = 220, padL = 52, padB = 26, padT = 10;
+    const max = Math.max(0, ...points.map((p) => p.v));
+    if (max <= 0) return '<div class="empty"><b>' + E(t("No sales in this period.")) + "</b></div>";
+    const step = (W - padL) / points.length, bw = Math.max(2, step * 0.66);
+    const y = (v) => padT + (H - padT - padB) * (1 - v / max);
+    let svg = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + E($("chart-title").textContent) + '">';
+    [0, 0.5, 1].forEach((f) => {
+      const yy = y(max * f);
+      svg += '<line class="grid" x1="' + padL + '" x2="' + W + '" y1="' + yy + '" y2="' + yy + '"/>' +
+        '<text x="' + (padL - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + E(posCore.money(max * f).replace(/\.00$/, "")) + "</text>";
+    });
+    const every = Math.ceil(points.length / 12);
+    points.forEach((p, i) => {
+      const x = padL + i * step + (step - bw) / 2;
+      svg += '<rect class="bar-rect" x="' + x.toFixed(1) + '" y="' + y(p.v).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, H - padB - y(p.v)).toFixed(1) + '" rx="3"><title>' + E(p.label + ": " + posCore.money(p.v)) + "</title></rect>";
+      if (i % every === 0) svg += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + E(p.short) + "</text>";
+    });
+    return svg + "</svg>";
+  }
+
+  async function load() {
+    const [from, to] = rangeFor(state.period);
+    state.from = from; state.to = to;
+    $("range-label").textContent = from === to ? fmtDay(from, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      : fmtDay(from, { day: "numeric", month: "short" }) + " – " + fmtDay(to, { day: "numeric", month: "short", year: "numeric" });
+    const { data: r, error } = await sb.rpc("sales_report", { p_org_id: posCore.orgId, p_from: from, p_to: to, p_location_id: state.location, p_event_id: state.event });
+    $("err").hidden = !error;
+    if (error) { $("err").textContent = posCore.errorText(error); return; }
+    report = r;
+
+    $("kpis").innerHTML = [
+      { l: t("Net sales"), v: money(r.net), d: delta(Number(r.net), Number(r.previous.net)) },
+      { l: t("Orders"), v: String(r.orders), d: delta(r.orders, r.previous.orders) },
+      { l: t("Average sale"), v: money(r.avg_ticket), d: "" },
+      { l: t("GST included"), v: money(r.gst), d: "" },
+    ].map((k) => '<div class="kpi"><span class="k-label">' + E(k.l) + '</span><span class="k-value">' + E(k.v) + "</span>" + k.d + "</div>").join("");
+    $("sub-kpis").innerHTML = "<span>" + E(t("Sales")) + ": <b>" + E(money(r.gross)) + "</b></span><span>" + E(t("Refunds")) + ": <b>" + E(money(r.refunds)) + "</b></span>" +
+      "<span>" + E(t("Complimentary")) + ": <b>" + E(t("{n} orders · {amount}", { n: r.complimentary.orders, amount: money(r.complimentary.value) })) + "</b></span>";
+
+    const single = r.days === 1;
+    $("chart-title").textContent = single ? t("Sales by hour") : t("Net sales by day");
+    const pts = single
+      ? r.by_hour.filter((h, i, all) => { const first = all.findIndex((x) => x.orders > 0), last = all.length - 1 - [...all].reverse().findIndex((x) => x.orders > 0); return first >= 0 && i >= Math.max(0, first - 1) && i <= Math.min(23, last + 1); })
+          .map((h) => ({ v: Number(h.gross), label: String(h.hour).padStart(2, "0") + ":00", short: String(h.hour) }))
+      : r.by_day.map((d) => ({ v: Number(d.net), label: fmtDay(d.date, { weekday: "short", day: "numeric", month: "short" }), short: fmtDay(d.date, { day: "numeric", month: r.days > 14 ? "numeric" : "short" }) }));
+    $("chart").innerHTML = chart(pts);
+
+    const pay = r.by_payment;
+    $("payments").innerHTML = barsHtml([
+      { n: t("Card"), v: Number(pay.card) - Number(pay.refunds_card) },
+      { n: t("Cash"), v: Number(pay.cash) - Number(pay.refunds_cash) },
+    ], (x) => x.v, (x) => x.n, money);
+    $("loc-panel").hidden = state.location || r.by_location.length < 2;
+    $("by-location").innerHTML = barsHtml(r.by_location, (x) => Number(x.net), (x) => x.name, money);
+    $("by-register").innerHTML = barsHtml(r.by_register, (x) => Number(x.gross), (x) => x.name, money);
+    $("by-staff").innerHTML = r.by_staff.length
+      ? "<thead><tr><th>" + E(t("Name")) + '</th><th class="n">' + E(t("Orders")) + '</th><th class="n">' + E(t("Sales")) + '</th><th class="n">' + E(t("Average sale")) + "</th></tr></thead><tbody>" +
+        r.by_staff.map((s) => "<tr><td>" + E(s.name) + '</td><td class="n">' + s.orders + '</td><td class="n">' + E(money(s.gross)) + '</td><td class="n">' + E(money(s.avg)) + "</td></tr>").join("") + "</tbody>"
+      : '<tr><td class="muted">' + E(t("No sales in this period.")) + "</td></tr>";
+    renderProducts();
+  }
+
+  function renderProducts() {
+    if (!report) return;
+    const q = $("prod-search").value.trim().toLowerCase();
+    const rows = report.by_product.filter((p) => !q || p.name.toLowerCase().includes(q));
+    const total = Number(report.gross) || 1;
+    $("by-product").innerHTML = rows.length
+      ? "<thead><tr><th>" + E(t("Product")) + '</th><th class="n">' + E(t("Quantity")) + '</th><th class="n">' + E(t("Sales")) + '</th><th class="n">' + E(t("Share")) + "</th></tr></thead><tbody>" +
+        rows.map((p) => "<tr><td>" + E(p.name) + '</td><td class="n">' + Number(p.qty) + '</td><td class="n">' + E(money(p.sales)) + '</td><td class="n">' + Math.round((Number(p.sales) / total) * 1000) / 10 + "%</td></tr>").join("") + "</tbody>"
+      : '<tr><td class="muted">' + E(t("No sales in this period.")) + "</td></tr>";
+  }
+
+  function exportCsv() {
+    if (!report) return;
+    const f = posUtils.csvField;
+    const lines = [
+      [t("Sales"), report.from + " – " + report.to].map(f).join(","),
+      [t("Net sales"), report.net].map(f).join(","), [t("Sales"), report.gross].map(f).join(","), [t("Refunds"), report.refunds].map(f).join(","),
+      [t("Orders"), report.orders].map(f).join(","), [t("GST included"), report.gst].map(f).join(","), "",
+      [t("Date"), t("Net sales"), t("Orders")].map(f).join(","), ...report.by_day.map((d) => [d.date, d.net, d.orders].map(f).join(",")), "",
+      [t("Product"), t("Quantity"), t("Sales")].map(f).join(","), ...report.by_product.map((p) => [p.name, p.qty, p.sales].map(f).join(",")),
+    ];
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "sales-" + report.from + "-" + report.to + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function setPeriod(p) {
+    state.period = p;
+    document.querySelectorAll("#period button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === p)));
+    $("custom-range").hidden = p !== "custom";
+    if (p === "custom" && !$("from").value) { $("to").value = localDate(0); $("from").value = addDays(localDate(0), -6); }
+    load();
+  }
+
+  async function loadFilters() {
+    const [{ data: locs }, { data: evs }] = await Promise.all([
+      sb.from("locations").select("id, name").eq("org_id", posCore.orgId).order("created_at"),
+      sb.from("events").select("id, name, event_date, active").eq("org_id", posCore.orgId).order("created_at", { ascending: false }).limit(50),
+    ]);
+    if (locs && locs.length > 1) {
+      $("loc-filter").innerHTML = '<option value="">' + E(t("All locations")) + "</option>" + locs.map((l) => '<option value="' + E(l.id) + '">' + E(l.name) + "</option>").join("");
+      $("loc-filter").hidden = false;
+    }
+    if (evs && evs.length) {
+      $("event-filter").innerHTML = '<option value="">' + E(t("All events")) + "</option>" + evs.map((e) => '<option value="' + E(e.id) + '">' + E(e.name) + (e.active ? " · " + t("live") : "") + "</option>").join("");
+      $("event-filter").hidden = false;
+      // Viene de "Ver reporte" en Hoy: abrir ese evento.
+      const pre = sessionStorage.getItem("pos_selected_event_id");
+      if (pre && evs.some((e) => e.id === pre)) { $("event-filter").value = pre; state.event = pre; state.period = "30"; }
+    }
+  }
+
+  document.querySelectorAll("#period button").forEach((b) => b.onclick = () => setPeriod(b.dataset.p));
+  $("from").onchange = $("to").onchange = () => load();
+  $("loc-filter").onchange = () => { state.location = $("loc-filter").value || null; load(); };
+  $("event-filter").onchange = () => { state.event = $("event-filter").value || null; load(); };
+  $("prod-search").oninput = renderProducts;
+  $("export").onclick = exportCsv;
+
+  posCore.ready.then(async () => {
+    if (!posOffice.require(["owner", "admin", "manager"])) return;
+    await loadFilters();
+    setPeriod(state.period);
+  });
 </script>
 </body>
 </html>

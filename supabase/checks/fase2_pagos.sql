@@ -20,12 +20,12 @@ declare v_reg uuid; v_ev uuid; v_cafe uuid; v_pisco uuid; v_ing uuid; v_o pos.or
 begin
   select id into v_reg from pos.registers where org_id = (select org_a from t_ids);
   select id into v_ev from pos.events where org_id = (select org_a from t_ids);
-  select id into v_cafe from pos.menu_items where register_id = v_reg and name = 'Café';
-  select id into v_pisco from pos.menu_items where register_id = v_reg and name = 'Piscola';
+  select id into v_cafe from pos.products where org_id = (select org_a from t_ids) and name = 'Café';
+  select id into v_pisco from pos.products where org_id = (select org_a from t_ids) and name = 'Piscola';
   -- Insumo con receta para probar la devolución proporcional de insumos.
-  v_ing := (pos.upsert_ingredient(v_reg, '1234', null, 'Pisco', 'ml', 700, 'bottle')).id;
-  perform pos.restock_ingredient(v_reg, '1234', v_ing, 'reset', 1000);
-  perform pos.set_recipe(v_reg, '1234', v_pisco, jsonb_build_array(jsonb_build_object('ingredient_id', v_ing, 'qty_per_unit', 60)));
+  v_ing := (pos.inventory_save_item((select org_a from t_ids), null, 'Pisco', 'ml', 700, 'bottle')).id;
+  perform pos.inventory_receive((select location_id from pos.registers where id = v_reg), 'item', v_ing, 1000, 'set');
+  perform pos.catalog_set_recipe((select org_a from t_ids), v_pisco, jsonb_build_array(jsonb_build_object('stock_item_id', v_ing, 'qty', 60)));
   insert into t2 values ('reg', v_reg), ('ev', v_ev), ('cafe', v_cafe), ('pisco', v_pisco), ('ing', v_ing);
 
   -- F1. Libro de pagos: mixto = 2 filas aprobadas que suman el total.
@@ -46,12 +46,12 @@ do $$
 declare v_reg uuid := (select v from t2 where k = 'reg'); v_orders int; v_stock numeric; v_id uuid;
 begin
   select count(*) into v_orders from pos.orders where register_id = v_reg;
-  select stock_qty into v_stock from pos.menu_items where id = (select v from t2 where k = 'pisco')::uuid;
+  select stock_qty into v_stock from pos.product_locations where product_id = (select v from t2 where k = 'pisco')::uuid;
   v_id := pos.record_payment_attempt(v_reg, '1234', 25.00, 'declined', 'Tester');
   if v_id is null then raise exception 'FALLA F2: no se registró el rechazo'; end if;
   if (select order_id from pos.payments where id = v_id) is not null then raise exception 'FALLA F2: el rechazo quedó ligado a un pedido'; end if;
   if (select count(*) from pos.orders where register_id = v_reg) <> v_orders then raise exception 'FALLA F2: el rechazo creó un pedido'; end if;
-  if (select stock_qty from pos.menu_items where id = (select v from t2 where k = 'pisco')::uuid) <> v_stock then raise exception 'FALLA F2: el rechazo tocó stock'; end if;
+  if (select stock_qty from pos.product_locations where product_id = (select v from t2 where k = 'pisco')::uuid) <> v_stock then raise exception 'FALLA F2: el rechazo tocó stock'; end if;
   if pos.record_payment_attempt(v_reg, '0000', 25.00, 'declined') is not null then raise exception 'FALLA F2: aceptó un PIN incorrecto'; end if;
   begin
     perform pos.record_payment_attempt(v_reg, '1234', 25.00, 'approved');
@@ -128,14 +128,14 @@ declare v_reg uuid := (select v from t2 where k = 'reg'); v_ev uuid := (select v
         v_pisco uuid := (select v from t2 where k = 'pisco'); v_ing uuid := (select v from t2 where k = 'ing');
         v_o pos.orders; v_s0 numeric; v_i0 numeric;
 begin
-  select stock_qty into v_s0 from pos.menu_items where id = v_pisco;
-  select stock_qty into v_i0 from pos.ingredients where id = v_ing;
+  select stock_qty into v_s0 from pos.product_locations where product_id = v_pisco;
+  select qty into v_i0 from pos.stock_levels where stock_item_id = v_ing;
   v_o := pos.create_order(v_reg, '1234', v_ev, jsonb_build_array(jsonb_build_object('id', v_pisco, 'qty', 2)), 'card', 0, 20.00, 'Restock', null, null);
-  if (select stock_qty from pos.ingredients where id = v_ing) <> v_i0 - 120 then raise exception 'FALLA F6: venta no descontó el insumo'; end if;
+  if (select qty from pos.stock_levels where stock_item_id = v_ing) <> v_i0 - 120 then raise exception 'FALLA F6: venta no descontó el insumo'; end if;
   perform pos.refund_order(v_reg, '1234', v_o.id, '[{"index":0,"qty":1}]', 'card', 'changed_mind', '4321', true);
-  if (select stock_qty from pos.menu_items where id = v_pisco) <> v_s0 - 1 then raise exception 'FALLA F6: stock del producto tras devolver'; end if;
-  if (select stock_qty from pos.ingredients where id = v_ing) <> v_i0 - 60 then raise exception 'FALLA F6: insumo tras devolver: %', (select stock_qty from pos.ingredients where id = v_ing); end if;
-  if (select count(*) from pos.stock_movements where type = 'refund_return' and (menu_item_id = v_pisco or ingredient_id = v_ing)) <> 2 then
+  if (select stock_qty from pos.product_locations where product_id = v_pisco) <> v_s0 - 1 then raise exception 'FALLA F6: stock del producto tras devolver'; end if;
+  if (select qty from pos.stock_levels where stock_item_id = v_ing) <> v_i0 - 60 then raise exception 'FALLA F6: insumo tras devolver: %', (select qty from pos.stock_levels where stock_item_id = v_ing); end if;
+  if (select count(*) from pos.inventory_movements where type = 'refund_return' and (product_id = v_pisco or stock_item_id = v_ing)) <> 2 then
     raise exception 'FALLA F6: movimientos refund_return';
   end if;
   raise notice 'OK F6: devolución de stock proporcional';
